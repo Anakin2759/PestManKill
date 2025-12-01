@@ -16,10 +16,10 @@
  */
 #pragma once
 #include <entt/entt.hpp>
-#include "src/components/Events.h"
-#include "src/context/GameContext.h"
-#include "src/view/App.h"
+#include "src/server/components/Events.h"
+#include "src/server/context/GameContext.h"
 #include <asio.hpp>
+
 class ViewSystem
 {
 public:
@@ -40,8 +40,7 @@ private:
                    [this]()
                    {
                        m_context->logger->info("界面展示");
-                       App mainWindow("sss", DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT);
-                       mainWindow.run();
+
                    });
     };
     void onCloseWindow([[maybe_unused]] events::CloseWindow event)

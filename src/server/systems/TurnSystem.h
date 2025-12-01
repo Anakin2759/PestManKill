@@ -17,8 +17,8 @@
 
 #pragma once
 #include <entt/entt.hpp>
-#include "src/context/GameContext.h"
-#include "src/components/Events.h"
+#include "src/server/context/GameContext.h"
+#include "src/server/components/Events.h"
 
 class TurnSystem
 {
@@ -84,6 +84,10 @@ private:
             default:
                 break;
         }
+    };
+
+    void onProceedToNextPhase() {
+        // 实现回合阶段的推进逻辑
     };
 
     GameContext* m_context;

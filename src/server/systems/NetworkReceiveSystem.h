@@ -1,11 +1,11 @@
 /**
  * ************************************************************************
  *
- * @file PlayerSystem.h
+ * @file NetworkReceiveSystem.h
  * @author AnakinLiu (azrael2759@qq.com)
- * @date 2025-11-25
+ * @date 2025-12-01
  * @version 0.1
- * @brief
+ * @brief 基于UDP的网络消息接收系统
  *
  * ************************************************************************
  * @copyright Copyright (c) 2025 AnakinLiu
@@ -16,14 +16,17 @@
 #pragma once
 #include <entt/entt.hpp>
 #include "src/server/context/GameContext.h"
-#include "src/server/components/Events.h"
-class PlayerSystem
+#include <asio.hpp>
+
+class NetworkReceiveSystem
 {
 public:
-    explicit PlayerSystem(GameContext& context) : m_context(&context) {};
+    explicit NetworkReceiveSystem(GameContext& context) : m_context(&context) {};
     void registerEvents() {};
     void unregisterEvents() {};
 
 private:
+
+
     GameContext* m_context;
 };

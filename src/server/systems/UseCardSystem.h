@@ -15,10 +15,10 @@
 
 #pragma once
 #include <entt/entt.hpp>
-#include "src/shared/components/Character.h"
+#include "src/server/components/Character.h"
 #include "src/server/context/GameContext.h"
-#include "src/shared/components/Events.h"
-#include "src/shared/components/Card.h"
+#include "src/server/components/Events.h"
+#include "src/server/components/Card.h"
 
 class UseCardSystem
 {

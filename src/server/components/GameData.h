@@ -1,9 +1,9 @@
 /**
  * ************************************************************************
  *
- * @file PlayerSystem.h
+ * @file GameData.h
  * @author AnakinLiu (azrael2759@qq.com)
- * @date 2025-11-25
+ * @date 2025-11-19
  * @version 0.1
  * @brief
  *
@@ -14,16 +14,17 @@
  */
 
 #pragma once
+#include <cstdint>
+#include <entt/entity/fwd.hpp>
 #include <entt/entt.hpp>
-#include "src/server/context/GameContext.h"
-#include "src/server/components/Events.h"
-class PlayerSystem
-{
-public:
-    explicit PlayerSystem(GameContext& context) : m_context(&context) {};
-    void registerEvents() {};
-    void unregisterEvents() {};
+#include "src/shared/common/Common.h"
 
-private:
-    GameContext* m_context;
+constexpr static int RESPONSE_TIME = 10; // 默认响应时间10秒
+struct GameData
+{
+    TurnPhase currentPhase = TurnPhase::START;
+    GameMode mode = GameMode::CHANLLENGE_PEST;
+    entt::entity currentPlayer = entt::null;
+    uint32_t round = 0;
+    uint8_t responseTime = RESPONSE_TIME;
 };

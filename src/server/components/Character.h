@@ -18,7 +18,7 @@
 #include <string>
 #include <cstdint>
 #include <entt/entt.hpp>
-#include "../common/Common.h"
+#include "src/shared/common/Common.h"
 
 struct MetaCharacterInfo
 {

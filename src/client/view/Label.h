@@ -14,19 +14,15 @@
  */
 
 #pragma once
-#include "src/view/AWidget.h"
+#include "Widget.h"
 #include <string>
+namespace ui
+{
 // 标签组件
-class ALabel : public AWidget
+class Label : public Widget
 {
 public:
-    explicit ALabel(std::string text) : m_text(std::move(text)) {}
-
-    void render(const ImVec2& position, const ImVec2& size) override
-    {
-        ImGui::SetCursorPos(position);
-        ImGui::TextUnformatted(m_text.c_str());
-    }
+    explicit Label(std::string text) : m_text(std::move(text)) {}
 
     ImVec2 calculateSize() override
     {
@@ -37,6 +33,14 @@ public:
         return ImGui::CalcTextSize(m_text.c_str());
     }
 
+protected:
+    void onRender(const ImVec2& position, const ImVec2& /*size*/) override
+    {
+        ImGui::SetCursorPos(position);
+        ImGui::TextUnformatted(m_text.c_str());
+    }
+
 private:
     std::string m_text;
 };
+} // namespace ui

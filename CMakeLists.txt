@@ -33,45 +33,51 @@ else()
     message(STATUS "clang-tidy integration disabled (ENABLE_CLANG_TIDY=OFF)")
 endif()
 
-set(SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp"
-)
-
+# Build SDL_image as static library
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 add_subdirectory(third_party/mimalloc)
 add_subdirectory(third_party/entt)
 add_subdirectory(third_party/json)
 add_subdirectory(third_party/spdlog)
 add_subdirectory(third_party/asio)
 add_subdirectory(third_party/SDL)
+
+add_subdirectory(third_party/stb)
+
 add_subdirectory(third_party/imgui)
 add_subdirectory(third_party/abseil-cpp)
 
 
 
-set(EXET_NAME PestManKill)
-add_executable(${EXET_NAME} ${SOURCES})
+add_subdirectory(src/client)
+add_subdirectory(src/server)
 
-target_compile_options(${EXET_NAME} PRIVATE
-    # GCC
-    $<$<AND:$<CXX_COMPILER_ID:GNU>,$<CONFIG:Debug>>:-Wall -Wextra -Wpedantic -O0 -g>
-    $<$<AND:$<CXX_COMPILER_ID:GNU>,$<CONFIG:Release>>:-Wall -O3 -DNDEBUG>
+# 自动嵌入函数
+function(embed_resource INPUT_FILE OUTPUT_HEADER)
+    add_custom_command(
+        OUTPUT  ${OUTPUT_HEADER}
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/embedded
+        COMMAND xxd -i ${INPUT_FILE} > ${OUTPUT_HEADER}
+        DEPENDS ${INPUT_FILE}
+        COMMENT "Embedding resource: ${INPUT_FILE}"
+    )
+endfunction()
 
-    # Clang
-    $<$<AND:$<CXX_COMPILER_ID:Clang>,$<CONFIG:Debug>>:-Wall -Wextra -Wpedantic -O0 -g>
-    $<$<AND:$<CXX_COMPILER_ID:Clang>,$<CONFIG:Release>>:-Wall -O3 -DNDEBUG>
+# 生成资源头文件目录
+set(EMBED_DIR ${CMAKE_CURRENT_BINARY_DIR}/embedded)
 
-    # MSVC
-    $<$<AND:$<CXX_COMPILER_ID:MSVC>,$<CONFIG:Debug>>:/W4 /Od /Zi>
-    $<$<AND:$<CXX_COMPILER_ID:MSVC>,$<CONFIG:Release>>:/O2 /DNDEBUG>
-)
-target_include_directories(${EXET_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-
-
-
-target_link_libraries(${EXET_NAME} PRIVATE mimalloc-static asio::asio spdlog::spdlog_header_only  SDL3::SDL3 imgui::imgui  EnTT::EnTT nlohmann_json::nlohmann_json absl::base absl::memory absl::strings)
-
-# Optional: install rule
-install(TARGETS ${EXET_NAME} 
-    RUNTIME DESTINATION bin
+# 要嵌入的资源
+set(ASSETS
+    ${CMAKE_SOURCE_DIR}/assets/icon.png
+    ${CMAKE_SOURCE_DIR}/assets/card_back.png
 )
 
+# 存放生成的头文件
+set(EMBED_HEADERS "")
+
+foreach(asset ${ASSETS})
+    get_filename_component(name ${asset} NAME)
+    set(header ${EMBED_DIR}/${name}.h)
+    embed_resource(${asset} ${header})
+    list(APPEND EMBED_HEADERS ${header})
+endforeach()
