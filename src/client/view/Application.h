@@ -19,6 +19,7 @@
 #include "Layout.h"
 #include "Label.h"
 #include "Button.h"
+#include "Image.h"
 #include <entt/entt.hpp>
 #include <iostream>
 namespace ui
@@ -93,24 +94,30 @@ protected:
         // 创建主布局
         auto mainLayout = std::make_shared<VBoxLayout>();
         mainLayout->setBackgroundEnabled(true);
+        // NOLINTBEGIN
         mainLayout->setBackgroundColor(ImVec4(0.15F, 0.12F, 0.10F, 1.0F)); // 木桌背景色
         mainLayout->setSpacing(5);
         mainLayout->setMargins(10, 10, 10, 10);
+        // NOLINTEND
 
         // ========== 顶部区域：对手玩家 ==========
         auto topOpponentsLayout = std::make_shared<HBoxLayout>();
         topOpponentsLayout->setBackgroundEnabled(true);
+        // NOLINTBEGIN
         topOpponentsLayout->setBackgroundColor(ImVec4(0.25F, 0.20F, 0.15F, 0.8F));
         topOpponentsLayout->setSpacing(15);
+        // NOLINTEND
 
         // 添加3个对手
         for (int i = 0; i < 3; ++i)
         {
             auto opponentCard = std::make_shared<VBoxLayout>();
             opponentCard->setBackgroundEnabled(true);
+            // NOLINTBEGIN
             opponentCard->setBackgroundColor(ImVec4(0.35F, 0.25F, 0.20F, 0.9F));
             opponentCard->setFixedSize(120, 160);
             opponentCard->setMargins(8, 8, 8, 8);
+            // NOLINTEND
 
             opponentCard->addWidget(std::make_shared<Label>("玩家" + std::to_string(i + 2)));
             opponentCard->addWidget(std::make_shared<Label>("[红桃] HP: 4/4"));
@@ -122,15 +129,18 @@ protected:
 
         // ========== 中间区域：游戏主区域 ==========
         auto middleLayout = std::make_shared<HBoxLayout>();
+        // NOLINTNEXTLINE
         middleLayout->setSpacing(10);
 
         // 左侧：牌堆和弃牌堆
         auto leftSideLayout = std::make_shared<VBoxLayout>();
         leftSideLayout->setBackgroundEnabled(true);
+        // NOLINTBEGIN
         leftSideLayout->setBackgroundColor(ImVec4(0.30F, 0.22F, 0.15F, 0.85F));
         leftSideLayout->setFixedSize(150, 0);
         leftSideLayout->setMargins(10, 10, 10, 10);
         leftSideLayout->setSpacing(10);
+        // NOLINTEND
 
         auto deckArea = std::make_shared<VBoxLayout>();
         deckArea->setBackgroundEnabled(true);
@@ -153,16 +163,26 @@ protected:
         // 中间：战斗和判定区
         auto centerArea = std::make_shared<VBoxLayout>();
         centerArea->setBackgroundEnabled(true);
+        // NOLINTNEXTLINE
         centerArea->setBackgroundColor(ImVec4(0.20F, 0.25F, 0.20F, 0.6F));
         centerArea->setSpacing(8);
+        // NOLINTNEXTLINE
         centerArea->setMargins(15, 15, 15, 15);
 
         // 判定区
         auto judgeArea = std::make_shared<VBoxLayout>();
         judgeArea->setBackgroundEnabled(true);
+        // NOLINTNEXTLINE
         judgeArea->setBackgroundColor(ImVec4(0.3F, 0.2F, 0.25F, 0.7F));
         judgeArea->addWidget(std::make_shared<Label>("判定区"));
         judgeArea->addWidget(std::make_shared<Label>("当前回合: 刘备"));
+
+        // 添加图片示例 - 使用嵌入的资源
+        // auto testImage = std::make_shared<Image>();
+        // testImage->setImageFromMemory(embedded_1, embedded_1_len);
+        // testImage->setFixedSize(200, 150);
+        // judgeArea->addWidget(testImage);
+
         judgeArea->addStretch(1);
 
         // 战斗信息区

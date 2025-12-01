@@ -1,9 +1,12 @@
 set(EXET_NAME PestManKillClient)
+
+# 源文件
 set(SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/main.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/view/Image.cpp"
 )
+
 add_executable(${EXET_NAME} ${SOURCES})
+
 
 target_compile_options(${EXET_NAME} PRIVATE
     # GCC
@@ -21,6 +24,7 @@ target_compile_options(${EXET_NAME} PRIVATE
 target_include_directories(${EXET_NAME} PRIVATE 
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}
+    ${CMAKE_BINARY_DIR}/embedded  # 添加嵌入资源头文件目录
 )
 
 target_link_libraries(${EXET_NAME} PRIVATE 

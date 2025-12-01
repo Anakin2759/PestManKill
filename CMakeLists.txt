@@ -47,37 +47,50 @@ add_subdirectory(third_party/stb)
 add_subdirectory(third_party/imgui)
 add_subdirectory(third_party/abseil-cpp)
 
-
-
-add_subdirectory(src/client)
-add_subdirectory(src/server)
-
-# 自动嵌入函数
-function(embed_resource INPUT_FILE OUTPUT_HEADER)
-    add_custom_command(
-        OUTPUT  ${OUTPUT_HEADER}
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/embedded
-        COMMAND xxd -i ${INPUT_FILE} > ${OUTPUT_HEADER}
-        DEPENDS ${INPUT_FILE}
-        COMMENT "Embedding resource: ${INPUT_FILE}"
-    )
-endfunction()
+# ==================== 资源嵌入 ====================
+# 必须在 add_subdirectory(src/client) 之前处理
 
 # 生成资源头文件目录
 set(EMBED_DIR ${CMAKE_CURRENT_BINARY_DIR}/embedded)
+file(MAKE_DIRECTORY ${EMBED_DIR})
 
 # 要嵌入的资源
 set(ASSETS
-    ${CMAKE_SOURCE_DIR}/assets/icon.png
-    ${CMAKE_SOURCE_DIR}/assets/card_back.png
+    ${CMAKE_SOURCE_DIR}/assets/1.jpeg
 )
 
 # 存放生成的头文件
 set(EMBED_HEADERS "")
 
+# 自动嵌入函数 - 使用 CMake 脚本生成 C 数组头文件
+function(embed_resource INPUT_FILE OUTPUT_HEADER VAR_NAME)
+    add_custom_command(
+        OUTPUT ${OUTPUT_HEADER}
+        COMMAND ${CMAKE_COMMAND} 
+            -DINPUT_FILE=${INPUT_FILE}
+            -DOUTPUT_HEADER=${OUTPUT_HEADER}
+            -DVAR_NAME=${VAR_NAME}
+            -P ${CMAKE_SOURCE_DIR}/cmake/embed_resource.cmake
+        DEPENDS ${INPUT_FILE}
+        COMMENT "Embedding resource: ${INPUT_FILE}"
+        VERBATIM
+    )
+endfunction()
+
 foreach(asset ${ASSETS})
     get_filename_component(name ${asset} NAME)
+    get_filename_component(name_we ${asset} NAME_WE)
     set(header ${EMBED_DIR}/${name}.h)
-    embed_resource(${asset} ${header})
+    # 生成合法的 C 变量名（替换特殊字符为下划线）
+    string(REGEX REPLACE "[^a-zA-Z0-9]" "_" var_name ${name})
+    embed_resource(${asset} ${header} ${var_name})
     list(APPEND EMBED_HEADERS ${header})
 endforeach()
+
+# 创建一个自定义目标来确保资源被生成
+add_custom_target(EmbeddedResources DEPENDS ${EMBED_HEADERS})
+
+# ==================== 子项目 ====================
+
+add_subdirectory(src/client)
+add_subdirectory(src/server)
