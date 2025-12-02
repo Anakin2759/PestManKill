@@ -29,13 +29,15 @@ public:
     explicit Button(std::string text, std::function<void()> onClick = nullptr)
         : m_text(std::move(text)), m_onClick(std::move(onClick))
     {
+        static size_t idCounter = 0;
+        m_uniqueId = "##Button_" + std::to_string(idCounter++);
     }
 
     ImVec2 calculateSize() override
     {
         if (isFixedSize())
         {
-            return {getMinWidth(), getMinHeight()};
+            return Widget::calculateSize();
         }
         constexpr float BUTTON_PADDING_X = 20.0F;
         constexpr float BUTTON_PADDING_Y = 10.0F;
@@ -47,7 +49,8 @@ protected:
     void onRender(const ImVec2& position, const ImVec2& size) override
     {
         ImGui::SetCursorPos(position);
-        if (ImGui::Button(m_text.c_str(), size))
+        std::string label = m_text + m_uniqueId;
+        if (ImGui::Button(label.c_str(), size))
         {
             if (m_onClick)
             {
@@ -58,6 +61,7 @@ protected:
 
 private:
     std::string m_text;
+    std::string m_uniqueId;
     std::function<void()> m_onClick;
 };
 } // namespace ui

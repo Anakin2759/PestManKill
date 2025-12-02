@@ -58,9 +58,9 @@ struct BasicCardTypeTag
     BasicCardType type;
 };
 
-struct TrickCardTypeTag
+struct StrategyCardTypeTag
 {
-    TrickCardType type;
+    StrategyCardType type;
 };
 
 struct EquipCardTypeTag
@@ -97,16 +97,16 @@ inline entt::entity CreateBasicCard(entt::registry& reg,
     return ent;
 }
 
-inline entt::entity CreateTrickCard(entt::registry& reg,
-                                    const MetaCardInfo& metaInfo,
-                                    const CardCost& cost,
-                                    const CardTarget& target,
-                                    const CardPointAndSuit& pointAndSuit,
-                                    const CardEffect& effect,
-                                    TrickCardType trickType)
+inline entt::entity CreateStrategyCard(entt::registry& reg,
+                                       const MetaCardInfo& metaInfo,
+                                       const CardCost& cost,
+                                       const CardTarget& target,
+                                       const CardPointAndSuit& pointAndSuit,
+                                       const CardEffect& effect,
+                                       StrategyCardType strategyType)
 {
     auto ent = CreateCard(reg, metaInfo, cost, target, pointAndSuit, effect);
-    reg.emplace<TrickCardTypeTag>(ent, TrickCardTypeTag{trickType});
+    reg.emplace<StrategyCardTypeTag>(ent, StrategyCardTypeTag{strategyType});
     return ent;
 }
 
@@ -135,7 +135,7 @@ inline entt::entity CreateAttackCard(entt::registry& reg,
     target.maxTargets = 1;
     target.range = 1; // 近战攻击
 
-    return CreateBasicCard(reg, metaInfo, cost, target, pointAndSuit, effect, BasicCardType::ATTACK);
+    return CreateBasicCard(reg, metaInfo, cost, target, pointAndSuit, effect, BasicCardType::STRIKE);
 }
 
 inline entt::entity CreateDodgeCard(entt::registry& reg,
@@ -178,4 +178,19 @@ inline entt::entity CreateAlcoholCard(entt::registry& reg,
     target.range = 0; // 无距离限制
 
     return CreateBasicCard(reg, metaInfo, cost, target, pointAndSuit, effect, BasicCardType::ALCOHOL);
+}
+
+inline entt::entity CreateFireAttackCard(entt::registry& reg,
+                                         const MetaCardInfo& metaInfo,
+                                         const CardCost& cost,
+                                         const CardPointAndSuit& pointAndSuit,
+                                         const CardEffect& effect)
+{
+    CardTarget target{};
+    target.needTarget = true;
+    target.minTargets = 1;
+    target.maxTargets = 1;
+    target.range = 0;
+
+    return CreateStrategyCard(reg, metaInfo, cost, target, pointAndSuit, effect, StrategyCardType::FIRE_ATTACK);
 }

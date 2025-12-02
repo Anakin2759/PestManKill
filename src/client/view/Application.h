@@ -19,6 +19,7 @@
 #include "Layout.h"
 #include "Label.h"
 #include "Button.h"
+#include "ListArea.h"
 #include <entt/entt.hpp>
 #include <array>
 #include <stdexcept>
@@ -337,18 +338,23 @@ protected:
 
         auto label = std::make_shared<Label>("手牌 (5张)");
         handCards->addWidget(label);
-        handCards->addWidget(createCardsRow(), 1);
+        handCards->addWidget(createCardsListArea(), 1);
         return handCards;
     }
 
-    static std::shared_ptr<Widget> createCardsRow()
+    static std::shared_ptr<Widget> createCardsListArea()
     {
         constexpr int CARD_WIDTH = 95;
         constexpr int CARD_HEIGHT = 135;
+        constexpr float CARD_SPACING = 10.0F;
 
-        auto cardsRow = std::make_shared<HBoxLayout>();
-        cardsRow->setSpacing(10);
+        auto cardsList = std::make_shared<ui::ListArea>(ListDirection::HORIZONTAL);
+        cardsList->setAlignment(ListAlignment::START); // 左对齐
+        cardsList->setItemSpacing(5.0F);               // 设置卡牌间距
+        cardsList->setScrollbarEnabled(true);          // 启用滚动条
+        cardsList->setMargins(5.0F);                   // 设置边距
 
+        // 创建卡牌按钮
         auto card1 = std::make_shared<Button>("♠杀");
         card1->setFixedSize(CARD_WIDTH, CARD_HEIGHT);
         auto card2 = std::make_shared<Button>("♥桃");
@@ -359,14 +365,24 @@ protected:
         card4->setFixedSize(CARD_WIDTH, CARD_HEIGHT);
         auto card5 = std::make_shared<Button>("♠无懈");
         card5->setFixedSize(CARD_WIDTH, CARD_HEIGHT);
+        auto card8 = std::make_shared<Button>("♠无懈");
+        card8->setFixedSize(CARD_WIDTH, CARD_HEIGHT);
+        auto card6 = std::make_shared<Button>("♠无懈");
+        card6->setFixedSize(CARD_WIDTH, CARD_HEIGHT);
+        auto card7 = std::make_shared<Button>("♠无懈");
+        card7->setFixedSize(CARD_WIDTH, CARD_HEIGHT);
 
-        cardsRow->addWidget(card1);
-        cardsRow->addWidget(card2);
-        cardsRow->addWidget(card3);
-        cardsRow->addWidget(card4);
-        cardsRow->addWidget(card5);
-        cardsRow->addStretch(1);
-        return cardsRow;
+        // 添加到ListArea
+        cardsList->addWidget(card1);
+        cardsList->addWidget(card2);
+        cardsList->addWidget(card3);
+        cardsList->addWidget(card4);
+        cardsList->addWidget(card5);
+        cardsList->addWidget(card6);
+        cardsList->addWidget(card7);
+        cardsList->addWidget(card8);
+
+        return cardsList;
     }
 
     virtual void onGui()

@@ -22,7 +22,7 @@ enum class TriggerMoment : uint8_t
     DURING
 };
 
-    enum class GameMode : uint8_t
+enum class GameMode : uint8_t
 {
     CLASSIC_FIVE,
     CLASSIC_EIGHT,
@@ -66,20 +66,27 @@ enum class SkillType : uint8_t
 enum class CardType : uint8_t
 {
     BASIC,
-    TRICK,
+    STRATEGY,
     EQUIP
 };
 
 enum class BasicCardType : uint8_t
 {
-    ATTACK,  // 攻击
+    STRIKE,  // 攻击
     DODGE,   // 闪避
     ALCOHOL, // 酒
     PEACH,   // 桃子
 };
 
-enum class TrickCardType : uint8_t
+enum class StrategyCardType : uint8_t
 {
+    FIRE_ATTACK,           // 火攻
+    DUEL,                  // 决斗
+    SNATCH,                // 顺手牵羊
+    DISMANTLE,             // 过河拆桥
+    LIGHTNING,             // 闪电
+    SOMETHING_FOR_NOTHING, // 无中生有
+    WARD                   // 无懈可击
 
 };
 
@@ -93,8 +100,9 @@ enum class EquipCardType : uint8_t
 
 enum class StatusType : uint8_t
 {
-    FLIP, // 翻面
-    TAP   // 横置
+    FLIP,   // 翻面
+    TAP,    // 横置
+    DRUNKED // 醉酒
 };
 
 enum class SuitType : uint8_t

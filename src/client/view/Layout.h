@@ -7,6 +7,11 @@
  * @version 0.1
  * @brief 布局容器定义
   模拟 Qt 的布局容器 QLayout、QHBoxLayout、QVBoxLayout
+
+  使用示例：
+  1. addStretch() - 添加弹性空间（推荐用于简单场景）
+  2. addWidget(createHorizontalSpacer()) - 添加 Spacer 组件（更灵活）
+  3. addWidget(createFixedSpacer(20, 10)) - 添加固定尺寸空白
  *
  * ************************************************************************
  * @copyright Copyright (c) 2025 AnakinLiu

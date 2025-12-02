@@ -24,6 +24,7 @@
 #include "src/client/utils/Logger.h"
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <SDL3/SDL.h>
 #include <stb_image.h>
 #include <imgui.h>
@@ -41,7 +42,7 @@ public:
         STRETCH // 拉伸填充容器，可能变形
     };
 
-    explicit Image(SDL_Renderer* renderer, const std::string& imagePath = "", ScaleMode scaleMode = ScaleMode::FIT)
+    explicit Image(SDL_Renderer* renderer, std::string_view imagePath = "", ScaleMode scaleMode = ScaleMode::FIT)
         : m_renderer(renderer), m_imagePath(imagePath), m_scaleMode(scaleMode)
     {
         if (!m_imagePath.empty())

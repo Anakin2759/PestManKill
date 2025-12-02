@@ -50,13 +50,6 @@ public:
 
     void unsetFixedSize() { m_useFixedSize = false; }
 
-    void reSize(float width, float height)
-    {
-        m_fixedWidth = width;
-        m_fixedHeight = height;
-        m_useFixedSize = true;
-    }
-
     void setPosition(float posX, float posY)
     {
         m_positionX = posX;
@@ -201,7 +194,7 @@ public:
     {
         if (m_useFixedSize)
         {
-            return ImVec2(m_fixedWidth, m_fixedHeight);
+            return {m_fixedWidth, m_fixedHeight};
         }
 
         // 如果有子 Widget，则计算总高度和最大宽度

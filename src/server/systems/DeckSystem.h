@@ -44,7 +44,7 @@ private:
     /**
      * @brief 初始化牌堆
      */
-    void onInitDeck(events::ShuffleDeck)
+    void onInitDeck(events::ShuffleDeck event)
     {
         initDeck();
         onShuffleDeck({});
