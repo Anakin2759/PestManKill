@@ -1,29 +1,15 @@
 /**
  * ************************************************************************
  *
- * @file PlayerSystem.h
+ * @file Arrow.h
  * @author AnakinLiu (azrael2759@qq.com)
- * @date 2025-11-25
+ * @date 2025-12-02
  * @version 0.1
- * @brief
+ * @brief 箭头特效组件定义
+    从一个角色的image组件指向另一个角色的image组件 起点终点取二者最小距离线段
  *
  * ************************************************************************
  * @copyright Copyright (c) 2025 AnakinLiu
  * For study and research only, no reprinting.
  * ************************************************************************
  */
-
-#pragma once
-#include <entt/entt.hpp>
-#include "src/server/context/GameContext.h"
-#include "src/server/events/Events.h"
-class PlayerSystem
-{
-public:
-    explicit PlayerSystem(GameContext& context) : m_context(&context) {};
-    void registerEvents() {};
-    void unregisterEvents() {};
-
-private:
-    GameContext* m_context;
-};

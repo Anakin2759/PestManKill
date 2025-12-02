@@ -15,9 +15,50 @@
 
 #pragma once
 #include <entt/entt.hpp>
+#include <string>
+#include <cstdint>
+#include "src/shared/common/Common.h"
 
+constexpr uint32_t DEFAULT_PLAYER_ID = 0xFFFFFFFF;
 struct MetaPlayerInfo
 {
-    std::string playerName;
-    uint32_t playerID;
+    std::string playerName = "000";
+    uint32_t playerID = DEFAULT_PLAYER_ID;
 };
+
+struct CharacterInfo
+{
+    entt::entity characterCard = entt::null; // 角色卡牌实体
+};
+
+struct HandCards
+{
+    std::vector<entt::entity> handCards;
+};
+
+struct Equipments
+{
+    entt::entity weapon = entt::null;
+    entt::entity armor = entt::null;
+    entt::entity attackhorse = entt::null;
+    entt::entity defensehorse = entt::null;
+};
+
+struct Identity
+{
+    IdentityType type = IdentityType::MEMBER;
+};
+
+inline entt::entity CreatePlayer(entt::registry& registry,
+                                 MetaPlayerInfo& metaInfo,
+                                 CharacterInfo& characterInfo,
+                                 HandCards& handCards,
+                                 Equipments& equipments)
+{
+    entt::entity player = registry.create();
+    registry.emplace<MetaPlayerInfo>(player, metaInfo);
+    registry.emplace<CharacterInfo>(player, characterInfo);
+    registry.emplace<HandCards>(player, handCards);
+    registry.emplace<Equipments>(player, equipments);
+    return player;
+}

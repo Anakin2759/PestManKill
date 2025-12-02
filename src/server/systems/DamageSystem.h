@@ -17,7 +17,7 @@
 
 #include <entt/entt.hpp>
 #include "src/server/context/GameContext.h"
-#include "src/server/components/Events.h"
+#include "src/server/events/Events.h"
 #include "src/server/components/Character.h"
 class DamageSystem
 {

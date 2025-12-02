@@ -15,14 +15,15 @@
 #pragma once
 #include <entt/entt.hpp>
 #include "entt/entity/fwd.hpp"
-#include "src/context/GameContext.h"
-#include "src/components/Deck.h"
-#include "src/components/Events.h"
-#include "src/components/Character.h"
-#include "src/components/Card.h"
+#include "src/server/context/GameContext.h"
+#include "src/server/components/Deck.h"
+#include "src/server/events/Events.h"
+#include "src/server/components/Player.h"
+#include "src/server/components/Card.h"
 #include <algorithm>
 #include <random>
-
+#include "src/server/events/DeckEvents.h"
+#include "src/server/events/GameFlowEvents.h"
 class DeckSystem
 {
 public:
@@ -34,21 +35,23 @@ public:
     DeckSystem(DeckSystem&&) = default;
     DeckSystem& operator=(DeckSystem&& other) = delete;
     ~DeckSystem() = default;
-    void registerEvents() {
-
-    };
+    void registerEvents() { initDeck(); };
     void unregisterEvents() {
 
     };
 
 private:
-    void onInitDeck()
+    /**
+     * @brief 初始化牌堆
+     */
+    void onInitDeck(events::ShuffleDeck)
     {
-        // 初始化牌堆
-
-        // 洗牌
+        initDeck();
         onShuffleDeck({});
     }
+    /**
+     * @brief 处理卡牌弃置事件
+     */
     void onCardDiscarded(events::CardDiscarded event)
     {
         auto& [player, cards, count] = event;
@@ -75,38 +78,41 @@ private:
         checkDiscarded(attackhorse, cardSet);
         checkDiscarded(defensehorse, cardSet);
 
-        m_Deck.processingArea.insert(m_Deck.processingArea.end(), cards.begin(), cards.end());
+        m_deck.processingArea.insert(m_deck.processingArea.end(), cards.begin(), cards.end());
     }
 
     void onProcessFinished()
     {
-        m_Deck.discardPile.insert(m_Deck.discardPile.end(), m_Deck.processingArea.begin(), m_Deck.processingArea.end());
-        m_Deck.processingArea.clear();
+        m_deck.discardPile.insert(m_deck.discardPile.end(), m_deck.processingArea.begin(), m_deck.processingArea.end());
+        m_deck.processingArea.clear();
     }
 
     void onShuffleDeck(events::ShuffleDeck event)
     {
         std::random_device rdd;
         std::mt19937 gen(rdd());
-        std::shuffle(m_Deck.discardPile.begin(), m_Deck.discardPile.end(), gen);
-        m_Deck.drawPile.insert(m_Deck.drawPile.end(), m_Deck.discardPile.begin(), m_Deck.discardPile.end());
-        m_Deck.discardPile.clear();
+        std::shuffle(m_deck.discardPile.begin(), m_deck.discardPile.end(), gen);
+        m_deck.drawPile.insert(m_deck.drawPile.end(), m_deck.discardPile.begin(), m_deck.discardPile.end());
+        m_deck.discardPile.clear();
     }
-
+    /**
+     * @brief 发牌
+     * @param event 发牌事件，包含玩家实体和发牌数量
+     */
     void onDealCards(events::DealCards event)
     {
         auto& [player, count] = event;
         auto& handCards = m_context->registry.get<HandCards>(player).handCards;
 
-        if (m_Deck.drawPile.empty() or m_Deck.drawPile.size() < count)
+        if (m_deck.drawPile.empty() or m_deck.drawPile.size() < count)
         {
             // 如果摸牌堆为空，触发洗牌事件
             m_context->dispatcher.trigger<events::ShuffleDeck>();
         }
-        if (!m_Deck.drawPile.empty())
+        if (!m_deck.drawPile.empty())
         {
-            handCards.insert(handCards.end(), m_Deck.drawPile.begin(), m_Deck.drawPile.begin() + count);
-            m_Deck.drawPile.erase(m_Deck.drawPile.begin(), m_Deck.drawPile.begin() + count);
+            handCards.insert(handCards.end(), m_deck.drawPile.begin(), m_deck.drawPile.begin() + count);
+            m_deck.drawPile.erase(m_deck.drawPile.begin(), m_deck.drawPile.begin() + count);
             m_context->dispatcher.trigger<events::CardDrawn>(
                 {.player = player,
                  .cards = std::span<entt::entity>(handCards.end() - count, handCards.end()),
@@ -115,30 +121,76 @@ private:
         else
         {
             m_context->logger->warn("无法发牌，摸牌堆和弃牌堆均为空");
-            m_context->dispatcher.trigger<events::GameEnd>({"无法发牌，游戏结束"});
+            m_context->dispatcher.trigger<events::GameEnd>({.reason = "无法发牌，游戏结束"});
         }
     }
-
+    /**
+     * @brief 在摸牌堆中查找指定卡牌
+     * @param event 查找卡牌事件，包含卡牌名称、花色和点数
+     */
     void onFindCardInDrawPile(events::FindCardInDrawPile event)
     {
         m_findCard = entt::null;
         auto& [cardName, suitType, rank] = event;
         {
-            auto it1 = std::ranges::find_if(m_Deck.drawPile.begin(),
-                                            m_Deck.drawPile.end(),
+            auto it1 = std::ranges::find_if(m_deck.drawPile.begin(),
+                                            m_deck.drawPile.end(),
                                             [&](entt::entity card)
                                             {
                                                 auto& meta = m_context->registry.get<MetaCardInfo>(card);
                                                 return meta.name == cardName;
                                             });
-            if (it1 != m_Deck.drawPile.end())
+            if (it1 != m_deck.drawPile.end())
             {
                 m_findCard = *it1;
                 return;
             }
         }
     }
+
+    void onFindCardInHandCards(events::FindCardInHandCardsArea event)
+    {
+        m_findCard = entt::null;
+        auto& [cardName, suitType, rank] = event;
+        // 遍历所有玩家手牌区域
+        for (auto player : m_context->registry.view<HandCards>())
+        {
+            auto& handCards = m_context->registry.get<HandCards>(player).handCards;
+            {
+                auto it1 = std::ranges::find_if(handCards.begin(),
+                                                handCards.end(),
+                                                [&](entt::entity card)
+                                                {
+                                                    auto& meta = m_context->registry.get<MetaCardInfo>(card);
+                                                    return meta.name == cardName;
+                                                });
+                if (it1 != handCards.end())
+                {
+                    m_findCard = *it1;
+                    return;
+                }
+            }
+        }
+    }
+
+    void initDeck()
+    {
+        // 初始化牌堆，创建所有卡牌实体并加入摸牌堆
+        // 这里简化为只创建少量示例卡牌
+        auto& registry = m_context->registry;
+        m_deck.drawPile.clear();
+        m_deck.discardPile.clear();
+        m_deck.processingArea.clear();
+        // NOLINTNEXTLINE
+        for (int i = 0; i < 52; ++i)
+        {
+            entt::entity card = registry.create();
+            registry.emplace<MetaCardInfo>(card, MetaCardInfo{.name = "Card" + std::to_string(i + 1)});
+            m_deck.drawPile.push_back(card);
+        }
+        m_context->logger->info("牌堆初始化完成，包含 {} 张卡牌", m_deck.drawPile.size());
+    }
     GameContext* m_context;
-    Deck m_Deck;
+    Deck m_deck;
     entt::entity m_findCard{entt::null};
 };

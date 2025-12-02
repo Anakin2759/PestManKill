@@ -21,10 +21,12 @@ Checks: >
   -hicpp-avoid-c-arrays,
   -hicpp-no-array-decay,
   -hicpp-uppercase-literal-suffix,
+  -hicpp-braces-around-statements,
   -fuchsia-default-arguments-calls,
   -fuchsia-header-anon-namespaces,
   -fuchsia-multiple-inheritance,
   -misc-non-private-member-variables-in-classes,
+
 
 CheckOptions:
   # === Naming Conventions ===

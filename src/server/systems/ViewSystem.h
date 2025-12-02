@@ -16,7 +16,7 @@
  */
 #pragma once
 #include <entt/entt.hpp>
-#include "src/server/components/Events.h"
+#include "src/server/events/Events.h"
 #include "src/server/context/GameContext.h"
 #include <asio.hpp>
 
@@ -40,7 +40,6 @@ private:
                    [this]()
                    {
                        m_context->logger->info("界面展示");
-
                    });
     };
     void onCloseWindow([[maybe_unused]] events::CloseWindow event)

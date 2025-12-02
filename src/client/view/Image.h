@@ -10,7 +10,7 @@
   支持加载和显示图片
   支持设置图片缩放模式
   支持设置图片路径动态更新图片
-  基于SDL2_image实现图片加载
+  基于stb_image实现图片加载
   基于ImGui实现图片渲染
  *
  * ************************************************************************
@@ -21,6 +21,7 @@
 
 #pragma once
 #include "Widget.h"
+#include "src/client/utils/Logger.h"
 #include <cstdint>
 #include <string>
 #include <SDL3/SDL.h>
@@ -67,6 +68,11 @@ public:
 
     void setScaleMode(ScaleMode mode) { m_scaleMode = mode; }
 
+    [[nodiscard]] bool isLoaded() const { return m_texture != nullptr; }
+    [[nodiscard]] int getWidth() const { return m_width; }
+    [[nodiscard]] int getHeight() const { return m_height; }
+    [[nodiscard]] const std::string& getImagePath() const { return m_imagePath; }
+
     void onRender(const ImVec2& position, const ImVec2& size) override
     {
         if (m_texture == nullptr)
@@ -103,23 +109,29 @@ private:
     {
         freeTexture();
 
+        // 重置尺寸
+        m_width = 0;
+        m_height = 0;
+
         int channels{0};
         constexpr int REQUIRED_CHANNELS = 4;
         unsigned char* data = stbi_load(path.c_str(), &m_width, &m_height, &channels, REQUIRED_CHANNELS);
         if (data == nullptr)
         {
-            SDL_LogError(
-                SDL_LOG_CATEGORY_APPLICATION, "Failed to load image %s: %s", path.c_str(), stbi_failure_reason());
+            utils::LOG_ERROR("Failed to load image {}: {}", path, stbi_failure_reason());
+            m_width = 0;
+            m_height = 0;
             return false;
         }
 
-        // SDL3: 使用 SDL_CreateSurfaceFrom 替代 SDL_CreateRGBSurfaceWithFormatFrom
         SDL_Surface* surface =
             SDL_CreateSurfaceFrom(m_width, m_height, SDL_PIXELFORMAT_RGBA32, data, m_width * REQUIRED_CHANNELS);
         if (surface == nullptr)
         {
-            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to create SDL surface: %s", SDL_GetError());
+            utils::LOG_ERROR("Failed to create SDL surface for {}: {}", path, SDL_GetError());
             stbi_image_free(data);
+            m_width = 0;
+            m_height = 0;
             return false;
         }
 
@@ -129,45 +141,48 @@ private:
 
         if (m_texture == nullptr)
         {
-            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to create SDL texture: %s", SDL_GetError());
+            utils::LOG_ERROR("Failed to create SDL texture for {}: {}", path, SDL_GetError());
+            m_width = 0;
+            m_height = 0;
             return false;
         }
 
+        utils::LOG_INFO("Successfully loaded image: {} ({}x{})", path, m_width, m_height);
         return true;
     }
 
-    ImVec2 calculateDrawSize(const ImVec2& containerSize)
+    [[nodiscard]] ImVec2 calculateDrawSize(const ImVec2& containerSize) const
     {
-        if (m_texture == nullptr)
+        if (m_texture == nullptr || m_width <= 0 || m_height <= 0)
         {
-            return ImVec2(0, 0);
+            return {0.0F, 0.0F};
         }
 
-        auto width = static_cast<float>(m_width);
-        auto height = static_cast<float>(m_height);
+        const auto WIDTH = static_cast<float>(m_width);
+        const auto HEIGHT = static_cast<float>(m_height);
 
         switch (m_scaleMode)
         {
             case ScaleMode::NONE:
-                return ImVec2(width, height);
+                return {WIDTH, HEIGHT};
 
             case ScaleMode::FIT:
             {
-                float scale = std::min(containerSize.x / width, containerSize.y / height);
-                return ImVec2(width * scale, height * scale);
+                const float SCALE = std::min(containerSize.x / WIDTH, containerSize.y / HEIGHT);
+                return {WIDTH * SCALE, HEIGHT * SCALE};
             }
 
             case ScaleMode::FILL:
             {
-                float scale = std::max(containerSize.x / width, containerSize.y / height);
-                return ImVec2(width * scale, height * scale);
+                const float SCALE = std::max(containerSize.x / WIDTH, containerSize.y / HEIGHT);
+                return {WIDTH * SCALE, HEIGHT * SCALE};
             }
 
             case ScaleMode::STRETCH:
                 return containerSize;
 
             default:
-                return ImVec2(width, height);
+                return {WIDTH, HEIGHT};
         }
     }
 };

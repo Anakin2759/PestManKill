@@ -18,7 +18,6 @@
 #include <string>
 #include <functional>
 #include <entt/entt.hpp>
-#include <vector>
 #include "src/shared/common/Common.h"
 
 struct MetaCardInfo
@@ -124,58 +123,59 @@ inline entt::entity CreateEquipCard(entt::registry& reg,
     return ent;
 }
 
-inline std::vector<entt::entity> CreateStandardDeck(entt::registry& reg)
+inline entt::entity CreateAttackCard(entt::registry& reg,
+                                     const MetaCardInfo& metaInfo,
+                                     const CardCost& cost,
+                                     const CardPointAndSuit& pointAndSuit,
+                                     const CardEffect& effect)
 {
-    std::vector<entt::entity> deck;
+    CardTarget target{};
+    target.needTarget = true;
+    target.minTargets = 1;
+    target.maxTargets = 1;
+    target.range = 1; // 近战攻击
 
-    return deck;
+    return CreateBasicCard(reg, metaInfo, cost, target, pointAndSuit, effect, BasicCardType::ATTACK);
 }
 
-inline void FireAttackEffect(entt::entity user, std::span<entt::entity> target, entt::registry& reg) {
-    // 实现火攻效果的逻辑
-};
+inline entt::entity CreateDodgeCard(entt::registry& reg,
+                                    const MetaCardInfo& metaInfo,
+                                    const CardCost& cost,
+                                    const CardPointAndSuit& pointAndSuit,
+                                    const CardEffect& effect)
+{
+    CardTarget target{};
+    target.needTarget = false; // 闪不需要目标
 
-inline void DismantleEffect(entt::entity user, std::span<entt::entity> target, entt::registry& reg) {
-    // 实现过河拆桥效果的逻辑
-};
+    return CreateBasicCard(reg, metaInfo, cost, target, pointAndSuit, effect, BasicCardType::DODGE);
+}
 
-inline void SupplyEffect(entt::entity user, std::span<entt::entity> target, entt::registry& reg) {
-    // 实现借刀杀人效果的逻辑
-};
+inline entt::entity CreatePeachCard(entt::registry& reg,
+                                    const MetaCardInfo& metaInfo,
+                                    const CardCost& cost,
+                                    const CardPointAndSuit& pointAndSuit,
+                                    const CardEffect& effect)
+{
+    CardTarget target{};
+    target.needTarget = true;
+    target.minTargets = 1;
+    target.maxTargets = 1;
+    target.range = 0; // 无距离限制
 
-inline void DuelEffect(entt::entity user, std::span<entt::entity> target, entt::registry& reg) {
-    // 实现决斗效果的逻辑
-};
+    return CreateBasicCard(reg, metaInfo, cost, target, pointAndSuit, effect, BasicCardType::PEACH);
+}
 
-inline void PeachEffect(entt::entity user, std::span<entt::entity> target, entt::registry& reg) {
-    // 实现桃效果的逻辑
-};
+inline entt::entity CreateAlcoholCard(entt::registry& reg,
+                                      const MetaCardInfo& metaInfo,
+                                      const CardCost& cost,
+                                      const CardPointAndSuit& pointAndSuit,
+                                      const CardEffect& effect)
+{
+    CardTarget target{};
+    target.needTarget = true;
+    target.minTargets = 1;
+    target.maxTargets = 1;
+    target.range = 0; // 无距离限制
 
-inline void SlashEffect(entt::entity user, std::span<entt::entity> target, entt::registry& reg) {
-    // 实现杀效果的逻辑
-
-};
-
-inline void ThunderSlashEffect(entt::entity user, std::span<entt::entity> target, entt::registry& reg) {
-    // 实现雷杀效果的逻辑
-};
-
-inline void FireSlashEffect(entt::entity user, std::span<entt::entity> target, entt::registry& reg) {
-    // 实现火杀效果的逻辑
-};
-
-inline void AnalepticEffect(entt::entity user, std::span<entt::entity> target, entt::registry& reg) {
-    // 实现酒效果的逻辑
-};
-
-inline void NullificationEffect(entt::entity user, std::span<entt::entity> target, entt::registry& reg) {
-    // 实现无懈可击效果的逻辑
-};
-
-inline void PeachGardenEffect(entt::entity user, std::span<entt::entity> target, entt::registry& reg) {
-    // 实现桃园结义效果的逻辑
-};
-
-inline void StealEffect(entt::entity user, std::span<entt::entity> target, entt::registry& reg) {
-    // 实现顺手牵羊效果的逻辑
-};
+    return CreateBasicCard(reg, metaInfo, cost, target, pointAndSuit, effect, BasicCardType::ALCOHOL);
+}

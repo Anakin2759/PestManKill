@@ -1,12 +1,20 @@
 /**
  * ************************************************************************
- *
- * @file NetworkSendSystem.h
+ * 
+ * @file ListArea.h
  * @author AnakinLiu (azrael2759@qq.com)
- * @date 2025-12-01
+ * @date 2025-12-02
  * @version 0.1
- * @brief 基于UDP的网络消息发送系统
- *
+ * @brief 
+ * 列表区域组件定义
+    模拟 Qt 的列表组件 QListWidget
+    支持添加、删除、选择列表项
+    支持单选和多选模式
+    支持设置项高度和间距
+    基于ImGui实现列表渲染
+    可以横向或纵向排列
+    必要时组件才重叠
+    
  * ************************************************************************
  * @copyright Copyright (c) 2025 AnakinLiu
  * For study and research only, no reprinting.

@@ -32,12 +32,6 @@ struct Gender
     GenderType type;
 };
 
-struct Identity
-{
-    IdentityType type;
-    bool revealed = false; // 是否公开身份
-};
-
 struct Faction
 {
     FactionType type;
@@ -46,19 +40,6 @@ struct Faction
 struct Skills
 {
     std::vector<entt::entity> skillList;
-};
-
-struct HandCards
-{
-    std::vector<entt::entity> handCards;
-};
-
-struct Equipments
-{
-    entt::entity weapon = entt::null;
-    entt::entity armor = entt::null;
-    entt::entity attackhorse = entt::null;
-    entt::entity defensehorse = entt::null;
 };
 
 struct Attributes
@@ -71,6 +52,10 @@ struct Attributes
     uint8_t rank = 0;
     uint8_t attackTimes = 1;
     int32_t currentHealth = 4;
+    bool weaponAreaEnabled = true;
+    bool armorAreaEnabled = true;
+    bool attackhorseAreaEnabled = true;
+    bool defensehorseAreaEnabled = true;
     bool isAlive = true;
 };
 
@@ -86,21 +71,16 @@ struct StatusFlags
     std::vector<Status> statusList; // 角色状态列表
 };
 
-inline entt::entity CreateCharacter(entt::registry& reg,
-                                    const MetaCharacterInfo& info,
-                                    IdentityType identity,
-                                    FactionType faction,
-                                    const Skills& skills)
+inline entt::entity
+    CreateCharacter(entt::registry& reg, const MetaCharacterInfo& info, FactionType faction, const Skills& skills)
 {
     auto ent = reg.create();
 
     reg.emplace<MetaCharacterInfo>(ent, info);
-    reg.emplace<Identity>(ent, Identity{identity, false});
     reg.emplace<Faction>(ent, Faction{faction});
     reg.emplace<Attributes>(ent, Attributes{});
     reg.emplace<StatusFlags>(ent);
     reg.emplace<Skills>(ent, skills);
-    reg.emplace<HandCards>(ent);
-    reg.emplace<Equipments>(ent);
+
     return ent;
 }

@@ -91,22 +91,9 @@ struct TurnPhase
     entt::entity player;      // 当前回合角色
     ::TurnPhase currentPhase; // 当前阶段，参考 TurnPhase 枚举
 };
-struct ShuffleDeck
-{
-};
 
-struct DealCards // 发牌事件
-{
-    entt::entity player; // 发牌角色
-    uint8_t count;       // 发牌数量
-};
 
-struct FindCardInDrawPile
-{
-    std::string cardName; // 需要查找的牌名
-    SuitType suitType;    // 需要查找的花色
-    uint8_t rank;         // 需要查找的点数
-};
+
 
 struct CardPlayed // 打出牌事件
 {
@@ -147,23 +134,6 @@ struct NearDeath
     int32_t currentHealth;  // 当前生命值
 };
 
-struct GameStart
-{
-    // 可以添加游戏开始时需要的信息
-    uint8_t playerCount; // 玩家数量
-};
-
-struct GameEnd
-{
-    std::string reason; // 游戏结束原因
-};
-
-struct UsingAttackCard
-{
-    entt::entity attacker; // 攻击者
-    entt::entity defender; // 防御者
-    size_t damage;         // 伤害值
-};
 
 struct CheckCardToResponse
 {

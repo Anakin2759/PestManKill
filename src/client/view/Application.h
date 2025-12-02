@@ -19,9 +19,11 @@
 #include "Layout.h"
 #include "Label.h"
 #include "Button.h"
-#include "Image.h"
 #include <entt/entt.hpp>
+#include <array>
+#include <stdexcept>
 #include <iostream>
+// NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers, readability-magic-numbers)
 namespace ui
 {
 // 主应用类
@@ -91,184 +93,272 @@ public:
 protected:
     virtual void setupUI()
     {
-        // 创建主布局
         auto mainLayout = std::make_shared<VBoxLayout>();
         mainLayout->setBackgroundEnabled(true);
-        // NOLINTBEGIN
-        mainLayout->setBackgroundColor(ImVec4(0.15F, 0.12F, 0.10F, 1.0F)); // 木桌背景色
-        mainLayout->setSpacing(5);
+        mainLayout->setBackgroundColor(ImVec4(0.08F, 0.10F, 0.13F, 1.0F));
+        mainLayout->setSpacing(8);
         mainLayout->setMargins(10, 10, 10, 10);
-        // NOLINTEND
 
-        // ========== 顶部区域：对手玩家 ==========
-        auto topOpponentsLayout = std::make_shared<HBoxLayout>();
-        topOpponentsLayout->setBackgroundEnabled(true);
-        // NOLINTBEGIN
-        topOpponentsLayout->setBackgroundColor(ImVec4(0.25F, 0.20F, 0.15F, 0.8F));
-        topOpponentsLayout->setSpacing(15);
-        // NOLINTEND
+        mainLayout->addWidget(createTopOpponentsArea(), 2);
+        mainLayout->addWidget(createMiddleGameArea(), 4);
+        mainLayout->addWidget(createBottomPlayerArea(), 4);
 
-        // 添加3个对手
+        m_rootLayout = mainLayout;
+    }
+
+    // 创建顶部对手区域
+    static std::shared_ptr<Widget> createTopOpponentsArea()
+    {
+        auto topLayout = std::make_shared<HBoxLayout>();
+        topLayout->setBackgroundEnabled(true);
+        topLayout->setBackgroundColor(ImVec4(0.12F, 0.15F, 0.18F, 0.75F));
+        topLayout->setSpacing(20);
+
         for (int i = 0; i < 3; ++i)
         {
-            auto opponentCard = std::make_shared<VBoxLayout>();
-            opponentCard->setBackgroundEnabled(true);
-            // NOLINTBEGIN
-            opponentCard->setBackgroundColor(ImVec4(0.35F, 0.25F, 0.20F, 0.9F));
-            opponentCard->setFixedSize(120, 160);
-            opponentCard->setMargins(8, 8, 8, 8);
-            // NOLINTEND
-
-            opponentCard->addWidget(std::make_shared<Label>("玩家" + std::to_string(i + 2)));
-            opponentCard->addWidget(std::make_shared<Label>("[红桃] HP: 4/4"));
-            opponentCard->addWidget(std::make_shared<Label>("手牌: 3"));
-            opponentCard->addStretch(1);
-
-            topOpponentsLayout->addWidget(opponentCard);
+            topLayout->addWidget(createOpponentCard(i + 2));
         }
+        return topLayout;
+    }
 
-        // ========== 中间区域：游戏主区域 ==========
+    // 创建单个对手卡片
+    static std::shared_ptr<Widget> createOpponentCard(int playerNum)
+    {
+        auto card = std::make_shared<VBoxLayout>();
+        card->setBackgroundEnabled(true);
+        card->setBackgroundColor(ImVec4(0.15F, 0.18F, 0.22F, 0.85F));
+        card->setFixedSize(140, 180);
+        card->setMargins(10, 10, 10, 10);
+
+        card->addWidget(std::make_shared<Label>("玩家" + std::to_string(playerNum)));
+        card->addWidget(std::make_shared<Label>("[红桃] HP: 4/4"));
+        card->addWidget(std::make_shared<Label>("手牌: 3"));
+        card->addStretch(1);
+        return card;
+    }
+
+    // 创建中间游戏区域
+    static std::shared_ptr<Widget> createMiddleGameArea()
+    {
         auto middleLayout = std::make_shared<HBoxLayout>();
-        // NOLINTNEXTLINE
         middleLayout->setSpacing(10);
 
-        // 左侧：牌堆和弃牌堆
-        auto leftSideLayout = std::make_shared<VBoxLayout>();
-        leftSideLayout->setBackgroundEnabled(true);
-        // NOLINTBEGIN
-        leftSideLayout->setBackgroundColor(ImVec4(0.30F, 0.22F, 0.15F, 0.85F));
-        leftSideLayout->setFixedSize(150, 0);
-        leftSideLayout->setMargins(10, 10, 10, 10);
-        leftSideLayout->setSpacing(10);
-        // NOLINTEND
+        middleLayout->addWidget(createLeftSidePanel());
+        middleLayout->addWidget(createCenterPanel(), 1);
+        middleLayout->addWidget(createRightSidePanel());
+        return middleLayout;
+    }
 
-        auto deckArea = std::make_shared<VBoxLayout>();
-        deckArea->setBackgroundEnabled(true);
-        deckArea->setBackgroundColor(ImVec4(0.2F, 0.15F, 0.12F, 1.0F));
-        deckArea->setMargins(5, 5, 5, 5);
-        deckArea->addWidget(std::make_shared<Label>("牌堆"));
-        deckArea->addWidget(std::make_shared<Label>("剩余: 58"));
-        leftSideLayout->addWidget(deckArea);
+    // 创建左侧面板（牌堆和弃牌堆）
+    static std::shared_ptr<Widget> createLeftSidePanel()
+    {
+        auto leftPanel = std::make_shared<VBoxLayout>();
+        leftPanel->setBackgroundEnabled(true);
+        leftPanel->setBackgroundColor(ImVec4(0.14F, 0.16F, 0.20F, 0.80F));
+        leftPanel->setFixedSize(160, 0);
+        leftPanel->setMargins(10, 10, 10, 10);
+        leftPanel->setSpacing(10);
 
-        auto discardArea = std::make_shared<VBoxLayout>();
-        discardArea->setBackgroundEnabled(true);
-        discardArea->setBackgroundColor(ImVec4(0.2F, 0.15F, 0.12F, 1.0F));
-        discardArea->setMargins(5, 5, 5, 5);
-        discardArea->addWidget(std::make_shared<Label>("弃牌堆"));
-        discardArea->addWidget(std::make_shared<Label>("数量: 12"));
-        leftSideLayout->addWidget(discardArea);
+        leftPanel->addWidget(createDeckArea());
+        leftPanel->addWidget(createDiscardArea());
+        leftPanel->addStretch(1);
+        return leftPanel;
+    }
 
-        leftSideLayout->addStretch(1);
+    static std::shared_ptr<Widget> createDeckArea()
+    {
+        auto deck = std::make_shared<VBoxLayout>();
+        deck->setBackgroundEnabled(true);
+        deck->setBackgroundColor(ImVec4(0.10F, 0.12F, 0.16F, 0.9F));
+        deck->setMargins(5, 5, 5, 5);
+        deck->addWidget(std::make_shared<Label>("牌堆"));
+        deck->addWidget(std::make_shared<Label>("剩余: 58"));
+        return deck;
+    }
 
-        // 中间：战斗和判定区
-        auto centerArea = std::make_shared<VBoxLayout>();
-        centerArea->setBackgroundEnabled(true);
-        // NOLINTNEXTLINE
-        centerArea->setBackgroundColor(ImVec4(0.20F, 0.25F, 0.20F, 0.6F));
-        centerArea->setSpacing(8);
-        // NOLINTNEXTLINE
-        centerArea->setMargins(15, 15, 15, 15);
+    static std::shared_ptr<Widget> createDiscardArea()
+    {
+        auto discard = std::make_shared<VBoxLayout>();
+        discard->setBackgroundEnabled(true);
+        discard->setBackgroundColor(ImVec4(0.10F, 0.12F, 0.16F, 0.9F));
+        discard->setMargins(5, 5, 5, 5);
+        discard->addWidget(std::make_shared<Label>("弃牌堆"));
+        discard->addWidget(std::make_shared<Label>("数量: 12"));
+        return discard;
+    }
 
-        // 判定区
-        auto judgeArea = std::make_shared<VBoxLayout>();
-        judgeArea->setBackgroundEnabled(true);
-        // NOLINTNEXTLINE
-        judgeArea->setBackgroundColor(ImVec4(0.3F, 0.2F, 0.25F, 0.7F));
-        judgeArea->addWidget(std::make_shared<Label>("判定区"));
-        judgeArea->addWidget(std::make_shared<Label>("当前回合: 刘备"));
+    // 创建中央面板（战斗和判定区）
+    static std::shared_ptr<Widget> createCenterPanel()
+    {
+        auto center = std::make_shared<VBoxLayout>();
+        center->setBackgroundEnabled(true);
+        center->setBackgroundColor(ImVec4(0.12F, 0.14F, 0.18F, 0.55F));
+        center->setSpacing(8);
+        center->setMargins(15, 15, 15, 15);
 
-        // 添加图片示例 - 使用嵌入的资源
-        // auto testImage = std::make_shared<Image>();
-        // testImage->setImageFromMemory(embedded_1, embedded_1_len);
-        // testImage->setFixedSize(200, 150);
-        // judgeArea->addWidget(testImage);
+        center->addWidget(createJudgeArea(), 1);
+        center->addWidget(createBattleLogArea(), 3);
+        return center;
+    }
 
-        judgeArea->addStretch(1);
+    static std::shared_ptr<Widget> createJudgeArea()
+    {
+        auto judge = std::make_shared<VBoxLayout>();
+        judge->setBackgroundEnabled(true);
+        judge->setBackgroundColor(ImVec4(0.16F, 0.18F, 0.22F, 0.65F));
+        judge->addWidget(std::make_shared<Label>("判定区"));
+        judge->addWidget(std::make_shared<Label>("当前回合: 刘备"));
+        judge->addStretch(1);
+        return judge;
+    }
 
-        // 战斗信息区
+    static std::shared_ptr<Widget> createBattleLogArea()
+    {
+        auto battleLog = std::make_shared<VBoxLayout>();
+
+        return battleLog;
+    }
+
+    // 创建右侧面板（装备区）
+    static std::shared_ptr<Widget> createRightSidePanel()
+    {
         auto battleLog = std::make_shared<VBoxLayout>();
         battleLog->setBackgroundEnabled(true);
-        battleLog->setBackgroundColor(ImVec4(0.18F, 0.18F, 0.22F, 0.8F));
+        battleLog->setBackgroundColor(ImVec4(0.10F, 0.12F, 0.15F, 0.75F));
         battleLog->setMargins(5, 5, 5, 5);
         battleLog->addWidget(std::make_shared<Label>("战斗记录:"));
         battleLog->addWidget(std::make_shared<Label>("刘备对张飞使用【杀】"));
         battleLog->addWidget(std::make_shared<Label>("张飞使用【闪】"));
         battleLog->addStretch(1);
+        return battleLog;
+    }
 
-        centerArea->addWidget(judgeArea, 1);
-        centerArea->addWidget(battleLog, 3);
-
-        // 右侧：装备区
-        auto rightSideLayout = std::make_shared<VBoxLayout>();
-        rightSideLayout->setBackgroundEnabled(true);
-        rightSideLayout->setBackgroundColor(ImVec4(0.30F, 0.22F, 0.15F, 0.85F));
-        rightSideLayout->setFixedSize(150, 0);
-        rightSideLayout->setMargins(10, 10, 10, 10);
-        rightSideLayout->setSpacing(8);
-
-        rightSideLayout->addWidget(std::make_shared<Label>("装备区"));
-        rightSideLayout->addWidget(std::make_shared<Button>("武器: 青釭剑"));
-        rightSideLayout->addWidget(std::make_shared<Button>("防具: 八卦阵"));
-        rightSideLayout->addWidget(std::make_shared<Button>("坐骑: 的卢"));
-        rightSideLayout->addStretch(1);
-
-        middleLayout->addWidget(leftSideLayout);
-        middleLayout->addWidget(centerArea, 1);
-        middleLayout->addWidget(rightSideLayout);
-
-        // ========== 底部区域：玩家手牌和信息 ==========
+    // 创建底部玩家区域
+    static std::shared_ptr<Widget> createBottomPlayerArea()
+    {
         auto bottomArea = std::make_shared<VBoxLayout>();
         bottomArea->setBackgroundEnabled(true);
-        bottomArea->setBackgroundColor(ImVec4(0.25F, 0.30F, 0.25F, 0.85F));
+        bottomArea->setBackgroundColor(ImVec4(0.13F, 0.16F, 0.20F, 0.82F));
         bottomArea->setSpacing(8);
         bottomArea->setMargins(10, 10, 10, 10);
 
-        // 玩家信息栏
-        auto playerInfoLayout = std::make_shared<HBoxLayout>();
-        playerInfoLayout->setBackgroundEnabled(true);
-        playerInfoLayout->setBackgroundColor(ImVec4(0.35F, 0.30F, 0.25F, 0.9F));
-        playerInfoLayout->setMargins(8, 8, 8, 8);
+        // 操作区在顶部
+        bottomArea->addWidget(createActionButtonsArea());
 
-        auto playerInfo = std::make_shared<VBoxLayout>();
-        playerInfo->addWidget(std::make_shared<Label>("【刘备】 主公"));
-        playerInfo->addWidget(std::make_shared<Label>("HP: 4/4 ♥♥♥♥"));
+        // 下方：角色区（左侧3）+ 手牌区（右侧7）
+        auto bottomContentLayout = std::make_shared<HBoxLayout>();
+        bottomContentLayout->setSpacing(10);
+        bottomContentLayout->addWidget(createPlayerCharacterArea(), 3);
+        bottomContentLayout->addWidget(createHandCardsArea(), 7);
 
-        auto skillsLayout = std::make_shared<HBoxLayout>();
-        skillsLayout->addWidget(std::make_shared<Button>("仁德"));
-        skillsLayout->addWidget(std::make_shared<Button>("激将"));
+        bottomArea->addWidget(bottomContentLayout, 1);
+        return bottomArea;
+    }
 
-        playerInfoLayout->addWidget(playerInfo);
-        playerInfoLayout->addWidget(skillsLayout);
-        playerInfoLayout->addStretch(1);
+    // 创建操作按钮区域（顶部）
+    static std::shared_ptr<Widget> createActionButtonsArea()
+    {
+        auto actionArea = std::make_shared<HBoxLayout>();
+        actionArea->setBackgroundEnabled(true);
+        actionArea->setBackgroundColor(ImVec4(0.16F, 0.19F, 0.23F, 0.88F));
+        actionArea->setMargins(8, 8, 8, 8);
+        actionArea->setSpacing(10);
 
-        auto actionButtons = std::make_shared<HBoxLayout>();
-        actionButtons->setSpacing(10);
-        actionButtons->addStretch(1);
-        actionButtons->addWidget(std::make_shared<Button>("出牌"));
-        actionButtons->addWidget(std::make_shared<Button>("结束回合"));
-        actionButtons->addWidget(std::make_shared<Button>("取消"));
+        actionArea->addStretch(1);
+        actionArea->addWidget(std::make_shared<Button>("出牌"));
+        actionArea->addWidget(std::make_shared<Button>("结束回合"));
+        actionArea->addWidget(std::make_shared<Button>("取消"));
+        actionArea->addStretch(1);
+        return actionArea;
+    }
 
-        playerInfoLayout->addWidget(actionButtons);
+    // 创建玩家角色区域（左侧，包含角色信息、装备、技能）
+    static std::shared_ptr<Widget> createPlayerCharacterArea()
+    {
+        auto characterArea = std::make_shared<VBoxLayout>();
+        characterArea->setBackgroundEnabled(true);
+        characterArea->setBackgroundColor(ImVec4(0.14F, 0.17F, 0.21F, 0.90F));
+        characterArea->setMargins(10, 10, 10, 10);
+        characterArea->setSpacing(8);
 
-        // 手牌区
-        auto handCardsLayout = std::make_shared<VBoxLayout>();
-        handCardsLayout->addWidget(std::make_shared<Label>("手牌 (5张):"));
+        // 角色基本信息
+        characterArea->addWidget(createPlayerBasicInfo());
+
+        // 装备区
+        auto equipmentLabel = std::make_shared<Label>("装备:");
+        characterArea->addWidget(equipmentLabel);
+        characterArea->addWidget(createPlayerEquipment());
+
+        // 技能区
+        auto skillLabel = std::make_shared<Label>("技能:");
+        characterArea->addWidget(skillLabel);
+        characterArea->addWidget(createPlayerSkills());
+
+        characterArea->addStretch(1);
+        return characterArea;
+    }
+
+    static std::shared_ptr<Widget> createPlayerBasicInfo()
+    {
+        auto info = std::make_shared<VBoxLayout>();
+        info->setSpacing(4);
+        info->addWidget(std::make_shared<Label>("【刘备】 主公"));
+        info->addWidget(std::make_shared<Label>("HP: 4/4 ♥♥♥♥"));
+        return info;
+    }
+
+    static std::shared_ptr<Widget> createPlayerEquipment()
+    {
+        auto equipment = std::make_shared<VBoxLayout>();
+        equipment->setSpacing(4);
+        equipment->addWidget(std::make_shared<Button>("武器: 青釭剑"));
+        equipment->addWidget(std::make_shared<Button>("防具: 八卦阵"));
+        equipment->addWidget(std::make_shared<Button>("坐骑: 的卢"));
+        return equipment;
+    }
+
+    static std::shared_ptr<Widget> createPlayerSkills()
+    {
+        auto skills = std::make_shared<VBoxLayout>();
+        skills->setSpacing(4);
+        skills->addWidget(std::make_shared<Button>("仁德"));
+        skills->addWidget(std::make_shared<Button>("激将"));
+        return skills;
+    }
+
+    // 创建手牌区域（右侧）
+    static std::shared_ptr<Widget> createHandCardsArea()
+    {
+        auto handCards = std::make_shared<VBoxLayout>();
+        handCards->setBackgroundEnabled(true);
+        handCards->setBackgroundColor(ImVec4(0.11F, 0.14F, 0.17F, 0.85F));
+        handCards->setMargins(10, 10, 10, 10);
+        handCards->setSpacing(8);
+
+        auto label = std::make_shared<Label>("手牌 (5张)");
+        handCards->addWidget(label);
+        handCards->addWidget(createCardsRow(), 1);
+        return handCards;
+    }
+
+    static std::shared_ptr<Widget> createCardsRow()
+    {
+        constexpr int CARD_WIDTH = 95;
+        constexpr int CARD_HEIGHT = 135;
 
         auto cardsRow = std::make_shared<HBoxLayout>();
-        cardsRow->setSpacing(8);
-        cardsRow->addStretch(1);
+        cardsRow->setSpacing(10);
 
-        // 添加5张手牌
         auto card1 = std::make_shared<Button>("♠杀");
-        card1->setFixedSize(80, 110);
+        card1->setFixedSize(CARD_WIDTH, CARD_HEIGHT);
         auto card2 = std::make_shared<Button>("♥桃");
-        card2->setFixedSize(80, 110);
+        card2->setFixedSize(CARD_WIDTH, CARD_HEIGHT);
         auto card3 = std::make_shared<Button>("♦闪");
-        card3->setFixedSize(80, 110);
+        card3->setFixedSize(CARD_WIDTH, CARD_HEIGHT);
         auto card4 = std::make_shared<Button>("♣决斗");
-        card4->setFixedSize(80, 110);
+        card4->setFixedSize(CARD_WIDTH, CARD_HEIGHT);
         auto card5 = std::make_shared<Button>("♠无懈");
-        card5->setFixedSize(80, 110);
+        card5->setFixedSize(CARD_WIDTH, CARD_HEIGHT);
 
         cardsRow->addWidget(card1);
         cardsRow->addWidget(card2);
@@ -276,18 +366,7 @@ protected:
         cardsRow->addWidget(card4);
         cardsRow->addWidget(card5);
         cardsRow->addStretch(1);
-
-        handCardsLayout->addWidget(cardsRow);
-
-        bottomArea->addWidget(playerInfoLayout);
-        bottomArea->addWidget(handCardsLayout);
-
-        // 组合所有区域
-        mainLayout->addWidget(topOpponentsLayout);
-        mainLayout->addWidget(middleLayout, 1);
-        mainLayout->addWidget(bottomArea);
-
-        m_rootLayout = mainLayout;
+        return cardsRow;
     }
 
     virtual void onGui()
@@ -301,6 +380,7 @@ protected:
                                                    static_cast<unsigned int>(ImGuiWindowFlags_NoResize) |
                                                    static_cast<unsigned int>(ImGuiWindowFlags_NoMove) |
                                                    static_cast<unsigned int>(ImGuiWindowFlags_NoScrollbar) |
+                                                   static_cast<unsigned int>(ImGuiWindowFlags_NoScrollWithMouse) |
                                                    static_cast<unsigned int>(ImGuiWindowFlags_NoCollapse)));
 
         if (m_rootLayout)
@@ -341,8 +421,8 @@ private:
         onGui();
 
         ImGui::Render();
-        // NOLINTNEXTLINE
-        SDL_SetRenderDrawColor(m_renderer, 30, 30, 30, 255);
+
+        SDL_SetRenderDrawColor(m_renderer, 20, 25, 33, 255);
         SDL_RenderClear(m_renderer);
         ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), m_renderer);
         SDL_RenderPresent(m_renderer);
@@ -361,7 +441,7 @@ private:
         fontCfg.PixelSnapH = true;
 
         // 加载中文字体，并合并常用符号
-        static const ImWchar ranges[] = {
+        static constexpr std::array<ImWchar, 12> FONT_RANGES = {
             0x0020,
             0x00FF, // 基本拉丁字母
             0x2000,
@@ -377,7 +457,7 @@ private:
                                           // NOLINTNEXTLINE
                                           18.0F,
                                           &fontCfg,
-                                          ranges);
+                                          FONT_RANGES.data());
 
         ImGui_ImplSDL3_InitForSDLRenderer(m_window, m_renderer);
         ImGui_ImplSDLRenderer3_Init(m_renderer);
@@ -391,3 +471,4 @@ private:
     }
 };
 } // namespace ui
+// NOLINTEND(cppcoreguidelines-avoid-magic-numbers, readability-magic-numbers)

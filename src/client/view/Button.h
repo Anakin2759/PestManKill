@@ -35,7 +35,7 @@ public:
     {
         if (isFixedSize())
         {
-            return ImVec2(getMinWidth(), getMinHeight());
+            return {getMinWidth(), getMinHeight()};
         }
         constexpr float BUTTON_PADDING_X = 20.0F;
         constexpr float BUTTON_PADDING_Y = 10.0F;
