@@ -1,13 +1,9 @@
 #include <mimalloc-new-delete.h>
-#include "view/Application.h"
-
+#include "view/MainWindow.h"
 int main()
 {
-    ui::Application app(
-        "PestManKill Client", ui::Application::DEFAULT_WINDOW_WIDTH, ui::Application::DEFAULT_WINDOW_HEIGHT);
-
-    // 渲染界面
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-magic-numbers, readability-magic-numbers)
+    MainWindow app("PestManKill", 1200, 800);
     app.run();
-
     return 0;
 }

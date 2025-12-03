@@ -359,7 +359,6 @@ private:
             }
 
             ImVec2 widgetSize = item.widget->calculateSize();
-            utils::LOG_ERROR("Widget size: ({}, {})", widgetSize.x, widgetSize.y);
             float itemHeight = item.customHeight > 0.0F ? item.customHeight : m_defaultItemHeight;
 
             if (m_direction == ListDirection::VERTICAL)

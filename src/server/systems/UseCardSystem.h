@@ -15,7 +15,7 @@
 
 #pragma once
 #include <entt/entt.hpp>
-#include "src/server/components/Character.h"
+#include "src/server/components/Player.h"
 #include "src/server/context/GameContext.h"
 #include "src/server/events/Events.h"
 #include "src/server/components/Card.h"

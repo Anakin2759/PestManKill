@@ -166,6 +166,11 @@ public:
 
         ImGui::SetCursorPos(effectivePos); // 设置光标位置为有效位置
 
+        // 设置裁剪区域，确保子组件不会超出父组件边界
+        ImVec2 clipMin = ImGui::GetCursorScreenPos();
+        ImVec2 clipMax = ImVec2(clipMin.x + finalSize.x, clipMin.y + finalSize.y);
+        ImGui::PushClipRect(clipMin, clipMax, true);
+
         // 绘制背景（如果启用）
         if (m_drawBackground)
         {
@@ -180,6 +185,9 @@ public:
         }
 
         onRender(effectivePos, finalSize);
+
+        // 恢复裁剪区域
+        ImGui::PopClipRect();
 
         if (pushAlpha)
         {

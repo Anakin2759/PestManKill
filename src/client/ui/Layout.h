@@ -55,6 +55,8 @@ struct LayoutItem
 class Layout : public Widget
 {
 public:
+    Layout() { setBackgroundEnabled(false); }
+
     void addWidget(const std::shared_ptr<Widget>& widget, int stretch = 0, Alignment alignment = Alignment::LEFT)
     {
         if (!widget)
@@ -105,7 +107,11 @@ private:
 class HBoxLayout : public Layout
 {
 public:
-    HBoxLayout() { setDirection(LayoutDirection::HORIZONTAL); }
+    HBoxLayout()
+    {
+        setDirection(LayoutDirection::HORIZONTAL);
+        setBackgroundEnabled(false);
+    }
 
 protected:
     void onRender(const ImVec2& position, const ImVec2& size) override
@@ -118,7 +124,11 @@ protected:
         ImVec2 contentPos(position.x + margins().x, position.y + margins().y);
         float availableWidth = size.x - margins().x - margins().z;
         float availableHeight = size.y - margins().y - margins().w;
-        float totalSpacing = spacing() * static_cast<float>(items().size() - 1);
+
+        // spacing 只计算组件之间的间距(N个组件有N-1个间距)
+        size_t widgetCount = std::count_if(
+            items().begin(), items().end(), [](const LayoutItem& item) { return item.widget != nullptr; });
+        float totalSpacing = widgetCount > 1 ? spacing() * static_cast<float>(widgetCount - 1) : 0.0F;
 
         float totalFixedWidth = 0;
         int totalStretch = 0;
@@ -218,7 +228,7 @@ public:
             widgetCount++;
         }
 
-        if (widgetCount > 0)
+        if (widgetCount > 1)
         {
             totalWidth += spacing() * static_cast<float>(widgetCount - 1);
         }
@@ -230,7 +240,11 @@ public:
 class VBoxLayout : public Layout
 {
 public:
-    VBoxLayout() { setDirection(LayoutDirection::VERTICAL); }
+    VBoxLayout()
+    {
+        setDirection(LayoutDirection::VERTICAL);
+        setBackgroundEnabled(false);
+    }
 
 protected:
     void onRender(const ImVec2& position, const ImVec2& size) override
@@ -243,7 +257,11 @@ protected:
         ImVec2 contentPos(position.x + margins().x, position.y + margins().y);
         float availableWidth = size.x - margins().x - margins().z;
         float availableHeight = size.y - margins().y - margins().w;
-        float totalSpacing = spacing() * static_cast<float>(items().size() - 1);
+
+        // spacing 只计算组件之间的间距(N个组件有N-1个间距)
+        size_t widgetCount = std::count_if(
+            items().begin(), items().end(), [](const LayoutItem& item) { return item.widget != nullptr; });
+        float totalSpacing = widgetCount > 1 ? spacing() * static_cast<float>(widgetCount - 1) : 0.0F;
 
         float totalFixedHeight = 0;
         int totalStretch = 0;
@@ -343,7 +361,7 @@ public:
             widgetCount++;
         }
 
-        if (widgetCount > 0)
+        if (widgetCount > 1)
         {
             totalHeight += spacing() * static_cast<float>(widgetCount - 1);
         }

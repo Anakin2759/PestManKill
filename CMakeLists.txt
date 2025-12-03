@@ -21,7 +21,7 @@ if (ENABLE_CLANG_TIDY)
     if (CLANG_TIDY_EXE)
         message(STATUS "clang-tidy found: ${CLANG_TIDY_EXE}")
         # Default checks can be customized by setting CLANG_TIDY_OPTIONS
-        set(CLANG_TIDY_OPTIONS "--checks=*,-clang-analyzer-alpha*")
+        set(CLANG_TIDY_OPTIONS "--checks=*,-clang-analyzer-alpha*,-header-filter=^${CMAKE_SOURCE_DIR}/src/.*")
         # Apply globally so all targets are analyzed; users can override with
         # -DCMAKE_CXX_CLANG_TIDY="<path>;[options]"
         set(CMAKE_CXX_CLANG_TIDY "${CLANG_TIDY_EXE};${CLANG_TIDY_OPTIONS}")

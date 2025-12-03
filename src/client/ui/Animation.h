@@ -17,11 +17,12 @@
  */
 
 #pragma once
-#include "AWidget.h"
+#include "Widget.h"
 #include <cstdint>
 #include <functional>
 #include <cmath>
-
+namespace ui
+{
 enum class AnimationProperty : uint8_t
 {
     POSITION,
@@ -40,19 +41,19 @@ enum class EasingType : uint8_t
     EASE_IN_OUT_CUBIC // 三次方缓入缓出
 };
 
-class AAnimation
+class Animation
 {
 public:
     using FinishedCallback = std::function<void()>;
     using UpdateCallback = std::function<void(float /*progress*/)>;
 
-    AAnimation(AWidget* target,
-               AnimationProperty property,
-               float startValue1,
-               float startValue2,
-               float endValue1,
-               float endValue2,
-               uint32_t durationMs)
+    Animation(Widget* target,
+              AnimationProperty property,
+              float startValue1,
+              float startValue2,
+              float endValue1,
+              float endValue2,
+              uint32_t durationMs)
         : m_target(target), m_property(property), m_startValue1(startValue1), m_startValue2(startValue2),
           m_endValue1(endValue1), m_endValue2(endValue2), m_durationMs(durationMs)
     {
@@ -238,7 +239,7 @@ private:
                 break;
 
             case AnimationProperty::SIZE:
-                m_target->reSize(currentValue1, currentValue2);
+                m_target->setFixedSize(currentValue1, currentValue2);
                 break;
 
             case AnimationProperty::OPACITY:
@@ -248,7 +249,7 @@ private:
     }
 
     // ===================== 成员变量 =====================
-    AWidget* m_target;
+    Widget* m_target;
     AnimationProperty m_property;
     EasingType m_easingType = EasingType::LINEAR;
 
@@ -268,3 +269,4 @@ private:
     FinishedCallback m_finishedCallback;
     UpdateCallback m_updateCallback;
 };
+} // namespace ui

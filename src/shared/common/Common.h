@@ -115,3 +115,25 @@ enum class SuitType : uint8_t
 };
 
 using Effect = entt::delegate<void(entt::entity, std::span<entt::entity>, entt::registry&)>;
+
+// 消息类型枚举
+// NOLINTNEXTLINE
+enum class MessageType : uint16_t
+{
+    HEARTBEAT = 0x0001, // 心跳包
+    LOGIN,              // 登录请求
+    LOGOUT,             // 登出请求
+    USE_CARD = 0x0100,  // 使用卡牌
+    DRAW_CARD,          // 抽卡
+    DISCARD_CARD,       // 弃牌
+    END_TURN,           // 结束回合
+    NEXT_PHASE,         // 下一个阶段
+    DAMAGE,             // 伤害
+
+    CHOOSING_TARGET, // 选择目标
+
+    CHAT_MESSAGE = 0x0200,  // 聊天消息
+    GAME_STATE = 0x0300,    // 游戏状态同步
+    ERROR_MESSAGE = 0x0F00, // 错误消息
+    ACK = 0xFFFF            // 确认包
+};

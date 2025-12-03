@@ -1,7 +1,7 @@
 /**
  * ************************************************************************
  *
- * @file NetWorkManager.h
+ * @file NetWorkClient.h
  * @author AnakinLiu
  * @date 2025-12-02
  * @version 0.3
@@ -32,11 +32,11 @@ constexpr uint16_t ACK_PACKET_TYPE = 0xFFFF;
 constexpr size_t MAX_PACKET_SIZE = 1024;
 constexpr int DEFAULT_ACK_TIMEOUT_MS = 1000;
 
-class NetWorkManager : public std::enable_shared_from_this<NetWorkManager>
+class NetWorkClient : public std::enable_shared_from_this<NetWorkClient>
 {
 public:
-    explicit NetWorkManager() = default;
-    ~NetWorkManager() { stop(); }
+    explicit NetWorkClient() = default;
+    ~NetWorkClient() { stop(); }
 
     void start()
     {
@@ -80,10 +80,10 @@ public:
         m_ioContext.stop();
     }
 
-    NetWorkManager(const NetWorkManager&) = delete;
-    NetWorkManager& operator=(const NetWorkManager&) = delete;
-    NetWorkManager(NetWorkManager&&) = delete;
-    NetWorkManager& operator=(NetWorkManager&&) = delete;
+    NetWorkClient(const NetWorkClient&) = delete;
+    NetWorkClient& operator=(const NetWorkClient&) = delete;
+    NetWorkClient(NetWorkClient&&) = delete;
+    NetWorkClient& operator=(NetWorkClient&&) = delete;
     /**
      * @brief 连接到服务器
      * @param host 服务器主机名或IP地址
