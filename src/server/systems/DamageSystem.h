@@ -5,7 +5,7 @@
  * @author AnakinLiu (azrael2759@qq.com)
  * @date 2025-11-25
  * @version 0.1
- * @brief
+ * @brief 处理伤害相关的系统
  *
  * ************************************************************************
  * @copyright Copyright (c) 2025 AnakinLiu

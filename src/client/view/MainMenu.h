@@ -1,23 +1,14 @@
 /**
  * ************************************************************************
  *
- * @file main.cpp
+ * @file MainMenu.h
  * @author AnakinLiu (azrael2759@qq.com)
- * @date 2025-12-01
+ * @date 2025-12-03
  * @version 0.1
- * @brief 服务器主程序入口
+ * @brief 主菜单视图 三个按钮： 创建房间， 加入房间，退出游戏
  *
  * ************************************************************************
  * @copyright Copyright (c) 2025 AnakinLiu
  * For study and research only, no reprinting.
  * ************************************************************************
  */
-
-#include <mimalloc-new-delete.h>
-#include <iostream>
-
-int main()
-{
-    std::cout << "Server is running..." << std::endl;
-    return 0;
-}

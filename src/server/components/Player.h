@@ -49,16 +49,22 @@ struct Identity
     IdentityType type = IdentityType::MEMBER;
 };
 
+struct LiveStatus
+{
+    bool isAlive = true;
+};
+
 inline entt::entity CreatePlayer(entt::registry& registry,
                                  MetaPlayerInfo& metaInfo,
                                  CharacterInfo& characterInfo,
                                  HandCards& handCards,
-                                 Equipments& equipments)
+                                 Equipments& equipments,LiveStatus& liveStatus)
 {
     entt::entity player = registry.create();
     registry.emplace<MetaPlayerInfo>(player, metaInfo);
     registry.emplace<CharacterInfo>(player, characterInfo);
     registry.emplace<HandCards>(player, handCards);
     registry.emplace<Equipments>(player, equipments);
+    registry.emplace<LiveStatus>(player, liveStatus);
     return player;
 }

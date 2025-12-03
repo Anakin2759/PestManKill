@@ -20,4 +20,11 @@ struct NextTurn
 {
 };
 
+struct GotKilled
+{
+    entt::entity player;        // 死亡的玩家实体
+    entt::entity killer;        // 杀死该玩家的实体（若有）
+    std::string deathReason;    // 死亡原因描述
+};
+
 } // namespace events

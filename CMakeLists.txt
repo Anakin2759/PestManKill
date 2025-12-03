@@ -5,13 +5,16 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON) #生成compile_commands.json文件
 set(CMAKE_CXX_EXTENSIONS OFF)
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+    # clang-cl 使用 MSVC 风格的链接
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /clang:-fms-compatibility-version=19.33")
+endif()
 
+# ==================== 静态分析工具 clang-tidy ====================
+# 允许用户通过选项启用或禁用 clang-tidy
+option(ENABLE_CLANG_TIDY "Enable clang-tidy static analysis" OFF)
 
-# Optionally enable clang-tidy static analysis. Can be overridden by passing
-# -DENABLE_CLANG_TIDY=OFF to CMake command line.
-option(ENABLE_CLANG_TIDY "Enable clang-tidy static analysis" ON)
-
-# Try to locate clang-tidy (check several common names)
+# 查找 clang-tidy 可执行文件
 find_program(CLANG_TIDY_EXE
     NAMES clang-tidy
 )
@@ -20,10 +23,7 @@ find_program(CLANG_TIDY_EXE
 if (ENABLE_CLANG_TIDY)
     if (CLANG_TIDY_EXE)
         message(STATUS "clang-tidy found: ${CLANG_TIDY_EXE}")
-        # Default checks can be customized by setting CLANG_TIDY_OPTIONS
         set(CLANG_TIDY_OPTIONS "--checks=*,-clang-analyzer-alpha*,-header-filter=^${CMAKE_SOURCE_DIR}/src/.*")
-        # Apply globally so all targets are analyzed; users can override with
-        # -DCMAKE_CXX_CLANG_TIDY="<path>;[options]"
         set(CMAKE_CXX_CLANG_TIDY "${CLANG_TIDY_EXE};${CLANG_TIDY_OPTIONS}")
     else()
         message(STATUS "ENABLE_CLANG_TIDY is ON but clang-tidy executable not found.")
@@ -33,6 +33,8 @@ else()
     message(STATUS "clang-tidy integration disabled (ENABLE_CLANG_TIDY=OFF)")
 endif()
 
+
+# ==================== 第三方库 ====================
 # Build SDL_image as static library
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 add_subdirectory(third_party/mimalloc)

@@ -39,17 +39,17 @@ enum class GenderType : uint8_t
 
 enum class IdentityType : uint8_t
 {
-    MEMBER,
-    OWNER,
-    ADMIN,
-    ROGUE,
-    PESTMAN
+    MEMBER, //群友
+    OWNER, // 版主
+    ADMIN, // 管理员
+    ROGUE, // 狂徒
+    PESTMAN // 害虫
 };
 enum class FactionType : uint8_t
 {
-    VIRGIN,
-    PLAYMAN,
-    BOOMER
+    VIRGIN, // 处男
+    PLAYMAN, // 玩咖
+    BOOMER //老登
 };
 
 enum class SkillType : uint8_t
@@ -136,4 +136,11 @@ enum class MessageType : uint16_t
     GAME_STATE = 0x0300,    // 游戏状态同步
     ERROR_MESSAGE = 0x0F00, // 错误消息
     ACK = 0xFFFF            // 确认包
+};
+
+enum class TargetType : uint8_t
+{
+    EQUIPMENT,
+    HANDCARD,
+    CHARACTER
 };

@@ -1,13 +1,14 @@
 If:
-  PathExclude: thrid_party/.*
+  PathExclude: [third_party/.*, build/.*]
 
 CompileFlags:
   # 使用项目根目录的 compile_commands.json
-  CompilationDatabase: .
+  CompilationDatabase: build
 
   Add:
     # C++23 标准
     - "-std=c++23"
+
     # 启用所有错误报告
     - "-ferror-limit=0"
     # 禁用宏回溯限制，便于调试
@@ -28,13 +29,7 @@ CompileFlags:
     - "-fmodules-ts"
     - "-fmodule-mapper=*"
     - "-fdeps-format=*"
-    # 移除 MSVC 特定参数
-    - "/W*"
-    - "/permissive-"
-    - "/Od"
-    - "/Zi"
-    - "/O2"
-    - "/DNDEBUG"
+
     # 移除其他可能有问题的参数
     - "-fcoroutines-ts"
     - "-ftemplate-backtrace-limit=*"

@@ -35,6 +35,7 @@ _deps/
 *~
 .idea/
 *.iml
+.VSCodeCounter/
 
 # 操作系统生成的文件
 .DS_Store

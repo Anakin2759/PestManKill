@@ -59,6 +59,7 @@ public:
     };
     void onGameStart(const events::GameStart& event) {
         // 处理游戏开始事件的逻辑
+        
     };
 
     void onGameEnd(const events::GameEnd& event) {
@@ -182,6 +183,8 @@ private:
         m_context->logger->info("游戏结束");
         // 清理资源，显示结算信息
     }
+
+    void 
 
     GameContext* m_context;
     utils::RoundRobin<entt::entity> m_playerQueue;
