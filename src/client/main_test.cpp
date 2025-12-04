@@ -19,21 +19,11 @@
 #include <chrono>
 #include <csignal>
 #include <atomic>
+#include <asio.hpp>
 #include <nlohmann/json.hpp>
 #include "src/client/net/GameClient.h"
 #include "src/client/utils/Logger.h"
 #include "net/IServerMessageHandler.h"
-
-std::atomic<bool> g_running{true};
-
-void signalHandler(int signal)
-{
-    if (signal == SIGINT || signal == SIGTERM)
-    {
-        std::cout << "\nReceived stop signal, shutting down client..." << std::endl;
-        g_running.store(false);
-    }
-}
 
 /**
  * @brief 简单的消息处理器实现
@@ -93,104 +83,52 @@ public:
 
 int main()
 {
-    // 注册信号处理
-    std::signal(SIGINT, signalHandler);
-    std::signal(SIGTERM, signalHandler);
 #if defined(_MSC_VER)
     // 设置控制台为 UTF-8 编码（Windows 特有）
     SetConsoleOutputCP(CP_UTF8);
     SetConsoleCP(CP_UTF8);
 #endif
-    try
-    {
-        utils::LOG_INFO("========================================");
-        utils::LOG_INFO("Client Startup - Heartbeat Communication Test");
-        utils::LOG_INFO("========================================");
 
-        // 创建 GameClient
-        auto gameClient = std::make_shared<GameClient>();
+    utils::LOG_INFO("========================================");
+    utils::LOG_INFO("Client Startup - Heartbeat Communication Test");
+    utils::LOG_INFO("========================================");
 
-        // 设置消息处理器
-        TestMessageHandler messageHandler;
-        gameClient->setMessageHandler(entt::poly<IServerMessageHandler>{std::move(messageHandler)});
+    // 创建 GameClient
+    auto gameClient = std::make_shared<GameClient>();
 
-        // 连接到服务器
-        std::string serverHost = "127.0.0.1";
-        constexpr uint16_t SERVER_PORT = 8888;
+    // 设置消息处理器
+    TestMessageHandler messageHandler;
+    gameClient->setMessageHandler(entt::poly<IServerMessageHandler>{std::move(messageHandler)});
 
-        utils::LOG_INFO("Connecting to server: {}:{}", serverHost, SERVER_PORT);
-        gameClient->connect(serverHost, SERVER_PORT);
+    // 连接到服务器（异步执行）
+    std::string serverHost = "127.0.0.1";
+    constexpr uint16_t SERVER_PORT = 8888;
 
-        // Wait for connection establishment
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    utils::LOG_INFO("Connecting to server: {}:{}", serverHost, SERVER_PORT);
 
-        // Login
-        std::string playerName = "TestPlayer";
-        utils::LOG_INFO("Sending login request: {}", playerName);
-
-        asio::co_spawn(
-            utils::ThreadPool::getInstance().get_executor(),
-            [gameClient, playerName]() -> asio::awaitable<void>
-            {
-                co_await gameClient->login(playerName);
-                gameClient->startHeartbeat(std::chrono::seconds(5));
-                co_return;
-            },
-            asio::detached);
-
-        // Main loop - keep running and receive heartbeat responses
-        utils::LOG_INFO("Client is running...");
-        utils::LOG_INFO("Heartbeat packets will be sent automatically (every 5 seconds after login)");
-        utils::LOG_INFO("Press Ctrl+C to stop the client");
-
-        int counter = 0;
-        while (g_running.load())
+    // 使用 co_spawn 在 ThreadPool 上执行异步连接
+    asio::co_spawn(
+        utils::ThreadPool::getInstance().get_executor(),
+        [gameClient, serverHost, playerName = std::string("TestPlayer")]() -> asio::awaitable<void>
         {
-            std::this_thread::sleep_for(std::chrono::seconds(1));
+            // 连接到服务器
+            co_await gameClient->connect(serverHost, SERVER_PORT);
 
-            counter++;
-            if (counter % 10 == 0)
-            {
-                auto state = gameClient->getState();
-                const char* stateStr = "UNKNOWN";
-                switch (state)
-                {
-                    case ClientState::DISCONNECTED:
-                        stateStr = "DISCONNECTED";
-                        break;
-                    case ClientState::CONNECTING:
-                        stateStr = "CONNECTING";
-                        break;
-                    case ClientState::CONNECTED:
-                        stateStr = "CONNECTED";
-                        break;
-                    case ClientState::AUTHENTICATED:
-                        stateStr = "AUTHENTICATED";
-                        break;
-                    case ClientState::IN_GAME:
-                        stateStr = "IN_GAME";
-                        break;
-                }
-                // utils::LOG_INFO("当前状态: {} | ClientID: {} | EntityID: {}",
-                //                 stateStr,
-                //                 gameClient->getClientId(),
-                //                 gameClient->getPlayerEntity());
-            }
-        }
+            // 登录
+            utils::LOG_INFO("Sending login request: {}", playerName);
+            co_await gameClient->login(playerName);
+        },
+        asio::detached);
 
-        // Disconnect
-        utils::LOG_INFO("Disconnecting...");
-        gameClient->disconnect();
+    // Main loop - keep running and receive heartbeat responses
+    utils::LOG_INFO("Client is running...");
+    utils::LOG_INFO("Heartbeat packets will be sent automatically (every 5 seconds after login)");
+    utils::LOG_INFO("Press Ctrl+C to stop the client");
 
-        // Wait for resource cleanup
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
-
-        utils::LOG_INFO("Client stopped");
-    }
-    catch (const std::exception& e)
+    // 保持程序运行
+    while (true)
     {
-        std::cerr << "客户端异常: " << e.what() << std::endl;
-        return 1;
+        std::this_thread::sleep_for(std::chrono::seconds(1));
     }
 
     return 0;

@@ -2,7 +2,7 @@
 #include <vector>
 #include <cstdint>
 #include <nlohmann/json.hpp>
-struct DiscardCardRequest
+struct DiscardCardResponse
 {
     uint32_t player;
     std::vector<uint32_t> cardIndexs;

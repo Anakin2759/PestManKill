@@ -53,23 +53,37 @@ public:
     {
         if (m_running.exchange(true)) return;
 
-        m_socket.emplace(m_ioContext, asio::ip::udp::v4());
+        try
+        {
+            // 创建 socket 并打开
+            m_socket.emplace(m_ioContext);
+            m_socket->open(asio::ip::udp::v4());
 
-        utils::LOG_INFO("Network client started, socket ready");
+            // 绑定到任意可用端口
+            m_socket->bind(asio::ip::udp::endpoint(asio::ip::udp::v4(), 0));
 
-        auto self = shared_from_this();
-        // 启动 receiveLoop 协程
-        asio::co_spawn(
-            utils::ThreadPool::getInstance().get_executor(),
-            // NOLINTNEXTLINE(cppcoreguidelines-avoid-capturing-lambda-coroutines) - safe: shared_ptr ensures lifetime
-            [self]() -> asio::awaitable<void> { co_await self->receiveLoop(); },
-            asio::detached);
+            utils::LOG_INFO("Network client started, socket ready on port {}", m_socket->local_endpoint().port());
 
-        // 启动 io_context 在 ThreadPool 上
-        asio::post(utils::ThreadPool::getInstance().get_executor(), [self] { self->m_ioContext.run(); });
+            // 启动 receiveLoop 协程（在 m_ioContext 上运行）
+            auto self = shared_from_this();
+            asio::co_spawn(
+                m_ioContext,
+                // NOLINTNEXTLINE(cppcoreguidelines-avoid-capturing-lambda-coroutines)
+                [self]() -> asio::awaitable<void> { co_await self->receiveLoop(); },
+                asio::detached);
 
-        // Give io_context time to start processing
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            // 启动 io_context 在 ThreadPool 上执行
+            asio::post(utils::ThreadPool::getInstance().get_executor(), [self] { self->m_ioContext.run(); });
+
+            // 等待网络层完全启动
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+        catch (const std::exception& e)
+        {
+            utils::LOG_ERROR("Failed to start network client: {}", e.what());
+            m_running.store(false);
+            throw;
+        }
     }
 
     void stop() noexcept

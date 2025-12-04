@@ -13,9 +13,10 @@
  * - 一个客户端是房间所有者 ，其他客户端是普通玩家
  * - 一个客户端对应一个玩家，只能在一个房间内
  * - 每一个ip只能有一个房间
- *
+ * - connect成功启动异步事件循环处理各类请求
  * - 处理服务器响应并触发客户端事件
- * - 心跳管理 客户端在服务器房间内每隔固定时间发送心跳包
+ * - 心跳管理 客户端在连接服务器时每隔固定时间发送心跳包
+ * - 可靠消息发送（基于 NetWorkClient 的 ACK 机制）
  *
  * ************************************************************************
  * @copyright Copyright (c) 2025 AnakinLiu
@@ -38,10 +39,11 @@
 #include <nlohmann/json.hpp>
 #include <entt/entt.hpp>
 #include "net/IServerMessageHandler.h"
+
 /**
  * @brief 客户端连接状态
  */
-enum class ClientState
+enum class ClientState : uint8_t
 {
     DISCONNECTED,  // 未连接
     CONNECTING,    // 连接中
@@ -49,19 +51,6 @@ enum class ClientState
     AUTHENTICATED, // 已认证（登录成功）
     IN_GAME        // 游戏中
 };
-struct ISystem : entt::type_list<>
-{
-    template <typename Base>
-    struct type : Base
-    {
-        void registerEvents() { entt::poly_call<0>(*this); }
-        void unregisterEvents() { entt::poly_call<1>(*this); }
-    };
-
-    template <typename T>
-    using impl = entt::value_list<&T::registerEvents, &T::unregisterEvents>;
-};
-
 /**
  * @brief 游戏客户端主类
  */
@@ -70,80 +59,26 @@ class GameClient : public std::enable_shared_from_this<GameClient>
 public:
     GameClient() : m_networkClient(std::make_shared<NetWorkClient>()) {}
 
-    ~GameClient() noexcept
-    {
-        try
-        {
-            disconnect();
-        }
-        catch (...)
-        {
-            // 析构函数不应抛出异常
-        }
-    }
+    ~GameClient() { disconnect(); }
 
-    // 禁用拷贝
     GameClient(const GameClient&) = delete;
     GameClient& operator=(const GameClient&) = delete;
-
-    // 允许移动（管理的资源可以安全转移）
-    GameClient(GameClient&& other) noexcept
-        : m_networkClient(std::move(other.m_networkClient)), m_messageHandler(std::move(other.m_messageHandler)),
-          m_state(other.m_state.load()), m_playerName(std::move(other.m_playerName)), m_clientId(other.m_clientId),
-          m_playerEntity(other.m_playerEntity), m_heartbeatRunning(other.m_heartbeatRunning.load()),
-          m_heartbeatTimer(std::move(other.m_heartbeatTimer)), m_heartbeatInterval(other.m_heartbeatInterval)
-    {
-        other.m_state.store(ClientState::DISCONNECTED);
-        other.m_clientId = 0;
-        other.m_playerEntity = 0;
-        other.m_heartbeatRunning.store(false);
-    }
-
-    GameClient& operator=(GameClient&& other) noexcept
-    {
-        if (this != &other)
-        {
-            // 清理当前资源
-            try
-            {
-                disconnect();
-            }
-            catch (...)
-            {
-            }
-
-            // 转移资源
-            m_networkClient = std::move(other.m_networkClient);
-            m_messageHandler = std::move(other.m_messageHandler);
-            m_state.store(other.m_state.load());
-            m_playerName = std::move(other.m_playerName);
-            m_clientId = other.m_clientId;
-            m_playerEntity = other.m_playerEntity;
-            m_heartbeatRunning.store(other.m_heartbeatRunning.load());
-            m_heartbeatTimer = std::move(other.m_heartbeatTimer);
-            m_heartbeatInterval = other.m_heartbeatInterval;
-
-            other.m_state.store(ClientState::DISCONNECTED);
-            other.m_clientId = 0;
-            other.m_playerEntity = 0;
-            other.m_heartbeatRunning.store(false);
-        }
-        return *this;
-    }
+    GameClient(GameClient&& other) = delete;
+    GameClient& operator=(GameClient&& other) = delete;
 
     // ==================== 连接管理 ====================
 
     /**
-     * @brief 连接到服务器
+     * @brief 连接到服务器（异步）
      * @param host 服务器地址
      * @param port 服务器端口
      */
-    void connect(const std::string& host, uint16_t port)
+    asio::awaitable<void> connect(const std::string& host, uint16_t port)
     {
         if (m_state != ClientState::DISCONNECTED)
         {
             utils::LOG_WARN("Already connected or connecting, ignoring duplicate connection request");
-            return;
+            co_return;
         }
 
         m_state = ClientState::CONNECTING;
@@ -158,6 +93,11 @@ public:
         // 启动网络层
         m_networkClient->start();
         m_networkClient->connect(host, port);
+
+        // 等待网络层初始化完成
+        auto timer = std::make_shared<asio::steady_timer>(utils::ThreadPool::getInstance().get_executor(),
+                                                          std::chrono::milliseconds(100));
+        co_await timer->async_wait(asio::use_awaitable);
 
         m_state = ClientState::CONNECTED;
 
@@ -206,7 +146,6 @@ public:
         }
         catch (const std::exception& e)
         {
-            // Log error but don't rethrow (disconnect should be noexcept)
             utils::LOG_ERROR("Exception during disconnect: {}", e.what());
         }
         catch (...)
