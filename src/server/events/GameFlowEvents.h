@@ -1,3 +1,18 @@
+/**
+ * ************************************************************************
+ *
+ * @file GameFlowEvents.h
+ * @author AnakinLiu (azrael2759@qq.com)
+ * @date 2025-12-04
+ * @version 0.1
+ * @brief 游戏流程相关事件定义
+    包含游戏开始、结束、回合切换等事件
+ *
+ * ************************************************************************
+ * @copyright Copyright (c) 2025 AnakinLiu
+ * For study and research only, no reprinting.
+ * ************************************************************************
+ */
 #pragma once
 #include <entt/entt.hpp>
 #include <string>
@@ -22,9 +37,9 @@ struct NextTurn
 
 struct GotKilled
 {
-    entt::entity player;        // 死亡的玩家实体
-    entt::entity killer;        // 杀死该玩家的实体（若有）
-    std::string deathReason;    // 死亡原因描述
+    entt::entity player;     // 死亡的玩家实体
+    entt::entity killer;     // 杀死该玩家的实体（若有）
+    std::string deathReason; // 死亡原因描述
 };
 
 } // namespace events

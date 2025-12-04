@@ -20,8 +20,15 @@
     可以设置对齐方式 左（上）/居中/右（下）
     可以设置滚动条/无滚动条
     可以设置组件间距
-    可以设置边距
+    可以设置边距 - 是内边距
     不单独处理文本/图片，由外部widget决定
+    - 提供添加和删除widget的方法 addWidget/removeWidget
+    - 提供设置选择模式的方法 setSelectionMode
+    - 提供选择和取消选择项的方法 selectItem/deselectItem/clearSelection
+    - 提供获取选中项的方法 getSelectedIndices
+    - 提供设置布局的方法 setDirection/setAlignment/setItemSpacing/setMargins
+    - 提供设置默认项高度的方法 setDefaultItemHeight
+    - 提供设置滚动条启用状态的方法 setScrollbarEnabled
  * ************************************************************************
  * @copyright Copyright (c) 2025 AnakinLiu
  * For study and research only, no reprinting.

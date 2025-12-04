@@ -57,10 +57,11 @@ public:
     {
         m_context->dispatcher.sink<events::GameStart>().disconnect<&GameFlowSystem::onGameStart>(this);
     };
-    void onGameStart(const events::GameStart& event) {
+    void onGameStart(const events::GameStart& event)
+    {
         // 处理游戏开始事件的逻辑
-        for (auto player : m_playerQueue){
-            
+        for (auto player : m_playerQueue)
+        {
         }
     };
 
@@ -70,6 +71,18 @@ public:
     void onNextTurn(const events::NextTurn& event) {
         // 处理下一回合事件的逻辑
 
+    };
+
+    void onLogin()
+    {
+        // 处理玩家登录事件的逻辑
+        m_playerQueue.add(CreatePlayer(m_context->registry,
+                                       MetaPlayerInfo{.playerName = "Player1", .playerID = 1},
+                                       CharacterInfo{.characterCard = entt::null},
+                                       HandCards{},
+                                       Equipments{},
+                                       LiveStatus{true}));
+        
     };
 
 private:
@@ -186,9 +199,9 @@ private:
         // 清理资源，显示结算信息
     }
 
-    void 
+    void
 
-    GameContext* m_context;
+        GameContext* m_context;
     utils::RoundRobin<entt::entity> m_playerQueue;
     TurnPhase m_currentPhase{TurnPhase::GAME_START};
     absl::flat_hash_map<TurnPhase, entt::delegate<void()>> m_phaseHandlers;

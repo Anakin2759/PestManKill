@@ -25,9 +25,9 @@ namespace ui
 {
 enum class AnimationProperty : uint8_t
 {
-    POSITION,
-    SIZE,
-    OPACITY
+    POSITION, // 位置
+    SIZE,     // 大小
+    OPACITY   // 透明度
 };
 
 enum class EasingType : uint8_t

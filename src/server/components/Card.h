@@ -22,9 +22,9 @@
 
 struct MetaCardInfo
 {
-    std::string name;
-    std::string description; // 新增描述字段
-    CardType type = CardType::BASIC;
+    std::string name;                // 牌名
+    std::string description;         // 新增描述字段
+    CardType type = CardType::BASIC; // 牌类型
 };
 
 struct CardCost
@@ -122,31 +122,56 @@ inline entt::entity CreateEquipCard(entt::registry& reg,
     reg.emplace<EquipCardTypeTag>(ent, EquipCardTypeTag{equipType});
     return ent;
 }
-
-inline entt::entity CreateAttackCard(entt::registry& reg,
-                                     const MetaCardInfo& metaInfo,
-                                     const CardCost& cost,
-                                     const CardPointAndSuit& pointAndSuit,
-                                     const CardEffect& effect)
+/**
+ * @brief 创建杀卡牌实体
+ * @param reg 注册表
+ * @param pointAndSuit 点数和花色
+ * @return entt::entity 实体ID
+ */
+inline entt::entity CreateStrickCard(entt::registry& reg, const CardPointAndSuit& pointAndSuit)
 {
-    CardTarget target{};
-    target.needTarget = true;
-    target.minTargets = 1;
-    target.maxTargets = 1;
-    target.range = 1; // 近战攻击
+    CardTarget target{
+        .needTarget = true,
+        .minTargets = 1,
+        .maxTargets = 1,
+        .range = 1,
+    };
+    CardCost cost{};
+    CardEffect effect{.apply = [](entt::entity user, std::span<entt::entity> targets, entt::registry& reg)
+                      {
+                          for (auto target : targets)
+                          {
+                              // reg.trigger<events::CardUsed>(user, target, reg);
+                          }
+                      }};
 
-    return CreateBasicCard(reg, metaInfo, cost, target, pointAndSuit, effect, BasicCardType::STRIKE);
+    return CreateBasicCard(reg,
+                           {.name = "杀", .description = "需要使用一张闪否则造成一点伤害", .type = CardType::BASIC},
+                           cost,
+                           target,
+                           pointAndSuit,
+                           effect,
+                           BasicCardType::STRIKE);
 }
 
-inline entt::entity CreateDodgeCard(entt::registry& reg,
-                                    const MetaCardInfo& metaInfo,
-                                    const CardCost& cost,
-                                    const CardPointAndSuit& pointAndSuit,
-                                    const CardEffect& effect)
+/**
+ * @brief 创建闪卡牌实体
+ * @param reg 注册表
+ * @param pointAndSuit 点数和花色
+ * @return entt::entity 实体ID
+ */
+inline entt::entity CreateDodgeCard(entt::registry& reg, const CardPointAndSuit& pointAndSuit)
 {
-    CardTarget target{};
-    target.needTarget = false; // 闪不需要目标
-
+    CardTarget target{.needTarget = false, .minTargets = 0, .maxTargets = 0, .range = 0};
+    MetaCardInfo metaInfo{.name = "闪", .description = "用于抵消一张杀的伤害", .type = CardType::BASIC};
+    CardCost cost{};
+    CardEffect effect{.apply = [](entt::entity user, std::span<entt::entity> targets, entt::registry& reg)
+                      {
+                          for (auto target : targets)
+                          {
+                              // reg.trigger<events::CardUsed>(user, target, reg);
+                          }
+                      }};
     return CreateBasicCard(reg, metaInfo, cost, target, pointAndSuit, effect, BasicCardType::DODGE);
 }
 
@@ -165,11 +190,13 @@ inline entt::entity CreatePeachCard(entt::registry& reg,
     return CreateBasicCard(reg, metaInfo, cost, target, pointAndSuit, effect, BasicCardType::PEACH);
 }
 
-inline entt::entity CreateAlcoholCard(entt::registry& reg,
-                                      const MetaCardInfo& metaInfo,
-                                      const CardCost& cost,
-                                      const CardPointAndSuit& pointAndSuit,
-                                      const CardEffect& effect)
+/**
+ * @brief 创建酒卡牌实体
+ * @param reg 注册表
+ * @param pointAndSuit 点数和花色
+ * @return entt::entity 实体ID
+ */
+inline entt::entity CreateAlcoholCard(entt::registry& reg, const CardPointAndSuit& pointAndSuit)
 {
     CardTarget target{};
     target.needTarget = true;
@@ -177,20 +204,73 @@ inline entt::entity CreateAlcoholCard(entt::registry& reg,
     target.maxTargets = 1;
     target.range = 0; // 无距离限制
 
+    MetaInfo metaInfo{.name = "酒",
+                      .description = "回合内使用后，下一次受到的伤害-1（至少为1）,濒死状态下使用可回复1点体力",
+                      .type = CardType::BASIC};
+    CardCost cost{};
+    CardEffect effect{.apply = [](entt::entity user, std::span<entt::entity> targets, entt::registry& reg)
+                      {
+                          for (auto target : targets)
+                          {
+                              // reg.trigger<events::CardUsed>(user, target, reg);
+                          }
+                      }};
     return CreateBasicCard(reg, metaInfo, cost, target, pointAndSuit, effect, BasicCardType::ALCOHOL);
 }
 
-inline entt::entity CreateFireAttackCard(entt::registry& reg,
-                                         const MetaCardInfo& metaInfo,
-                                         const CardCost& cost,
-                                         const CardPointAndSuit& pointAndSuit,
-                                         const CardEffect& effect)
+/**
+ * @brief 创建火攻卡牌实体
+ * @param reg 注册表
+ * @param pointAndSuit 点数和花色
+ * @return entt::entity 实体ID
+ */
+inline entt::entity CreateFireAttackCard(entt::registry& reg, const CardPointAndSuit& pointAndSuit)
 {
     CardTarget target{};
     target.needTarget = true;
     target.minTargets = 1;
     target.maxTargets = 1;
     target.range = 0;
+    MetaInfo metaInfo{.name = "火攻",
+                      .description = "对目标角色造成一点火焰伤害，目标角色可以使用一张闪避来抵消伤害",
+                      .type = CardType::STRATEGY};
+    CardCost cost{};
+    CardEffect effect{.apply = [](entt::entity user, std::span<entt::entity> targets, entt::registry& reg)
+                      {
+                          for (auto target : targets)
+                          {
+                              // reg.trigger<events::CardUsed>(user, target, reg);
+                          }
+                      }};
 
     return CreateStrategyCard(reg, metaInfo, cost, target, pointAndSuit, effect, StrategyCardType::FIRE_ATTACK);
+}
+
+/**
+ * @brief 创建决斗卡牌实体
+ * @param reg 注册表
+ * @param pointAndSuit 点数和花色
+ * @return entt::entity 实体ID
+ */
+inline entt::entity CreateDuelCard(entt::registry& reg, const CardPointAndSuit& pointAndSuit)
+{
+    CardTarget target{
+        .needTarget = true,
+        .minTargets = 1,
+        .maxTargets = 1,
+        .range = 0xFF, // 无距离限制
+    };
+    MetaInfo metaInfo{.name = "决斗",
+                      .description = "与你指定的角色进行决斗，双方轮流出杀，未能出杀的一方受到一点伤害",
+                      .type = CardType::STRATEGY};
+    CardCost cost{};
+    CardEffect effect{.apply = [](entt::entity user, std::span<entt::entity> targets, entt::registry& reg)
+                      {
+                          for (auto target : targets)
+                          {
+                              // reg.trigger<events::CardUsed>(user, target, reg);
+                          }
+                      }};
+
+    return CreateStrategyCard(reg, metaInfo, cost, target, pointAndSuit, effect, StrategyCardType::DUEL);
 }

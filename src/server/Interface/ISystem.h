@@ -1,4 +1,19 @@
-
+/**
+ * ************************************************************************
+ *
+ * @file ISystem.h
+ * @author AnakinLiu (azrael2759@qq.com)
+ * @date 2025-12-04
+ * @version 0.1
+ * @brief 系统接口定义
+    所有系统均实现该接口
+    提供注册和注销事件的方法
+ *
+ * ************************************************************************
+ * @copyright Copyright (c) 2025 AnakinLiu
+ * For study and research only, no reprinting.
+ * ************************************************************************
+ */
 #pragma once
 #include <entt/entt.hpp>
 #include <entt/poly/poly.hpp>
