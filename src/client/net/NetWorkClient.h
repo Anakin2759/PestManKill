@@ -36,13 +36,26 @@ class NetWorkClient : public std::enable_shared_from_this<NetWorkClient>
 {
 public:
     explicit NetWorkClient() = default;
-    ~NetWorkClient() { stop(); }
+
+    ~NetWorkClient() noexcept
+    {
+        try
+        {
+            stop();
+        }
+        catch (...)
+        {
+            // 析构函数不应抛出异常
+        }
+    }
 
     void start()
     {
         if (m_running.exchange(true)) return;
 
         m_socket.emplace(m_ioContext, asio::ip::udp::v4());
+
+        utils::LOG_INFO("Network client started, socket ready");
 
         auto self = shared_from_this();
         // 启动 receiveLoop 协程
@@ -54,30 +67,57 @@ public:
 
         // 启动 io_context 在 ThreadPool 上
         asio::post(utils::ThreadPool::getInstance().get_executor(), [self] { self->m_ioContext.run(); });
+
+        // Give io_context time to start processing
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 
-    void stop()
+    void stop() noexcept
     {
-        bool expected = true;
-        if (!m_running.compare_exchange_strong(expected, false)) return;
-
-        if (m_socket)
+        try
         {
-            asio::error_code cancelError;
-            [[maybe_unused]] auto cancelResult = m_socket->cancel(cancelError);
-            if (cancelError)
+            bool expected = true;
+            if (!m_running.compare_exchange_strong(expected, false))
             {
-                utils::LOG_WARN("Socket cancel failed: {}", cancelError.message());
+                return;
             }
 
-            asio::error_code closeError;
-            [[maybe_unused]] auto closeResult = m_socket->close(closeError);
-            if (closeError)
+            if (m_socket)
             {
-                utils::LOG_WARN("Socket close failed: {}", closeError.message());
+                asio::error_code cancelError;
+                [[maybe_unused]] auto cancelResult = m_socket->cancel(cancelError);
+                if (cancelError)
+                {
+                    utils::LOG_WARN("Socket cancel failed: {}", cancelError.message());
+                }
+
+                asio::error_code closeError;
+                [[maybe_unused]] auto closeResult = m_socket->close(closeError);
+                if (closeError)
+                {
+                    utils::LOG_WARN("Socket close failed: {}", closeError.message());
+                }
+
+                m_socket.reset();
             }
+
+            // 清理所有待处理的 ACK
+            {
+                std::scoped_lock lock(m_ackMutex);
+                m_pendingAcks.clear();
+            }
+
+            m_ioContext.stop();
         }
-        m_ioContext.stop();
+        catch (const std::exception& e)
+        {
+            // stop 应当是 noexcept，记录但不抛出
+            utils::LOG_ERROR("Stop failed: {}", e.what());
+        }
+        catch (...)
+        {
+            utils::LOG_ERROR("Stop failed with unknown exception");
+        }
     }
 
     NetWorkClient(const NetWorkClient&) = delete;
@@ -110,7 +150,7 @@ public:
         m_serverEndpoint = asio::ip::udp::endpoint{};
     }
 
-    void setPacketHandler(std::function<void(const uint8_t*, size_t, const asio::ip::udp::endpoint&)> handler)
+    void setPacketHandler(std::function<void(uint16_t, const uint8_t*, size_t, const asio::ip::udp::endpoint&)> handler)
     {
         m_packetHandler = std::move(handler);
     }
@@ -118,14 +158,31 @@ public:
     // 不可靠发送
     asio::awaitable<void> sendPacket(uint16_t type, std::vector<uint8_t> payload)
     {
-        if (!m_running.load()) co_return;
+        if (!m_running.load())
+        {
+            utils::LOG_ERROR("Cannot send packet: network not running");
+            co_return;
+        }
+
+        utils::LOG_INFO("[Client] sendPacket type={}, size={} bytes", type, payload.size());
 
         auto data = buildPacket(type, 0, payload);
         asio::error_code errorCode;
-        co_await m_socket->async_send_to(asio::buffer(*data),
-                                         m_serverEndpoint,
-                                         asio::bind_executor(utils::ThreadPool::getInstance().get_executor(),
-                                                             asio::redirect_error(asio::use_awaitable, errorCode)));
+        size_t sent =
+            co_await m_socket->async_send_to(asio::buffer(*data),
+                                             m_serverEndpoint,
+                                             asio::bind_executor(utils::ThreadPool::getInstance().get_executor(),
+                                                                 asio::redirect_error(asio::use_awaitable, errorCode)));
+
+        if (errorCode)
+        {
+            utils::LOG_ERROR("Send packet failed: {}", errorCode.message());
+        }
+        else
+        {
+            utils::LOG_DEBUG(
+                "Sent {} bytes to {}:{}", sent, m_serverEndpoint.address().to_string(), m_serverEndpoint.port());
+        }
     }
 
     // 可靠发送
@@ -140,26 +197,37 @@ public:
         uint32_t seq = m_nextSeq.fetch_add(1, std::memory_order_relaxed);
         auto data = buildPacket(type, seq, payload);
 
+        utils::LOG_INFO("[Client] Sending reliable packet: type={}, seq={}, size={}", type, seq, payload.size());
+
         for (int retry = 0; retry < maxRetries; ++retry)
         {
             if (!m_running.load()) co_return false;
 
             asio::error_code errorCode;
-            co_await m_socket->async_send_to(asio::buffer(*data),
-                                             m_serverEndpoint,
-                                             asio::bind_executor(utils::ThreadPool::getInstance().get_executor(),
-                                                                 asio::redirect_error(asio::use_awaitable, errorCode)));
+            size_t sent = co_await m_socket->async_send_to(
+                asio::buffer(*data),
+                m_serverEndpoint,
+                asio::bind_executor(utils::ThreadPool::getInstance().get_executor(),
+                                    asio::redirect_error(asio::use_awaitable, errorCode)));
 
             if (errorCode)
             {
-                utils::LOG_ERROR("Failed to send reliable packet: {}", errorCode.message());
+                utils::LOG_ERROR("Failed to send reliable packet (retry {}): {}", retry, errorCode.message());
                 co_return false;
             }
 
+            utils::LOG_DEBUG("Sent {} bytes (seq={}), waiting for ACK... (retry {})", sent, seq, retry);
+
             bool ack = co_await waitForAck(seq, timeout);
-            if (ack) co_return true;
+            if (ack)
+            {
+                utils::LOG_DEBUG("Received ACK for seq={}", seq);
+                co_return true;
+            }
+            utils::LOG_WARN("Timeout waiting for ACK (seq={}, retry={})", seq, retry);
         }
 
+        utils::LOG_ERROR("Failed to send reliable packet after {} retries", maxRetries);
         co_return false;
     }
 
@@ -204,6 +272,7 @@ private:
 
     asio::awaitable<void> receiveLoop()
     {
+        utils::LOG_INFO("Receive loop started");
         std::array<uint8_t, MAX_PACKET_SIZE> buf{};
         asio::ip::udp::endpoint sender;
 
@@ -216,11 +285,31 @@ private:
                 asio::bind_executor(utils::ThreadPool::getInstance().get_executor(),
                                     asio::redirect_error(asio::use_awaitable, errorCode)));
 
-            if (errorCode) break;
-            if (bytes < sizeof(PacketHeader)) continue;
+            if (errorCode)
+            {
+                if (errorCode != asio::error::operation_aborted)
+                {
+                    utils::LOG_ERROR("Receive error: {}", errorCode.message());
+                }
+                break;
+            }
+
+            utils::LOG_DEBUG("Received {} bytes from {}:{}", bytes, sender.address().to_string(), sender.port());
+
+            if (bytes < sizeof(PacketHeader))
+            {
+                utils::LOG_WARN("Packet too small: {} bytes", bytes);
+                continue;
+            }
 
             PacketHeader header{};
             std::memcpy(&header, buf.data(), sizeof(PacketHeader));
+
+            utils::LOG_INFO("[Client] Received packet: type={}, seq={}, ack={}, payloadSize={}",
+                            header.type,
+                            header.seq,
+                            header.ack,
+                            header.size);
 
             // 处理 ACK
             if (header.type == ACK_PACKET_TYPE && header.ack != 0)
@@ -254,10 +343,15 @@ private:
             if (m_packetHandler)
             {
                 asio::post(utils::ThreadPool::getInstance().get_executor(),
-                           [self = shared_from_this(), buf, size = header.size, sender, handler = m_packetHandler]()
+                           [self = shared_from_this(),
+                            buf,
+                            type = header.type,
+                            size = header.size,
+                            sender,
+                            handler = m_packetHandler]()
                            {
-                               // 使用偏移量而非指针算术
-                               handler(&buf[sizeof(PacketHeader)], size, sender);
+                               // 传递消息类型和 Payload
+                               handler(type, &buf[sizeof(PacketHeader)], size, sender);
                            });
             }
         }
@@ -289,7 +383,7 @@ private:
     asio::ip::udp::endpoint m_serverEndpoint;
     std::atomic<uint32_t> m_nextSeq{1};
 
-    std::function<void(const uint8_t*, size_t, const asio::ip::udp::endpoint&)> m_packetHandler;
+    std::function<void(uint16_t, const uint8_t*, size_t, const asio::ip::udp::endpoint&)> m_packetHandler;
 
     // 多可靠包 ACK 管理
     std::unordered_map<uint32_t, std::shared_ptr<asio::steady_timer>> m_pendingAcks;

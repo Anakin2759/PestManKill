@@ -41,5 +41,11 @@ inline void LOG_ERROR(fmt::format_string<Args...> fmt, Args&&... args)
 {
     Logger::getLogger()->error(fmt, std::forward<Args>(args)...);
 }
+
+template <typename... Args>
+inline void LOG_DEBUG(fmt::format_string<Args...> fmt, Args&&... args)
+{
+    Logger::getLogger()->debug(fmt, std::forward<Args>(args)...);
+}
 } // namespace utils
 // NOLINTEND

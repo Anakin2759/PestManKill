@@ -5,14 +5,19 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON) #生成compile_commands.json文件
 set(CMAKE_CXX_EXTENSIONS OFF)
+if (MSVC)
+    add_compile_options(/utf-8)
+endif()
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
     # clang-cl 使用 MSVC 风格的链接
+    add_compile_options(/utf-8)
+
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /clang:-fms-compatibility-version=19.33")
 endif()
 
 # ==================== 静态分析工具 clang-tidy ====================
 # 允许用户通过选项启用或禁用 clang-tidy
-option(ENABLE_CLANG_TIDY "Enable clang-tidy static analysis" OFF)
+option(ENABLE_CLANG_TIDY "Enable clang-tidy static analysis" ON)
 
 # 查找 clang-tidy 可执行文件
 find_program(CLANG_TIDY_EXE

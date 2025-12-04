@@ -59,7 +59,9 @@ public:
     };
     void onGameStart(const events::GameStart& event) {
         // 处理游戏开始事件的逻辑
-        
+        for (auto player : m_playerQueue){
+            
+        }
     };
 
     void onGameEnd(const events::GameEnd& event) {

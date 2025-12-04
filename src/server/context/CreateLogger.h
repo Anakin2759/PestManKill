@@ -19,6 +19,9 @@ inline std::shared_ptr<spdlog::logger> CreateRollingLogger()
     logger->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%l] %v");
     logger->set_level(spdlog::level::debug);
     logger->flush_on(spdlog::level::info);
-
+    auto sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+    sink->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%^%l%$] %v");
+    sink->set_level(spdlog::level::debug);
+    logger->sinks().push_back(sink);
     return logger;
 }

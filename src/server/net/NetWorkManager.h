@@ -29,7 +29,7 @@
 #include <atomic>
 #include <mutex>
 #include "src/shared/messages/PacketHeader.h"
-#include <spdlog/spdlog.h>
+#include "src/server/context/GameContext.h"
 
 constexpr uint16_t ACK_PACKET_TYPE = 0xFFFF;
 constexpr size_t MAX_PACKET_SIZE = 1024;
@@ -38,10 +38,7 @@ constexpr int DEFAULT_ACK_TIMEOUT_MS = 1000;
 class NetWorkManager : public std::enable_shared_from_this<NetWorkManager>
 {
 public:
-    explicit NetWorkManager(asio::thread_pool& threadPool, std::shared_ptr<spdlog::logger> logger)
-        : m_threadPool(&threadPool), m_logger(std::move(logger))
-    {
-    }
+    explicit NetWorkManager(GameContext& context) : m_context(context) {}
 
     ~NetWorkManager() { stop(); }
 
@@ -54,18 +51,23 @@ public:
         if (m_running.exchange(true)) return;
 
         m_socket.emplace(m_ioContext, asio::ip::udp::endpoint(asio::ip::udp::v4(), port));
-        m_logger->info("服务器启动，监听端口: {}", port);
 
         auto self = shared_from_this();
         // 启动 receiveLoop 协程
         asio::co_spawn(
-            m_threadPool->get_executor(),
+            m_context.threadPool.get_executor(),
             // NOLINTNEXTLINE(cppcoreguidelines-avoid-capturing-lambda-coroutines) - safe: shared_ptr ensures lifetime
             [self]() -> asio::awaitable<void> { co_await self->receiveLoop(); },
             asio::detached);
 
         // 启动 io_context 在 ThreadPool 上
-        asio::post(m_threadPool->get_executor(), [self] { self->m_ioContext.run(); });
+        asio::post(m_context.threadPool.get_executor(),
+                   [self]
+                   {
+                       self->m_context.logger->info("[Server] io_context run begin");
+                       self->m_ioContext.run();
+                       self->m_context.logger->info("[Server] io_context run end");
+                   });
     }
 
     void stop()
@@ -79,18 +81,18 @@ public:
             [[maybe_unused]] auto cancelResult = m_socket->cancel(cancelError);
             if (cancelError)
             {
-                m_logger->warn("Socket cancel failed: {}", cancelError.message());
+                m_context.logger->warn("Socket cancel failed: {}", cancelError.message());
             }
 
             asio::error_code closeError;
             [[maybe_unused]] auto closeResult = m_socket->close(closeError);
             if (closeError)
             {
-                m_logger->warn("Socket close failed: {}", closeError.message());
+                m_context.logger->warn("Socket close failed: {}", closeError.message());
             }
         }
         m_ioContext.stop();
-        m_logger->info("服务器已停止");
+        m_context.logger->info("服务器已停止");
     }
 
     NetWorkManager(const NetWorkManager&) = delete;
@@ -98,7 +100,7 @@ public:
     NetWorkManager(NetWorkManager&&) = delete;
     NetWorkManager& operator=(NetWorkManager&&) = delete;
 
-    void setPacketHandler(std::function<void(const uint8_t*, size_t, const asio::ip::udp::endpoint&)> handler)
+    void setPacketHandler(std::function<void(uint16_t, const uint8_t*, size_t, const asio::ip::udp::endpoint&)> handler)
     {
         m_packetHandler = std::move(handler);
     }
@@ -110,13 +112,21 @@ public:
 
         auto data = buildPacket(type, 0, payload);
         asio::error_code errorCode;
-        co_await m_socket->async_send_to(
-            asio::buffer(*data),
-            endpoint,
-            asio::bind_executor(m_threadPool->get_executor(), asio::redirect_error(asio::use_awaitable, errorCode)));
+        co_await m_socket->async_send_to(asio::buffer(*data),
+                                         endpoint,
+                                         asio::bind_executor(m_context.threadPool.get_executor(),
+                                                             asio::redirect_error(asio::use_awaitable, errorCode)));
         if (errorCode)
         {
-            m_logger->error("发送数据包失败: {}", errorCode.message());
+            m_context.logger->error("发送数据包失败: {}", errorCode.message());
+        }
+        else
+        {
+            m_context.logger->info("[Server] sendPacket type={} size={} bytes to {}:{}",
+                                   type,
+                                   payload.size(),
+                                   endpoint.address().to_string(),
+                                   endpoint.port());
         }
     }
 
@@ -133,6 +143,13 @@ public:
         uint32_t seq = m_nextSeq.fetch_add(1, std::memory_order_relaxed);
         auto data = buildPacket(type, seq, payload);
 
+        m_context.logger->info("[Server] Sending reliable packet: type={}, seq={}, size={} to {}:{}",
+                               type,
+                               seq,
+                               payload.size(),
+                               endpoint.address().to_string(),
+                               endpoint.port());
+
         for (int retry = 0; retry < maxRetries; ++retry)
         {
             if (!m_running.load()) co_return false;
@@ -140,22 +157,22 @@ public:
             asio::error_code errorCode;
             co_await m_socket->async_send_to(asio::buffer(*data),
                                              endpoint,
-                                             asio::bind_executor(m_threadPool->get_executor(),
+                                             asio::bind_executor(m_context.threadPool.get_executor(),
                                                                  asio::redirect_error(asio::use_awaitable, errorCode)));
 
             if (errorCode)
             {
-                m_logger->error("可靠发送失败: {}", errorCode.message());
+                m_context.logger->error("可靠发送失败: {}", errorCode.message());
                 co_return false;
             }
 
             bool ack = co_await waitForAck(seq, endpoint, timeout);
             if (ack)
             {
-                m_logger->debug("收到ACK确认, seq={}", seq);
+                m_context.logger->info("[Server] 收到ACK确认, seq={}", seq);
                 co_return true;
             }
-            m_logger->warn("未收到ACK, 重试 {}/{}", retry + 1, maxRetries);
+            m_context.logger->warn("[Server] 未收到ACK, 重试 {}/{}", retry + 1, maxRetries);
         }
 
         co_return false;
@@ -197,7 +214,7 @@ private:
     // 等待单个 ACK (事件驱动 + 超时)
     asio::awaitable<bool> waitForAck(uint32_t seq, asio::ip::udp::endpoint endpoint, std::chrono::milliseconds timeout)
     {
-        auto timer = std::make_shared<asio::steady_timer>(m_threadPool->get_executor());
+        auto timer = std::make_shared<asio::steady_timer>(m_context.threadPool.get_executor());
         timer->expires_after(timeout);
 
         AckKey key{seq, endpoint};
@@ -230,14 +247,14 @@ private:
             std::size_t bytes = co_await m_socket->async_receive_from(
                 asio::buffer(buf),
                 sender,
-                asio::bind_executor(m_threadPool->get_executor(),
+                asio::bind_executor(m_context.threadPool.get_executor(),
                                     asio::redirect_error(asio::use_awaitable, errorCode)));
 
             if (errorCode)
             {
                 if (errorCode != asio::error::operation_aborted)
                 {
-                    m_logger->error("接收数据失败: {}", errorCode.message());
+                    m_context.logger->error("接收数据失败: {}", errorCode.message());
                 }
                 break;
             }
@@ -263,7 +280,7 @@ private:
                 }
                 if (timer)
                 {
-                    asio::post(m_threadPool->get_executor(), [timer]() { timer->cancel(); });
+                    asio::post(m_context.threadPool.get_executor(), [timer]() { timer->cancel(); });
                 }
                 continue;
             }
@@ -272,7 +289,7 @@ private:
             if (header.seq != 0)
             {
                 asio::co_spawn(
-                    m_threadPool->get_executor(),
+                    m_context.threadPool.get_executor(),
                     // NOLINTNEXTLINE(cppcoreguidelines-avoid-capturing-lambda-coroutines) - safe: shared_ptr ensures
                     [self = shared_from_this(), seq = header.seq, sender]() -> asio::awaitable<void>
                     { co_await self->sendAck(seq, sender); },
@@ -280,11 +297,22 @@ private:
             }
 
             // 调用用户 handler
+            if (header.size > bytes - sizeof(PacketHeader))
+            {
+                m_context.logger->warn(
+                    "Payload size mismatch: header={}, actual={}", header.size, bytes - sizeof(PacketHeader));
+                continue;
+            }
+
             if (m_packetHandler)
             {
-                asio::post(m_threadPool->get_executor(),
-                           [self = shared_from_this(), buf, size = header.size, sender, handler = m_packetHandler]()
-                           { handler(&buf[sizeof(PacketHeader)], size, sender); });
+                asio::post(m_context.threadPool.get_executor(),
+                           [self = shared_from_this(),
+                            buf,
+                            type = header.type,
+                            size = header.size,
+                            sender,
+                            handler = m_packetHandler]() { handler(type, &buf[sizeof(PacketHeader)], size, sender); });
             }
         }
 
@@ -302,26 +330,24 @@ private:
         std::memcpy(ackBuf.data(), &ack, sizeof(PacketHeader));
 
         asio::error_code errorCode;
-        co_await m_socket->async_send_to(
-            asio::buffer(ackBuf),
-            endpoint,
-            asio::bind_executor(m_threadPool->get_executor(), asio::redirect_error(asio::use_awaitable, errorCode)));
+        co_await m_socket->async_send_to(asio::buffer(ackBuf),
+                                         endpoint,
+                                         asio::bind_executor(m_context.threadPool.get_executor(),
+                                                             asio::redirect_error(asio::use_awaitable, errorCode)));
         if (errorCode)
         {
-            m_logger->error("发送ACK失败: {}", errorCode.message());
+            m_context.logger->error("发送ACK失败: {}", errorCode.message());
         }
     }
 
+    GameContext& m_context;
     asio::io_context m_ioContext;
     std::optional<asio::ip::udp::socket> m_socket;
     std::atomic<bool> m_running{false};
 
-    asio::thread_pool* m_threadPool;
-    std::shared_ptr<spdlog::logger> m_logger;
-
     std::atomic<uint32_t> m_nextSeq{1};
 
-    std::function<void(const uint8_t*, size_t, const asio::ip::udp::endpoint&)> m_packetHandler;
+    std::function<void(uint16_t, const uint8_t*, size_t, const asio::ip::udp::endpoint&)> m_packetHandler;
 
     // 多可靠包 ACK 管理（按客户端endpoint区分）
     std::unordered_map<AckKey, std::shared_ptr<asio::steady_timer>, AckKeyHash> m_pendingAcks;

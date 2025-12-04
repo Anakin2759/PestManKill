@@ -9,4 +9,12 @@ struct NetworkMessageReceived
 {
     std::string message;
 };
+
+struct Login{
+};
+
+struct Logout{
+};
+
+
 } // namespace events
