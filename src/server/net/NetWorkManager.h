@@ -276,6 +276,17 @@ private:
                     {
                         timer = iter->second;
                         m_pendingAcks.erase(iter);
+                        m_context.logger->debug("[Server] Received ACK for seq={} from {}:{}",
+                                                header.ack,
+                                                sender.address().to_string(),
+                                                sender.port());
+                    }
+                    else
+                    {
+                        m_context.logger->warn("[Server] Received unexpected ACK for seq={} from {}:{}",
+                                               header.ack,
+                                               sender.address().to_string(),
+                                               sender.port());
                     }
                 }
                 if (timer)

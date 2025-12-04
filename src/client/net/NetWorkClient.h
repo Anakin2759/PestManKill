@@ -331,6 +331,7 @@ private:
             // 收到可靠包时发送 ACK
             if (header.seq != 0)
             {
+                utils::LOG_DEBUG("[Client] Received reliable packet with seq={}, sending ACK", header.seq);
                 asio::co_spawn(
                     utils::ThreadPool::getInstance().get_executor(),
                     // NOLINTNEXTLINE(cppcoreguidelines-avoid-capturing-lambda-coroutines) - safe: shared_ptr ensures
@@ -370,10 +371,20 @@ private:
         std::memcpy(ackBuf.data(), &ack, sizeof(PacketHeader));
 
         asio::error_code errorCode;
-        co_await m_socket->async_send_to(asio::buffer(ackBuf),
-                                         m_serverEndpoint,
-                                         asio::bind_executor(utils::ThreadPool::getInstance().get_executor(),
-                                                             asio::redirect_error(asio::use_awaitable, errorCode)));
+        size_t sent =
+            co_await m_socket->async_send_to(asio::buffer(ackBuf),
+                                             m_serverEndpoint,
+                                             asio::bind_executor(utils::ThreadPool::getInstance().get_executor(),
+                                                                 asio::redirect_error(asio::use_awaitable, errorCode)));
+
+        if (errorCode)
+        {
+            utils::LOG_ERROR("[Client] Failed to send ACK for seq={}: {}", seq, errorCode.message());
+        }
+        else
+        {
+            utils::LOG_DEBUG("[Client] Sent ACK for seq={}, {} bytes", seq, sent);
+        }
     }
 
     asio::io_context m_ioContext;

@@ -10,11 +10,20 @@ struct NetworkMessageReceived
     std::string message;
 };
 
-struct Login{
+struct Login
+{
 };
 
-struct Logout{
+struct Logout
+{
 };
 
+struct CreateRoom
+{
+};
+
+struct JoinRoom
+{
+};
 
 } // namespace events

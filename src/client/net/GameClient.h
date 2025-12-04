@@ -257,7 +257,7 @@ public:
 
         // 发送可靠消息
         bool success = co_await m_networkClient->sendReliablePacket(
-            static_cast<uint16_t>(MessageType::LOGIN), payload, 3, std::chrono::milliseconds(2000));
+            static_cast<uint16_t>(RequestType::LOGIN), payload, 3, std::chrono::milliseconds(2000));
 
         if (!success)
         {
@@ -286,7 +286,7 @@ public:
         asio::co_spawn(
             utils::ThreadPool::getInstance().get_executor(),
             [self = shared_from_this(), emptyPayload]() -> asio::awaitable<void>
-            { co_await self->m_networkClient->sendPacket(static_cast<uint16_t>(MessageType::LOGOUT), emptyPayload); },
+            { co_await self->m_networkClient->sendPacket(static_cast<uint16_t>(RequestType::LOGOUT), emptyPayload); },
             asio::detached);
     }
 
@@ -319,7 +319,7 @@ public:
         utils::LOG_INFO("Sending use card: card={}, targets={}", card, targetsStr);
 
         bool success =
-            co_await m_networkClient->sendReliablePacket(static_cast<uint16_t>(MessageType::USE_CARD), payload);
+            co_await m_networkClient->sendReliablePacket(static_cast<uint16_t>(RequestType::USE_CARD), payload);
 
         if (!success)
         {
@@ -356,7 +356,7 @@ public:
         utils::LOG_INFO("Sending discard cards: cards={}", cardsStr);
 
         bool success =
-            co_await m_networkClient->sendReliablePacket(static_cast<uint16_t>(MessageType::DISCARD_CARD), payload);
+            co_await m_networkClient->sendReliablePacket(static_cast<uint16_t>(RequestType::DISCARD_CARD), payload);
 
         if (!success)
         {
@@ -382,7 +382,7 @@ public:
         std::vector<uint8_t> emptyPayload;
 
         bool success =
-            co_await m_networkClient->sendReliablePacket(static_cast<uint16_t>(MessageType::END_TURN), emptyPayload);
+            co_await m_networkClient->sendReliablePacket(static_cast<uint16_t>(RequestType::END_TURN), emptyPayload);
 
         co_return success;
     }
@@ -394,7 +394,7 @@ public:
     {
         std::vector<uint8_t> payload(message.begin(), message.end());
 
-        co_await m_networkClient->sendPacket(static_cast<uint16_t>(MessageType::CHAT_MESSAGE), payload);
+        co_await m_networkClient->sendPacket(static_cast<uint16_t>(RequestType::CHAT_MESSAGE), payload);
     }
 
     // ==================== 心跳管理 ====================
@@ -447,20 +447,23 @@ private:
                           size_t size,
                           [[maybe_unused]] const asio::ip::udp::endpoint& sender)
     {
-        auto messageType = static_cast<MessageType>(msgType);
-
         utils::LOG_DEBUG("Received message: type={}, size={}", msgType, size);
 
-        // Dispatch by message type
-        switch (messageType)
+        // 目前客户端侧仍然按旧协议解析：
+        // 服务器用 LOGIN 作为登录响应、HEARTBEAT 作为心跳回显、
+        // GAME_STATE / USE_CARD / BROADCAST_EVENT / ERROR_MESSAGE / CHAT_MESSAGE 保持不变。
+        auto legacyType = static_cast<MessageType>(msgType);
+
+        switch (legacyType)
         {
             case MessageType::LOGIN:
                 handleLoginResponse(data, size);
                 break;
 
             case MessageType::HEARTBEAT:
-                // 心跳响应，无需处理
-                utils::LOG_DEBUG("Received HEARTBEAT from {}:{}", sender.address().to_string(), sender.port());
+                // 心跳响应：服务器确认收到心跳，连接正常
+                utils::LOG_DEBUG(
+                    "♥ Heartbeat acknowledged by server ({}:{})", sender.address().to_string(), sender.port());
                 break;
 
             case MessageType::GAME_STATE:
@@ -698,13 +701,14 @@ private:
             return;
         }
 
+        utils::LOG_DEBUG("♥ Sending heartbeat to server");
         std::vector<uint8_t> emptyPayload;
 
         asio::co_spawn(
             utils::ThreadPool::getInstance().get_executor(),
             [self = shared_from_this(), emptyPayload]() -> asio::awaitable<void>
             {
-                co_await self->m_networkClient->sendPacket(static_cast<uint16_t>(MessageType::HEARTBEAT), emptyPayload);
+                co_await self->m_networkClient->sendPacket(static_cast<uint16_t>(RequestType::HEARTBEAT), emptyPayload);
                 co_return;
             },
             asio::detached);

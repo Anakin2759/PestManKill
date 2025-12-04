@@ -40,7 +40,7 @@ void signalHandler(int signal)
     }
 }
 
-int main(int argc, char* argv[])
+int main()
 {
     // 注册信号处理
     std::signal(SIGINT, signalHandler);

@@ -44,9 +44,7 @@ private:
         m_context->logger->info("Received network message: {}", event.message);
     }
 
-    void LOGIN{
-        // 处理登录请求 无检查直接允许登录
-    };
+    
 
     GameContext* m_context;
     std::shared_ptr<NetWorkManager> m_networkManager;
