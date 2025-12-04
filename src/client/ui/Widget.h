@@ -8,6 +8,18 @@
  * @brief 基础组件类定义
   模拟 Qt 的组件基类 QWidget
   所有UI组件均继承自该类
+    提供基本的尺寸、位置、可见性、背景绘制等功能
+    支持子组件管理（树形结构）
+    提供渲染接口（基于 ImGui 实现）
+
+    - 提供设置和获取尺寸、位置的方法
+    - 提供设置和获取可见性的方法
+    - 提供设置和获取背景颜色和启用状态的方法
+    - 提供添加子组件的方法
+    - 提供渲染方法 render，用于绘制组件及其子组件
+    - 提供透明度设置方法
+    - 提供可选的 checkable 功能（类似复选框）
+    - 提供防止父子环的检测机制
  *
  * ************************************************************************
  * @copyright Copyright (c) 2025 AnakinLiu
@@ -245,6 +257,9 @@ protected:
         }
     }
 
+    void setRenderer(SDL_Renderer* renderer) { m_renderer = renderer; }
+    [[nodiscard]] SDL_Renderer* getRenderer() const { return m_renderer; }
+
 private:
     std::vector<Ptr> m_children;
 
@@ -274,5 +289,6 @@ private:
 
     bool m_drawBackground = false;
     ImVec4 m_backgroundColor{1.0F, 1.0F, 1.0F, 1.0F}; // 默认白色
+    SDL_Renderer* m_renderer = nullptr;
 };
 } // namespace ui

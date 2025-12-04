@@ -12,6 +12,8 @@
   支持设置图片路径动态更新图片
   基于stb_image实现图片加载
   基于ImGui实现图片渲染
+
+  sdl_render应该
  *
  * ************************************************************************
  * @copyright Copyright (c) 2025 AnakinLiu
@@ -42,8 +44,8 @@ public:
         STRETCH // 拉伸填充容器，可能变形
     };
 
-    explicit Image(SDL_Renderer* renderer, std::string_view imagePath = "", ScaleMode scaleMode = ScaleMode::FIT)
-        : m_renderer(renderer), m_imagePath(imagePath), m_scaleMode(scaleMode)
+    explicit Image(std::string_view imagePath = "", ScaleMode scaleMode = ScaleMode::FIT)
+        : m_imagePath(imagePath), m_scaleMode(scaleMode)
     {
         if (!m_imagePath.empty())
         {
@@ -90,7 +92,6 @@ public:
     }
 
 private:
-    SDL_Renderer* m_renderer;
     std::string m_imagePath;
     ScaleMode m_scaleMode;
     SDL_Texture* m_texture{nullptr};
@@ -136,7 +137,7 @@ private:
             return false;
         }
 
-        m_texture = SDL_CreateTextureFromSurface(m_renderer, surface);
+        m_texture = SDL_CreateTextureFromSurface(getRenderer(), surface);
         SDL_DestroySurface(surface); // SDL3: SDL_FreeSurface 重命名为 SDL_DestroySurface
         stbi_image_free(data);
 

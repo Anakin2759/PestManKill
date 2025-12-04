@@ -24,6 +24,8 @@
 #include "src/client/ui/Button.h"
 #include "src/client/ui/ListArea.h"
 
+#include "HandCardView.h"
+
 // NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers, readability-magic-numbers)
 class MainWindow : public ui::Application
 {

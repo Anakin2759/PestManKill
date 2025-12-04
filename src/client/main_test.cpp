@@ -40,31 +40,28 @@ public:
         utils::LOG_INFO("✅ Login successful! clientId={}, playerEntity={}", clientId, playerEntity);
     }
 
-    void onLoginFailed(const std::string& reason) { utils::LOG_ERROR("❌ Login failed: {}", reason); }
+    void onLoginFailed(const std::string_view reason) { utils::LOG_ERROR("❌ Login failed: {}", reason); }
 
     void onGameStart() { utils::LOG_INFO("🎮 Game started"); }
 
-    void onGameEnd(const std::string& reason) { utils::LOG_INFO("🏁 Game ended: {}", reason); }
-    void onPlayerJoined(const std::string& playerName) { utils::LOG_INFO("👤 Player joined: {}", playerName); }
+    void onGameEnd(std::string_view reason) { utils::LOG_INFO("🏁 Game ended: {}", reason); }
+    void onPlayerJoined(std::string_view playerName) { utils::LOG_INFO("👤 Player joined: {}", playerName); }
 
-    void onPlayerLeft(const std::string& playerName) { utils::LOG_INFO("👋 Player left: {}", playerName); }
+    void onPlayerLeft(std::string_view playerName) { utils::LOG_INFO("👋 Player left: {}", playerName); }
 
-    void onPlayerDisconnected(const std::string& playerName)
+    void onPlayerDisconnected(std::string_view playerName)
     {
         utils::LOG_WARN("⚠️  Player disconnected: {}", playerName);
     }
 
-    void onPlayerReconnected(const std::string& playerName)
-    {
-        utils::LOG_INFO("🔄 Player reconnected: {}", playerName);
-    }
+    void onPlayerReconnected(std::string_view playerName) { utils::LOG_INFO("🔄 Player reconnected: {}", playerName); }
 
     void onGameStateUpdate(const nlohmann::json& gameState)
     {
         utils::LOG_INFO("📦 Game state updated: {}", gameState.dump());
     }
 
-    void onUseCardResponse(bool success, const std::string& message)
+    void onUseCardResponse(bool success, std::string_view message)
     {
         if (success)
         {

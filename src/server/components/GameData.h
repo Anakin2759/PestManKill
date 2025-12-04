@@ -5,7 +5,7 @@
  * @author AnakinLiu (azrael2759@qq.com)
  * @date 2025-11-19
  * @version 0.1
- * @brief
+ * @brief 游戏数据结构定义
  *
  * ************************************************************************
  * @copyright Copyright (c) 2025 AnakinLiu

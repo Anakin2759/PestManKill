@@ -47,7 +47,7 @@ public:
      * @param jsonData JSON数据
      * @return 完整的数据包(不含Header,由NetworkManager添加)
      */
-    static std::vector<uint8_t> createJsonPacket(MessageType type, const nlohmann::json& jsonData)
+    static std::vector<uint8_t> createJsonPacket(RequestType type, const nlohmann::json& jsonData)
     {
         std::string jsonStr = jsonData.dump();
         std::vector<uint8_t> payload(jsonStr.begin(), jsonStr.end());
@@ -60,14 +60,14 @@ public:
      * @param data 二进制数据
      * @return 完整的数据包(不含Header)
      */
-    static std::vector<uint8_t> createBinaryPacket(MessageType type, const std::vector<uint8_t>& data) { return data; }
+    static std::vector<uint8_t> createBinaryPacket(RequestType type, const std::vector<uint8_t>& data) { return data; }
 
     /**
      * @brief 创建空数据包(只有类型,无payload)
      * @param type 消息类型
      * @return 空数据包
      */
-    static std::vector<uint8_t> createEmptyPacket(MessageType type) { return {}; }
+    static std::vector<uint8_t> createEmptyPacket(RequestType type) { return {}; }
 
     /**
      * @brief 创建包含POD结构体的数据包
@@ -77,10 +77,8 @@ public:
      * @return 完整的数据包(不含Header)
      */
     template <typename T>
-    static std::vector<uint8_t> createStructPacket(MessageType type, const T& data)
+    static std::vector<uint8_t> createStructPacket(RequestType type, const T& data)
 
-
-    
     {
         static_assert(std::is_standard_layout_v<T>, "T must be a POD type");
 
@@ -94,7 +92,7 @@ public:
     /**
      * @brief 创建心跳包
      */
-    static std::vector<uint8_t> createHeartbeat() { return createEmptyPacket(MessageType::HEARTBEAT); }
+    static std::vector<uint8_t> createHeartbeat() { return createEmptyPacket(RequestType::HEARTBEAT); }
 
     /**
      * @brief 创建登录请求包
@@ -104,13 +102,13 @@ public:
     static std::vector<uint8_t> createLoginRequest(const std::string& username, const std::string& password)
     {
         nlohmann::json loginData = {{"username", username}, {"password", password}};
-        return createJsonPacket(MessageType::LOGIN, loginData);
+        return createJsonPacket(RequestType::LOGIN, loginData);
     }
 
     /**
      * @brief 创建登出请求包
      */
-    static std::vector<uint8_t> createLogoutRequest() { return createEmptyPacket(MessageType::LOGOUT); }
+    static std::vector<uint8_t> createLogoutRequest() { return createEmptyPacket(RequestType::LOGOUT); }
 
     /**
      * @brief 创建使用卡牌消息包
@@ -122,7 +120,7 @@ public:
         createUseCardMessage(uint32_t playerId, uint32_t cardId, const std::vector<uint32_t>& targets)
     {
         nlohmann::json cardData = {{"player", playerId}, {"card", cardId}, {"targets", targets}};
-        return createJsonPacket(MessageType::USE_CARD, cardData);
+        return createJsonPacket(RequestType::USE_CARD, cardData);
     }
 
     /**
@@ -133,7 +131,7 @@ public:
     static std::vector<uint8_t> createDrawCardMessage(uint32_t playerId, uint32_t count = 1)
     {
         nlohmann::json drawData = {{"player", playerId}, {"count", count}};
-        return createJsonPacket(MessageType::DRAW_CARD, drawData);
+        return createJsonPacket(RequestType::DRAW_CARD, drawData);
     }
 
     /**
@@ -143,7 +141,7 @@ public:
     static std::vector<uint8_t> createEndTurnMessage(uint32_t playerId)
     {
         nlohmann::json endTurnData = {{"player", playerId}};
-        return createJsonPacket(MessageType::END_TURN, endTurnData);
+        return createJsonPacket(RequestType::END_TURN, endTurnData);
     }
 
     /**
@@ -155,19 +153,10 @@ public:
     static std::vector<uint8_t> createChatMessage(uint32_t senderId, const std::string& message, uint32_t channelId = 0)
     {
         nlohmann::json chatData = {{"sender", senderId}, {"message", message}, {"channel", channelId}};
-        return createJsonPacket(MessageType::CHAT_MESSAGE, chatData);
+        return createJsonPacket(RequestType::CHAT_MESSAGE, chatData);
     }
 
-    /**
-     * @brief 创建错误消息包
-     * @param errorCode 错误码
-     * @param errorMessage 错误描述
-     */
-    static std::vector<uint8_t> createErrorMessage(uint32_t errorCode, const std::string& errorMessage)
-    {
-        nlohmann::json errorData = {{"code", errorCode}, {"message", errorMessage}};
-        return createJsonPacket(MessageType::ERROR_MESSAGE, errorData);
-    }
+    // 注意：错误消息由服务器发送，客户端不应创建
 
     // ========== 数据包解析方法 ==========
 
@@ -249,46 +238,102 @@ public:
     // ========== 辅助方法 ==========
 
     /**
-     * @brief 获取消息类型的字符串表示
-     * @param type 消息类型
+     * @brief 获取请求类型的字符串表示
+     * @param type 请求类型
      * @return 类型名称
      */
-    static const char* getMessageTypeName(MessageType type)
+    static const char* getRequestTypeName(RequestType type)
     {
         switch (type)
         {
-            case MessageType::HEARTBEAT:
+            case RequestType::HEARTBEAT:
                 return "HEARTBEAT";
-            case MessageType::LOGIN:
+            case RequestType::LOGIN:
                 return "LOGIN";
-            case MessageType::LOGOUT:
+            case RequestType::LOGOUT:
                 return "LOGOUT";
-            case MessageType::USE_CARD:
+            case RequestType::USE_CARD:
                 return "USE_CARD";
-            case MessageType::DRAW_CARD:
+            case RequestType::DRAW_CARD:
                 return "DRAW_CARD";
-            case MessageType::END_TURN:
+            case RequestType::DISCARD_CARD:
+                return "DISCARD_CARD";
+            case RequestType::END_TURN:
                 return "END_TURN";
-            case MessageType::CHAT_MESSAGE:
+            case RequestType::NEXT_PHASE:
+                return "NEXT_PHASE";
+            case RequestType::CHOOSING_TARGET:
+                return "CHOOSING_TARGET";
+            case RequestType::CHAT_MESSAGE:
                 return "CHAT_MESSAGE";
-            case MessageType::GAME_STATE:
-                return "GAME_STATE";
-            case MessageType::ERROR_MESSAGE:
-                return "ERROR_MESSAGE";
-            case MessageType::ACK:
-                return "ACK";
             default:
                 return "UNKNOWN";
         }
     }
 
     /**
-     * @brief 将MessageType转换为uint16_t
+     * @brief 获取响应类型的字符串表示
+     * @param type 响应类型
+     * @return 类型名称
      */
-    static uint16_t toUint16(MessageType type) { return static_cast<uint16_t>(type); }
+    static const char* getResponseTypeName(ResponseType type)
+    {
+        switch (type)
+        {
+            case ResponseType::OK:
+                return "OK";
+            case ResponseType::ERROR_MESSAGE:
+                return "ERROR_MESSAGE";
+            default:
+                return "UNKNOWN";
+        }
+    }
 
     /**
-     * @brief 将uint16_t转换为MessageType
+     * @brief 获取事件类型的字符串表示
+     * @param type 事件类型
+     * @return 类型名称
      */
-    static MessageType fromUint16(uint16_t value) { return static_cast<MessageType>(value); }
+    static const char* getEventTypeName(EventType type)
+    {
+        switch (type)
+        {
+            case EventType::GAME_STATE:
+                return "GAME_STATE";
+            case EventType::BROADCAST_EVENT:
+                return "BROADCAST_EVENT";
+            default:
+                return "UNKNOWN";
+        }
+    }
+
+    /**
+     * @brief 将RequestType转换为uint16_t
+     */
+    static uint16_t toUint16(RequestType type) { return static_cast<uint16_t>(type); }
+
+    /**
+     * @brief 将ResponseType转换为uint16_t
+     */
+    static uint16_t toUint16(ResponseType type) { return static_cast<uint16_t>(type); }
+
+    /**
+     * @brief 将EventType转换为uint16_t
+     */
+    static uint16_t toUint16(EventType type) { return static_cast<uint16_t>(type); }
+
+    /**
+     * @brief 将uint16_t转换为RequestType
+     */
+    static RequestType toRequestType(uint16_t value) { return static_cast<RequestType>(value); }
+
+    /**
+     * @brief 将uint16_t转换为ResponseType
+     */
+    static ResponseType toResponseType(uint16_t value) { return static_cast<ResponseType>(value); }
+
+    /**
+     * @brief 将uint16_t转换为EventType
+     */
+    static EventType toEventType(uint16_t value) { return static_cast<EventType>(value); }
 };

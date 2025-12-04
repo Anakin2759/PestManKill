@@ -6,7 +6,7 @@
  * @date 2025-11-27
  * @version 0.1
  * @brief 主应用类定义
-    IMGUI+SDL3+SDL_Renderer3实现的UI应用框架
+    IMGUI+SDL3实现的UI应用框架
     模拟 Qt 的应用类 QApplication
  *
  * ************************************************************************
@@ -46,8 +46,8 @@ public:
             throw std::runtime_error(SDL_GetError());
         }
         utils::LOG_INFO("Window created: {} ({}x{})", title, width, height);
-        m_renderer = SDL_CreateRenderer(m_window, nullptr);
-        if (m_renderer == nullptr)
+        setRenderer(SDL_CreateRenderer(m_window, nullptr));
+        if (getRenderer() == nullptr)
         {
             throw std::runtime_error(SDL_GetError());
         }
@@ -62,9 +62,9 @@ public:
     ~Application() override
     {
         shutdownImGui();
-        if (m_renderer != nullptr)
+        if (getRenderer() != nullptr)
         {
-            SDL_DestroyRenderer(m_renderer);
+            SDL_DestroyRenderer(getRenderer());
         }
         if (m_window != nullptr)
         {
@@ -128,7 +128,7 @@ protected:
 
 private:
     SDL_Window* m_window = nullptr;
-    SDL_Renderer* m_renderer = nullptr;
+
     bool m_running = true;
     std::shared_ptr<Layout> m_rootLayout;
 
@@ -158,14 +158,14 @@ private:
 
         // 使用 Widget 的背景色设置
         const ImVec4& bgColor = getBackgroundColor();
-        SDL_SetRenderDrawColor(m_renderer,
+        SDL_SetRenderDrawColor(getRenderer(),
                                static_cast<Uint8>(bgColor.x * 255.0F),
                                static_cast<Uint8>(bgColor.y * 255.0F),
                                static_cast<Uint8>(bgColor.z * 255.0F),
                                static_cast<Uint8>(bgColor.w * 255.0F));
-        SDL_RenderClear(m_renderer);
-        ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), m_renderer);
-        SDL_RenderPresent(m_renderer);
+        SDL_RenderClear(getRenderer());
+        ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), getRenderer());
+        SDL_RenderPresent(getRenderer());
     }
 
     void initImGui()
@@ -199,8 +199,8 @@ private:
                                           &fontCfg,
                                           FONT_RANGES.data());
 
-        ImGui_ImplSDL3_InitForSDLRenderer(m_window, m_renderer);
-        ImGui_ImplSDLRenderer3_Init(m_renderer);
+        ImGui_ImplSDL3_InitForSDLRenderer(m_window, getRenderer());
+        ImGui_ImplSDLRenderer3_Init(getRenderer());
     }
 
     static void shutdownImGui()

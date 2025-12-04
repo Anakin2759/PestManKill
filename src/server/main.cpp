@@ -74,20 +74,20 @@ int main()
             [&logger, &sessionManager, &networkManager, &threadPool](
                 uint16_t type, const uint8_t* payload, size_t size, const asio::ip::udp::endpoint& sender)
             {
-                auto messageType = static_cast<MessageType>(type);
+                auto requestType = static_cast<RequestType>(type);
 
                 // 更新心跳
                 sessionManager->updateHeartbeat(sender);
 
-                logger->debug("Received message: type={}, size={}, from={}:{}",
+                logger->debug("Received message: type=0x{:04X}, size={}, from={}:{}",
                               type,
                               size,
                               sender.address().to_string(),
                               sender.port());
 
-                switch (messageType)
+                switch (requestType)
                 {
-                    case MessageType::LOGIN:
+                    case RequestType::LOGIN:
                     {
                         // 解析玩家名称
                         if (size == 0U)
@@ -110,7 +110,7 @@ int main()
                         // 注册会话
                         sessionManager->registerClient(sender, entt::entity(entityId), playerName);
 
-                        // 发送登录响应
+                        // 发送登录响应（使用 ResponseType::OK）
                         nlohmann::json response;
                         response["clientId"] = clientId;
                         response["entityId"] = entityId;
@@ -124,31 +124,31 @@ int main()
                             [networkManager, sender, payload_data]() -> asio::awaitable<void>
                             {
                                 co_await networkManager->sendReliablePacket(
-                                    sender, static_cast<uint16_t>(MessageType::LOGIN), payload_data);
+                                    sender, static_cast<uint16_t>(ResponseType::OK), payload_data);
                             },
                             asio::detached);
 
                         break;
                     }
 
-                    case MessageType::HEARTBEAT:
+                    case RequestType::HEARTBEAT:
                     {
                         logger->debug("Received heartbeat from {}:{}", sender.address().to_string(), sender.port());
 
-                        // 回复心跳
+                        // 回复心跳（使用 ResponseType::OK，空载荷）
                         std::vector<uint8_t> emptyPayload;
                         asio::co_spawn(
                             threadPool.get_executor(),
                             [networkManager, sender, emptyPayload]() -> asio::awaitable<void>
                             {
                                 co_await networkManager->sendPacket(
-                                    sender, static_cast<uint16_t>(MessageType::HEARTBEAT), emptyPayload);
+                                    sender, static_cast<uint16_t>(ResponseType::OK), emptyPayload);
                             },
                             asio::detached);
                         break;
                     }
 
-                    case MessageType::LOGOUT:
+                    case RequestType::LOGOUT:
                     {
                         auto entity = sessionManager->getPlayerEntity(sender);
                         if (entity.has_value())

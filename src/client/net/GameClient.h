@@ -45,11 +45,12 @@
  */
 enum class ClientState : uint8_t
 {
-    DISCONNECTED,  // 未连接
-    CONNECTING,    // 连接中
-    CONNECTED,     // 已连接（但未登录）
-    AUTHENTICATED, // 已认证（登录成功）
-    IN_GAME        // 游戏中
+    DISCONNECTED,   // 未连接
+    CONNECTING,     // 连接中
+    CONNECTED,      // 已连接（但未登录）
+    AUTHENTICATING, // 正在认证中
+    AUTHENTICATED,  // 已认证（登录成功）
+    IN_GAME         // 游戏中
 };
 /**
  * @brief 游戏客户端主类
@@ -205,6 +206,11 @@ public:
             {
                 m_messageHandler->onLoginFailed("Network error");
             }
+        }
+        else
+        {
+            // 登录请求发送成功，设置状态为正在认证
+            m_state = ClientState::AUTHENTICATING;
         }
     }
 
@@ -388,45 +394,72 @@ private:
     {
         utils::LOG_DEBUG("Received message: type={}, size={}", msgType, size);
 
-        // 目前客户端侧仍然按旧协议解析：
-        // 服务器用 LOGIN 作为登录响应、HEARTBEAT 作为心跳回显、
-        // GAME_STATE / USE_CARD / BROADCAST_EVENT / ERROR_MESSAGE / CHAT_MESSAGE 保持不变。
-        auto legacyType = static_cast<MessageType>(msgType);
-
-        switch (legacyType)
+        // 根据值范围判断消息类型：
+        // ResponseType: 0x0000~0x0FFF
+        // EventType: 0x0300~0x0FFF
+        // 优先判断 EventType（因为范围更具体）
+        if (msgType >= static_cast<uint16_t>(EventType::GAME_STATE) && msgType <= 0x0FFF)
         {
-            case MessageType::LOGIN:
-                handleLoginResponse(data, size);
-                break;
+            auto eventType = static_cast<EventType>(msgType);
+            switch (eventType)
+            {
+                case EventType::GAME_STATE:
+                    handleGameStateUpdate(data, size);
+                    break;
 
-            case MessageType::HEARTBEAT:
-                // 心跳响应：服务器确认收到心跳，连接正常
-                utils::LOG_DEBUG(
-                    "♥ Heartbeat acknowledged by server ({}:{})", sender.address().to_string(), sender.port());
-                break;
+                case EventType::BROADCAST_EVENT:
+                    handleBroadcastEvent(data, size);
+                    break;
 
-            case MessageType::GAME_STATE:
-                handleGameStateUpdate(data, size);
-                break;
+                default:
+                    utils::LOG_WARN("Unhandled event type: 0x{:04X}", msgType);
+            }
+        }
+        else if (msgType <= 0x0FFF)
+        {
+            auto responseType = static_cast<ResponseType>(msgType);
+            switch (responseType)
+            {
+                case ResponseType::OK:
+                    // 通用成功响应（可能是登录或心跳的回应）
+                    handleOkResponse(data, size, sender);
+                    break;
 
-            case MessageType::USE_CARD:
-                handleUseCardResponse(data, size);
-                break;
+                case ResponseType::ERROR_MESSAGE:
+                    handleErrorMessage(data, size);
+                    break;
 
-            case MessageType::BROADCAST_EVENT:
-                handleBroadcastEvent(data, size);
-                break;
+                default:
+                    utils::LOG_WARN("Unhandled response type: 0x{:04X}", msgType);
+            }
+        }
+        else
+        {
+            utils::LOG_WARN("Unknown message type: 0x{:04X}", msgType);
+        }
+    }
 
-            case MessageType::ERROR_MESSAGE:
-                handleErrorMessage(data, size);
-                break;
-
-            case MessageType::CHAT_MESSAGE:
-                handleChatMessage(data, size);
-                break;
-
-            default:
-                utils::LOG_WARN("Unhandled message type: {}", msgType);
+    /**
+     * @brief 处理通用成功响应（ResponseType::OK）
+     * 用于登录成功或心跳确认
+     */
+    void handleOkResponse(const uint8_t* data, size_t size, [[maybe_unused]] const asio::ip::udp::endpoint& sender)
+    {
+        // 如果当前状态是 AUTHENTICATING，说明是登录响应
+        if (m_state == ClientState::AUTHENTICATING)
+        {
+            handleLoginResponse(data, size);
+        }
+        // 否则可能是心跳响应
+        else if (size == 0 || (size > 0 && data[0] == 0))
+        {
+            // 空响应或心跳确认
+            utils::LOG_DEBUG("♥ Heartbeat acknowledged by server ({}:{})", sender.address().to_string(), sender.port());
+        }
+        else
+        {
+            // 其他 OK 响应，尝试解析
+            utils::LOG_DEBUG("Received OK response: size={}", size);
         }
     }
 
@@ -591,16 +624,47 @@ private:
     }
 
     /**
-     * @brief 处理聊天消息（文本数据）
+     * @brief 处理聊天消息（JSON 数据）
+     * 接收 SendMessageToChatResponse 结构：{ sender: uint32_t, chatMessage: string }
      */
     void handleChatMessage(const uint8_t* data, size_t size)
     {
-        std::string message(reinterpret_cast<const char*>(data), size);
-        utils::LOG_INFO("Chat message: {}", message);
-
-        if (m_messageHandler)
+        try
         {
-            m_messageHandler->onBroadcastEvent(message);
+            std::string jsonStr(reinterpret_cast<const char*>(data), size);
+            nlohmann::json json = nlohmann::json::parse(jsonStr);
+
+            uint32_t sender = json.value("sender", 0u);
+            std::string chatMessage = json.value("chatMessage", "");
+
+            utils::LOG_INFO("Chat message from player {}: {}", sender, chatMessage);
+
+            // 触发 SendMessageToChatResponded 事件（如果有事件系统）
+            // 这里先通过 message handler 处理
+            // 将来可以扩展为使用 entt::dispatcher 发送事件
+
+            if (m_messageHandler)
+            {
+                // 格式化消息：[发送者ID] 消息内容
+                std::string formattedMessage = "[Player " + std::to_string(sender) + "]: " + chatMessage;
+                m_messageHandler->onBroadcastEvent(formattedMessage);
+            }
+        }
+        catch (const nlohmann::json::exception& e)
+        {
+            // 如果不是 JSON 格式，可能是旧格式的纯文本
+            utils::LOG_WARN("Failed to parse chat message as JSON: {}, treating as plain text", e.what());
+            std::string message(reinterpret_cast<const char*>(data), size);
+            utils::LOG_INFO("Chat message (plain text): {}", message);
+
+            if (m_messageHandler)
+            {
+                m_messageHandler->onBroadcastEvent(message);
+            }
+        }
+        catch (const std::exception& e)
+        {
+            utils::LOG_ERROR("Failed to handle chat message: {}", e.what());
         }
     }
 

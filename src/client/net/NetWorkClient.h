@@ -37,17 +37,7 @@ class NetWorkClient : public std::enable_shared_from_this<NetWorkClient>
 public:
     explicit NetWorkClient() = default;
 
-    ~NetWorkClient() noexcept
-    {
-        try
-        {
-            stop();
-        }
-        catch (...)
-        {
-            // 析构函数不应抛出异常
-        }
-    }
+    ~NetWorkClient() noexcept { stop(); }
 
     void start()
     {
