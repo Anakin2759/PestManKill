@@ -26,6 +26,7 @@ Checks: >
   -fuchsia-header-anon-namespaces,
   -fuchsia-multiple-inheritance,
   -misc-non-private-member-variables-in-classes,
+  -clang-diagnostic-unknown-argument,
 
 
 CheckOptions:
@@ -119,3 +120,4 @@ ExtraArgs:
   - -DUNICODE
   - -D_UNICODE
   - -Wno-unknown-pragmas
+  - -fexceptions          

@@ -24,6 +24,7 @@
 #include <unordered_map>
 #include <vector>
 #include <atomic>
+#include <absl/container/flat_hash_map.h>
 #include "src/shared/messages/PacketHeader.h"
 #include "src/client/utils/ThreadPool.h"
 #include "src/client/utils/Logger.h"
@@ -364,17 +365,23 @@ private:
         m_running.store(false);
     }
 
+    /**
+     * @brief 发送确认包
+     * @param seq 序列号
+     * @return asio::awaitable<void> 协程任务
+     */
     asio::awaitable<void> sendAck(uint32_t seq)
     {
         if (!m_running.load())
         {
-            co_return;
+            co_return; // 网络未运行，直接返回
         }
         PacketHeader ack{.seq = 0, .ack = seq, .type = ACK_PACKET_TYPE, .size = 0};
         std::array<uint8_t, sizeof(PacketHeader)> ackBuf{};
         std::memcpy(ackBuf.data(), &ack, sizeof(PacketHeader));
 
         asio::error_code errorCode;
+        // 发送 ACK 包
         size_t sent =
             co_await m_socket->async_send_to(asio::buffer(ackBuf),
                                              m_serverEndpoint,
@@ -401,6 +408,6 @@ private:
     std::function<void(uint16_t, const uint8_t*, size_t, const asio::ip::udp::endpoint&)> m_packetHandler;
 
     // 多可靠包 ACK 管理
-    std::unordered_map<uint32_t, std::shared_ptr<asio::steady_timer>> m_pendingAcks;
+    absl::flat_hash_map<uint32_t, std::shared_ptr<asio::steady_timer>> m_pendingAcks;
     std::mutex m_ackMutex; // 保护 pendingAcks
 };

@@ -30,6 +30,7 @@
 #include <mutex>
 #include "src/shared/messages/PacketHeader.h"
 #include "src/server/context/GameContext.h"
+#include <absl/container/flat_hash_map.h>
 
 constexpr uint16_t ACK_PACKET_TYPE = 0xFFFF;
 constexpr size_t MAX_PACKET_SIZE = 1024;
@@ -361,6 +362,6 @@ private:
     std::function<void(uint16_t, const uint8_t*, size_t, const asio::ip::udp::endpoint&)> m_packetHandler;
 
     // 多可靠包 ACK 管理（按客户端endpoint区分）
-    std::unordered_map<AckKey, std::shared_ptr<asio::steady_timer>, AckKeyHash> m_pendingAcks;
+    absl::flat_hash_map<AckKey, std::shared_ptr<asio::steady_timer>, AckKeyHash> m_pendingAcks;
     std::mutex m_ackMutex; // 保护 pendingAcks
 };

@@ -1,3 +1,17 @@
+/**
+ * ************************************************************************
+ *
+ * @file IServerMessageHandler.h
+ * @author AnakinLiu (azrael2759@qq.com)
+ * @date 2025-12-05
+ * @version 0.1
+ * @brief 服务器消息处理接口定义
+ *
+ * ************************************************************************
+ * @copyright Copyright (c) 2025 AnakinLiu
+ * For study and research only, no reprinting.
+ * ************************************************************************
+ */
 #pragma once
 #include <string>
 #include <nlohmann/json.hpp>

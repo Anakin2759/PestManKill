@@ -6,37 +6,18 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON) #生成compile_commands.json文件
 set(CMAKE_CXX_EXTENSIONS OFF)
 if (MSVC)
+    message(STATUS "MSVC")
     add_compile_options(/utf-8)
+    # 对所有 target 都启用异常展开
+    add_compile_options(/EHsc)
 endif()
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
     # clang-cl 使用 MSVC 风格的链接
     add_compile_options(/utf-8)
-
+    add_compile_options(/EHsc)  # <--- 启用异常展开
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /clang:-fms-compatibility-version=19.33")
 endif()
 
-# ==================== 静态分析工具 clang-tidy ====================
-# 允许用户通过选项启用或禁用 clang-tidy
-option(ENABLE_CLANG_TIDY "Enable clang-tidy static analysis" ON)
-
-# 查找 clang-tidy 可执行文件
-find_program(CLANG_TIDY_EXE
-    NAMES clang-tidy
-)
-
-
-if (ENABLE_CLANG_TIDY)
-    if (CLANG_TIDY_EXE)
-        message(STATUS "clang-tidy found: ${CLANG_TIDY_EXE}")
-        set(CLANG_TIDY_OPTIONS "--checks=*,-clang-analyzer-alpha*,-header-filter=^${CMAKE_SOURCE_DIR}/src/.*")
-        set(CMAKE_CXX_CLANG_TIDY "${CLANG_TIDY_EXE};${CLANG_TIDY_OPTIONS}")
-    else()
-        message(STATUS "ENABLE_CLANG_TIDY is ON but clang-tidy executable not found.")
-        message(STATUS "Install clang-tidy or set CLANG_TIDY_EXE to its path to enable.")
-    endif()
-else()
-    message(STATUS "clang-tidy integration disabled (ENABLE_CLANG_TIDY=OFF)")
-endif()
 
 
 # ==================== 第三方库 ====================
@@ -54,50 +35,40 @@ add_subdirectory(third_party/stb)
 add_subdirectory(third_party/imgui)
 add_subdirectory(third_party/abseil-cpp)
 
-# ==================== 资源嵌入 ====================
-# 必须在 add_subdirectory(src/client) 之前处理
 
-# 生成资源头文件目录
-set(EMBED_DIR ${CMAKE_CURRENT_BINARY_DIR}/embedded)
-file(MAKE_DIRECTORY ${EMBED_DIR})
 
-# 要嵌入的资源
-set(ASSETS
-    ${CMAKE_SOURCE_DIR}/assets/1.jpeg
+# ==================== 静态分析工具 clang-tidy ====================
+# 允许用户通过选项启用或禁用 clang-tidy
+option(ENABLE_CLANG_TIDY "Enable clang-tidy static analysis" ON)
+
+# 查找 clang-tidy 可执行文件
+find_program(CLANG_TIDY_EXE
+    NAMES clang-tidy
 )
+if(ENABLE_CLANG_TIDY)
+    if(CLANG_TIDY_EXE)
+        message(STATUS "clang-tidy found: ${CLANG_TIDY_EXE}")
 
-# 存放生成的头文件
-set(EMBED_HEADERS "")
+        # clang-tidy 检查选项
+        set(CLANG_TIDY_OPTIONS
+            # 排除第三方库，检查项目 src 下的文件
+            "--config-file=${CMAKE_SOURCE_DIR}/.clang-tidy"
+            "-header-filter=^(?!.*third_party/).*"
+        )
 
-# 自动嵌入函数 - 使用 CMake 脚本生成 C 数组头文件
-function(embed_resource INPUT_FILE OUTPUT_HEADER VAR_NAME)
-    add_custom_command(
-        OUTPUT ${OUTPUT_HEADER}
-        COMMAND ${CMAKE_COMMAND} 
-            -DINPUT_FILE=${INPUT_FILE}
-            -DOUTPUT_HEADER=${OUTPUT_HEADER}
-            -DVAR_NAME=${VAR_NAME}
-            -P ${CMAKE_SOURCE_DIR}/cmake/embed_resource.cmake
-        DEPENDS ${INPUT_FILE}
-        COMMENT "Embedding resource: ${INPUT_FILE}"
-        VERBATIM
-    )
-endfunction()
+        # 设置 CMAKE_CXX_CLANG_TIDY
+        set(CMAKE_CXX_CLANG_TIDY
+            "${CLANG_TIDY_EXE};${CLANG_TIDY_OPTIONS}"
+        )
+    else()
+        message(STATUS "ENABLE_CLANG_TIDY is ON but clang-tidy executable not found.")
+        message(STATUS "Install clang-tidy or set CLANG_TIDY_EXE to its path to enable.")
+    endif()
+else()
+    message(STATUS "clang-tidy integration disabled (ENABLE_CLANG_TIDY=OFF)")
+endif()
 
-foreach(asset ${ASSETS})
-    get_filename_component(name ${asset} NAME)
-    get_filename_component(name_we ${asset} NAME_WE)
-    set(header ${EMBED_DIR}/${name}.h)
-    # 生成合法的 C 变量名（替换特殊字符为下划线）
-    string(REGEX REPLACE "[^a-zA-Z0-9]" "_" var_name ${name})
-    embed_resource(${asset} ${header} ${var_name})
-    list(APPEND EMBED_HEADERS ${header})
-endforeach()
 
-# 创建一个自定义目标来确保资源被生成
-add_custom_target(EmbeddedResources DEPENDS ${EMBED_HEADERS})
-
-# ==================== 子项目 ====================
-
+# ===================== 项目主程序 ====================
 add_subdirectory(src/client)
 add_subdirectory(src/server)

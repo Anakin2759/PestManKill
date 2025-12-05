@@ -14,14 +14,14 @@
  */
 #pragma once
 #include <entt/entt.hpp>
-#include "entt/entity/fwd.hpp"
+#include <absl/random/random.h>
+#include <absl/random/shuffle.h>
+#include <algorithm>
 #include "src/server/context/GameContext.h"
 #include "src/server/components/Deck.h"
 #include "src/server/events/Events.h"
 #include "src/server/components/Player.h"
 #include "src/server/components/Card.h"
-#include <algorithm>
-#include <random>
 #include "src/server/events/DeckEvents.h"
 #include "src/server/events/GameFlowEvents.h"
 class DeckSystem
@@ -60,7 +60,7 @@ private:
         auto* equipments = m_context->registry.try_get<Equipments>(player);
         auto& [weapon, armor, attackhorse, defensehorse] = *equipments;
         // 用 unordered_set 提升查找效率
-        std::unordered_set<entt::entity> cardSet(cards.begin(), cards.end());
+        absl::flat_hash_set<entt::entity> cardSet(cards.begin(), cards.end());
 
         // 移除手牌
         auto newEnd = std::ranges::remove_if(handCards, [&](entt::entity card) { return cardSet.contains(card); });
@@ -89,12 +89,18 @@ private:
 
     void onShuffleDeck(events::ShuffleDeck event)
     {
-        std::random_device rdd;
-        std::mt19937 gen(rdd());
-        std::shuffle(m_deck.discardPile.begin(), m_deck.discardPile.end(), gen);
+        absl::BitGen gen; // 自动使用系统随机源初始化
+
+        // 打乱弃牌堆
+        absl::Shuffle(gen, m_deck.discardPile);
+
+        // 将弃牌堆放入抽牌堆
         m_deck.drawPile.insert(m_deck.drawPile.end(), m_deck.discardPile.begin(), m_deck.discardPile.end());
+
+        // 清空弃牌堆
         m_deck.discardPile.clear();
     }
+
     /**
      * @brief 发牌
      * @param event 发牌事件，包含玩家实体和发牌数量

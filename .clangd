@@ -1,5 +1,5 @@
 If:
-  PathExclude: [third_party/.*, build/.*]
+  PathExclude: [third_party/.*]
 
 CompileFlags:
   # 使用项目根目录的 compile_commands.json
@@ -8,7 +8,9 @@ CompileFlags:
   Add:
     # C++23 标准
     - "-std=c++23"
-
+    # 明确启用异常支持
+    - "-fexceptions"
+    - "-fcxx-exceptions"
     # 启用所有错误报告
     - "-ferror-limit=0"
     # 禁用宏回溯限制，便于调试
@@ -36,6 +38,7 @@ CompileFlags:
     - "-fmacro-backtrace-limit=*"
     - "-fmodule-mapper=*"
     - "-fdeps-format=*"
+    
 
 
 # 诊断配置

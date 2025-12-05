@@ -20,6 +20,10 @@ target_compile_options(${EXET_NAME} PRIVATE
     # MSVC
     $<$<AND:$<CXX_COMPILER_ID:MSVC>,$<CONFIG:Debug>>:/W4 /Od /Zi /EHsc>
     $<$<AND:$<CXX_COMPILER_ID:MSVC>,$<CONFIG:Release>>:/O2 /DNDEBUG /EHsc>
+
+    $<$<AND:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_FRONTEND_VARIANT:MSVC>,$<CONFIG:Debug>>:/EHsc /Zi /W4>
+    $<$<AND:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_FRONTEND_VARIANT:MSVC>,$<CONFIG:Release>>:/EHsc /O2 /DNDEBUG>
+
 )
 target_include_directories(${EXET_NAME} PRIVATE 
     ${CMAKE_CURRENT_SOURCE_DIR}
@@ -38,7 +42,10 @@ target_link_libraries(${EXET_NAME} PRIVATE
     nlohmann_json::nlohmann_json 
     absl::base 
     absl::memory 
-    absl::strings)
+    absl::strings
+    absl::hash
+    absl::flat_hash_map
+    absl::raw_hash_set)
 
 # 测试可执行文件 - 心跳包通信测试（无 GUI）
 set(TEST_EXET_NAME PestManKillClientTest)
@@ -60,6 +67,10 @@ target_compile_options(${TEST_EXET_NAME} PRIVATE
     # MSVC
     $<$<AND:$<CXX_COMPILER_ID:MSVC>,$<CONFIG:Debug>>:/W4 /Od /Zi /EHsc>
     $<$<AND:$<CXX_COMPILER_ID:MSVC>,$<CONFIG:Release>>:/O2 /DNDEBUG /EHsc>
+
+    $<$<AND:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_FRONTEND_VARIANT:MSVC>,$<CONFIG:Debug>>:/EHsc /Zi /W4>
+    $<$<AND:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_FRONTEND_VARIANT:MSVC>,$<CONFIG:Release>>:/EHsc /O2 /DNDEBUG>
+
 )
 
 target_include_directories(${TEST_EXET_NAME} PRIVATE 
@@ -75,4 +86,7 @@ target_link_libraries(${TEST_EXET_NAME} PRIVATE
     nlohmann_json::nlohmann_json 
     absl::base 
     absl::memory 
-    absl::strings)
+    absl::strings
+    absl::hash
+    absl::flat_hash_map
+    absl::raw_hash_set)
