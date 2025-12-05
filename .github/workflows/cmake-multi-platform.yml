@@ -1,4 +1,4 @@
-name: CMake Multi-Platform Build
+name: CMake Windows Build
 
 on:
   push:
@@ -8,67 +8,23 @@ on:
 
 jobs:
   build:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          # Windows + MSVC
-          - os: windows-latest
-            c_compiler: cl
-            cpp_compiler: cl
-            build_type: Release
-          # Linux + GCC
-          - os: ubuntu-latest
-            c_compiler: gcc
-            cpp_compiler: g++
-            build_type: Release
-          # Linux + Clang
-          - os: ubuntu-latest
-            c_compiler: clang
-            cpp_compiler: clang++
-            build_type: Release
-
-    runs-on: ${{ matrix.os }}
+    runs-on: windows-latest
 
     steps:
     - uses: actions/checkout@v4
 
-    # ================= Linux 依赖安装 =================
-    - name: Install dependencies (Ubuntu)
-      if: matrix.os == 'ubuntu-latest'
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y build-essential cmake xorg-dev libx11-dev libxrandr-dev \
-          libxinerama-dev libxcursor-dev libxi-dev libgl1-mesa-dev libvulkan-dev
-
     # ================= CMake 配置 =================
-    - name: Configure CMake (Windows)
-      if: matrix.os == 'windows-latest'
+    - name: Configure CMake
       shell: pwsh
-      run: cmake -B build -S . -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
-
-    - name: Configure CMake (Linux)
-      if: matrix.os == 'ubuntu-latest'
-      run: cmake -B build -S . -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }} -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+      run: cmake -B build -S . -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DCMAKE_BUILD_TYPE=Release
 
     # ================= Build =================
-    - name: Build (Windows)
-      if: matrix.os == 'windows-latest'
+    - name: Build
       shell: pwsh
-      run: cmake --build build --config ${{ matrix.build_type }}
-
-    - name: Build (Linux)
-      if: matrix.os == 'ubuntu-latest'
-      run: cmake --build build --config ${{ matrix.build_type }}
+      run: cmake --build build --config Release
 
     # ================= Test =================
-    - name: Test (Windows)
-      if: matrix.os == 'windows-latest'
+    - name: Test
       shell: pwsh
       working-directory: build
-      run: ctest --build-config ${{ matrix.build_type }}
-
-    - name: Test (Linux)
-      if: matrix.os == 'ubuntu-latest'
-      working-directory: build
-      run: ctest --build-config ${{ matrix.build_type }}
+      run: ctest --build-config Release
