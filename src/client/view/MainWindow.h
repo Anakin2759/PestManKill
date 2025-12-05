@@ -24,7 +24,13 @@
 #include "src/client/ui/Button.h"
 #include "src/client/ui/ListArea.h"
 
+#include "CharacterView.h"
+#include "DeckView.h"
+#include "EquipmentArea.h"
 #include "HandCardView.h"
+#include "OperationArea.h"
+#include "OtherPlayerView.h"
+#include "ProcessingArea.h"
 
 // NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers, readability-magic-numbers)
 class MainWindow : public ui::Application
@@ -32,293 +38,365 @@ class MainWindow : public ui::Application
 public:
     using ui::Application::Application;
 
+    // ==================== 公共接口 ====================
+
+    // 玩家角色相关
+    void updatePlayerCharacter(const std::string& name, const std::string& identity, const std::string& faction)
+    {
+        if (m_playerCharacter)
+        {
+            m_playerCharacter->setCharacterName(name);
+            m_playerCharacter->setIdentity(identity);
+            m_playerCharacter->setFaction(faction);
+        }
+    }
+
+    void updatePlayerHp(int current, int max)
+    {
+        if (m_playerCharacter)
+        {
+            m_playerCharacter->setHp(current, max);
+        }
+    }
+
+    void addPlayerSkill(const std::string& name, const std::string& description)
+    {
+        if (m_playerCharacter)
+        {
+            m_playerCharacter->addSkill({name, description});
+        }
+    }
+
+    // 装备相关
+    void equipPlayerWeapon(const std::string& name, const std::string& iconPath = "", int range = 1)
+    {
+        if (m_equipmentArea)
+        {
+            m_equipmentArea->equipWeapon(name, iconPath);
+        }
+    }
+
+    void equipPlayerArmor(const std::string& name, const std::string& iconPath = "")
+    {
+        if (m_equipmentArea)
+        {
+            m_equipmentArea->equipArmor(name, iconPath);
+        }
+    }
+
+    void unequipPlayerWeapon()
+    {
+        if (m_equipmentArea)
+        {
+            m_equipmentArea->unequipWeapon();
+        }
+    }
+
+    // 手牌相关
+    void addHandCard(std::shared_ptr<HandCardView> card)
+    {
+        if (m_operationArea)
+        {
+            m_operationArea->addHandCard(card);
+        }
+    }
+
+    void clearHandCards()
+    {
+        if (m_operationArea)
+        {
+            m_operationArea->clearHandCards();
+        }
+    }
+
+    // 处理区相关
+    void addCardToProcessing(std::shared_ptr<HandCardView> card)
+    {
+        if (m_processingArea)
+        {
+            m_processingArea->addCard(card);
+        }
+    }
+
+    void clearProcessingArea()
+    {
+        if (m_processingArea)
+        {
+            m_processingArea->clear();
+        }
+    }
+
+    // 牌堆相关
+    void updateDeckCount(int deckCount, int discardCount)
+    {
+        if (m_deckView)
+        {
+            m_deckView->setDeckCount(deckCount);
+            m_deckView->setDiscardCount(discardCount);
+        }
+    }
+
+    // 对手相关
+    void updateOpponent(size_t index, const std::string& name, int currentHp, int maxHp, int handCount)
+    {
+        if (index < m_opponentViews.size())
+        {
+            m_opponentViews[index]->setPlayerName(name);
+            m_opponentViews[index]->setHp(currentHp, maxHp);
+            m_opponentViews[index]->setHandCardCount(handCount);
+        }
+    }
+
+private:
+    // 组件引用（用于动态更新）
+    std::shared_ptr<CharacterView> m_playerCharacter;
+    std::shared_ptr<EquipmentArea> m_equipmentArea;
+    std::shared_ptr<OperationArea> m_operationArea;
+    std::shared_ptr<ProcessingArea> m_processingArea;
+    std::shared_ptr<DeckView> m_deckView;
+    std::vector<std::shared_ptr<OtherPlayerView>> m_opponentViews;
+
 protected:
     void setupUI() override
     {
         auto mainLayout = std::make_shared<ui::VBoxLayout>();
-        mainLayout->setSpacing(8);
-        //    mainLayout->setMargins(10, 10, 10, 10);
+        mainLayout->setSpacing(10);
+        mainLayout->setMargins(5, 5, 5, 5);
 
+        // 顶部：对手区域
         mainLayout->addWidget(createTopOpponentsArea(), 2);
+
+        // 中间：游戏区域（左侧牌堆 + 中央处理区 + 右侧战斗记录）
         mainLayout->addWidget(createMiddleGameArea(), 4);
+
+        // 底部：玩家区域（角色信息 + 装备 + 操作区）
         mainLayout->addWidget(createBottomPlayerArea(), 4);
 
         setRootLayout(mainLayout);
+
+        // 初始化测试数据
+        initializeTestData();
     }
 
 private:
-    // 创建顶部对手区域
-    static std::shared_ptr<ui::Widget> createTopOpponentsArea()
+    // ==================== 顶部对手区域 ====================
+    std::shared_ptr<ui::Widget> createTopOpponentsArea()
     {
         auto topLayout = std::make_shared<ui::HBoxLayout>();
         topLayout->setBackgroundEnabled(true);
         topLayout->setBackgroundColor(ImVec4(0.12F, 0.15F, 0.18F, 0.75F));
-        topLayout->setSpacing(20);
+        topLayout->setSpacing(15);
+        topLayout->setMargins(10, 10, 10, 10);
 
+        // 创建3个对手视图
         for (int i = 0; i < 3; ++i)
         {
-            topLayout->addWidget(createOpponentCard(i + 2));
+            auto opponent = std::make_shared<OtherPlayerView>();
+            opponent->setPlayerName("玩家" + std::to_string(i + 2));
+            opponent->setHp(4, 4);
+            opponent->setHandCardCount(3);
+            opponent->setIdentity("忠臣");
+            opponent->setOnlineStatus(true);
+
+            m_opponentViews.push_back(opponent);
+            topLayout->addWidget(opponent);
         }
+
         return topLayout;
     }
 
-    // 创建单个对手卡片
-    static std::shared_ptr<ui::Widget> createOpponentCard(int playerNum)
-    {
-        auto card = std::make_shared<ui::VBoxLayout>();
-        card->setBackgroundEnabled(true);
-        card->setBackgroundColor(ImVec4(0.15F, 0.18F, 0.22F, 0.85F));
-        card->setFixedSize(140, 180);
-        card->setMargins(10, 10, 10, 10);
-
-        card->addWidget(std::make_shared<ui::Label>("玩家" + std::to_string(playerNum)));
-        card->addWidget(std::make_shared<ui::Label>("[红桃] HP: 4/4"));
-        card->addWidget(std::make_shared<ui::Label>("手牌: 3"));
-        card->addStretch(1);
-        return card;
-    }
-
-    // 创建中间游戏区域
-    static std::shared_ptr<ui::Widget> createMiddleGameArea()
+    // ==================== 中间游戏区域 ====================
+    std::shared_ptr<ui::Widget> createMiddleGameArea()
     {
         auto middleLayout = std::make_shared<ui::HBoxLayout>();
         middleLayout->setSpacing(10);
 
+        // 左侧：牌堆和弃牌堆
         middleLayout->addWidget(createLeftSidePanel());
+
+        // 中央：处理区
         middleLayout->addWidget(createCenterPanel(), 1);
+
+        // 右侧：战斗记录
         middleLayout->addWidget(createRightSidePanel());
+
         return middleLayout;
     }
 
-    // 创建左侧面板（牌堆和弃牌堆）
-    static std::shared_ptr<ui::Widget> createLeftSidePanel()
+    std::shared_ptr<ui::Widget> createLeftSidePanel()
     {
         auto leftPanel = std::make_shared<ui::VBoxLayout>();
         leftPanel->setBackgroundEnabled(true);
         leftPanel->setBackgroundColor(ImVec4(0.14F, 0.16F, 0.20F, 0.80F));
-        leftPanel->setFixedSize(160, 0);
+        leftPanel->setFixedSize(180, 0);
         leftPanel->setMargins(10, 10, 10, 10);
         leftPanel->setSpacing(10);
 
-        leftPanel->addWidget(createDeckArea());
-        leftPanel->addWidget(createDiscardArea());
+        // 使用 DeckView 组件
+        m_deckView = std::make_shared<DeckView>();
+        leftPanel->addWidget(m_deckView);
+
         leftPanel->addStretch(1);
         return leftPanel;
     }
 
-    static std::shared_ptr<ui::Widget> createDeckArea()
-    {
-        auto deck = std::make_shared<ui::VBoxLayout>();
-        deck->setBackgroundEnabled(true);
-        deck->setBackgroundColor(ImVec4(0.10F, 0.12F, 0.16F, 0.9F));
-        deck->setMargins(5, 5, 5, 5);
-        deck->addWidget(std::make_shared<ui::Label>("牌堆"));
-        deck->addWidget(std::make_shared<ui::Label>("剩余: 58"));
-        return deck;
-    }
-
-    static std::shared_ptr<ui::Widget> createDiscardArea()
-    {
-        auto discard = std::make_shared<ui::VBoxLayout>();
-        discard->setBackgroundEnabled(true);
-        discard->setBackgroundColor(ImVec4(0.10F, 0.12F, 0.16F, 0.9F));
-        discard->setMargins(5, 5, 5, 5);
-        discard->addWidget(std::make_shared<ui::Label>("弃牌堆"));
-        discard->addWidget(std::make_shared<ui::Label>("数量: 12"));
-        return discard;
-    }
-
-    // 创建中央面板（处理区）
-    static std::shared_ptr<ui::Widget> createCenterPanel()
+    std::shared_ptr<ui::Widget> createCenterPanel()
     {
         auto center = std::make_shared<ui::VBoxLayout>();
         center->setBackgroundEnabled(true);
         center->setBackgroundColor(ImVec4(0.12F, 0.14F, 0.18F, 0.55F));
-        center->setSpacing(8);
         center->setMargins(15, 15, 15, 15);
 
-        center->addWidget(createJudgeArea(), 1);
-        center->addWidget(createBattleLogArea(), 3);
+        // 使用 ProcessingArea 组件
+        m_processingArea = std::make_shared<ProcessingArea>();
+        center->addWidget(m_processingArea, 1);
+
         return center;
     }
 
-    static std::shared_ptr<ui::Widget> createJudgeArea()
-    {
-        auto judge = std::make_shared<ui::VBoxLayout>();
-        judge->setBackgroundEnabled(true);
-        judge->setBackgroundColor(ImVec4(0.16F, 0.18F, 0.22F, 0.65F));
-        judge->addStretch(1);
-        return judge;
-    }
-
-    static std::shared_ptr<ui::Widget> createBattleLogArea()
-    {
-        auto battleLog = std::make_shared<ui::VBoxLayout>();
-        return battleLog;
-    }
-
-    // 创建右侧面板（战斗记录）
-    static std::shared_ptr<ui::Widget> createRightSidePanel()
+    std::shared_ptr<ui::Widget> createRightSidePanel()
     {
         auto battleLog = std::make_shared<ui::VBoxLayout>();
         battleLog->setBackgroundEnabled(true);
         battleLog->setBackgroundColor(ImVec4(0.10F, 0.12F, 0.15F, 0.75F));
-        battleLog->setMargins(5, 5, 5, 5);
-        battleLog->addWidget(std::make_shared<ui::Label>("战斗记录:"));
-        battleLog->addWidget(std::make_shared<ui::Label>("刘备对张飞使用【杀】"));
-        battleLog->addWidget(std::make_shared<ui::Label>("张飞使用【闪】"));
-        battleLog->addStretch(1);
+        battleLog->setFixedSize(200, 0);
+        battleLog->setMargins(10, 10, 10, 10);
+        battleLog->setSpacing(5);
+
+        auto title = std::make_shared<ui::Label>("战斗记录:");
+        title->setTextColor(ImVec4(1.0F, 0.8F, 0.4F, 1.0F));
+        battleLog->addWidget(title);
+
+        // 战斗记录列表
+        auto logList = std::make_shared<ui::ListArea>(ui::ListDirection::VERTICAL);
+        logList->setScrollbarEnabled(true);
+        logList->setItemSpacing(3.0F);
+
+        auto log1 = std::make_shared<ui::Label>("刘备对张飞使用【杀】");
+        log1->setTextColor(ImVec4(0.9F, 0.9F, 0.9F, 1.0F));
+        auto log2 = std::make_shared<ui::Label>("张飞使用【闪】");
+        log2->setTextColor(ImVec4(0.9F, 0.9F, 0.9F, 1.0F));
+
+        logList->addWidget(log1);
+        logList->addWidget(log2);
+
+        battleLog->addWidget(logList, 1);
         return battleLog;
     }
 
-    // 创建底部玩家区域
-    static std::shared_ptr<ui::Widget> createBottomPlayerArea()
+    // ==================== 底部玩家区域 ====================
+    std::shared_ptr<ui::Widget> createBottomPlayerArea()
     {
-        auto bottomArea = std::make_shared<ui::VBoxLayout>();
+        auto bottomArea = std::make_shared<ui::HBoxLayout>();
         bottomArea->setBackgroundEnabled(true);
         bottomArea->setBackgroundColor(ImVec4(0.13F, 0.16F, 0.20F, 0.82F));
-        bottomArea->setSpacing(8);
+        bottomArea->setSpacing(10);
         bottomArea->setMargins(10, 10, 10, 10);
 
-        // 操作区在顶部
-        bottomArea->addWidget(createActionButtonsArea());
+        // 左侧：角色信息 + 装备区
+        bottomArea->addWidget(createPlayerInfoArea(), 3);
 
-        // 下方：角色区（左侧3）+ 手牌区（右侧7）
-        auto bottomContentLayout = std::make_shared<ui::HBoxLayout>();
-        bottomContentLayout->setSpacing(10);
-        bottomContentLayout->addWidget(createPlayerCharacterArea(), 3);
-        bottomContentLayout->addWidget(createHandCardsArea(), 7);
+        // 右侧：操作区（按钮 + 手牌）
+        bottomArea->addWidget(createPlayerOperationArea(), 7);
 
-        bottomArea->addWidget(bottomContentLayout, 1);
         return bottomArea;
     }
 
-    // 创建操作按钮区域（顶部）
-    static std::shared_ptr<ui::Widget> createActionButtonsArea()
+    std::shared_ptr<ui::Widget> createPlayerInfoArea()
     {
-        auto actionArea = std::make_shared<ui::HBoxLayout>();
-        actionArea->setBackgroundEnabled(true);
-        actionArea->setBackgroundColor(ImVec4(0.16F, 0.19F, 0.23F, 0.88F));
-        actionArea->setMargins(8, 8, 8, 8);
-        actionArea->setSpacing(10);
+        auto infoArea = std::make_shared<ui::VBoxLayout>();
+        infoArea->setSpacing(10);
 
-        actionArea->addStretch(1);
-        actionArea->addWidget(std::make_shared<ui::Button>("出牌"));
-        actionArea->addWidget(std::make_shared<ui::Button>("结束回合"));
-        actionArea->addWidget(std::make_shared<ui::Button>("取消"));
-        actionArea->addStretch(1);
-        return actionArea;
-    }
-
-    // 创建玩家角色区域（左侧，包含角色信息、装备、技能）
-    static std::shared_ptr<ui::Widget> createPlayerCharacterArea()
-    {
-        auto characterArea = std::make_shared<ui::VBoxLayout>();
-        characterArea->setBackgroundEnabled(true);
-        characterArea->setBackgroundColor(ImVec4(0.14F, 0.17F, 0.21F, 0.90F));
-        characterArea->setMargins(10, 10, 10, 10);
-        characterArea->setSpacing(8);
-
-        // 角色基本信息
-        characterArea->addWidget(createPlayerBasicInfo());
+        // 角色视图
+        m_playerCharacter = std::make_shared<CharacterView>();
+        infoArea->addWidget(m_playerCharacter, 3);
 
         // 装备区
-        auto equipmentLabel = std::make_shared<ui::Label>("装备:");
-        characterArea->addWidget(equipmentLabel);
-        characterArea->addWidget(createPlayerEquipment());
+        m_equipmentArea = std::make_shared<EquipmentArea>();
+        infoArea->addWidget(m_equipmentArea, 2);
 
-        // 技能区
-        auto skillLabel = std::make_shared<ui::Label>("技能:");
-        characterArea->addWidget(skillLabel);
-        characterArea->addWidget(createPlayerSkills());
-
-        characterArea->addStretch(1);
-        return characterArea;
+        return infoArea;
     }
 
-    static std::shared_ptr<ui::Widget> createPlayerBasicInfo()
+    std::shared_ptr<ui::Widget> createPlayerOperationArea()
     {
-        auto info = std::make_shared<ui::VBoxLayout>();
-        info->setSpacing(4);
-        info->addWidget(std::make_shared<ui::Label>("【刘备】 主公"));
-        info->addWidget(std::make_shared<ui::Label>("HP: 4/4 ♥♥♥♥"));
-        return info;
+        // 使用 OperationArea 组件
+        m_operationArea = std::make_shared<OperationArea>();
+
+        // 设置按钮回调
+        m_operationArea->setOnUseCard(
+            [this]()
+            {
+                // 处理使用卡牌逻辑
+                utils::LOG_INFO("使用卡牌按钮被点击");
+            });
+
+        m_operationArea->setOnCancel(
+            [this]()
+            {
+                // 处理取消逻辑
+                utils::LOG_INFO("取消按钮被点击");
+            });
+
+        m_operationArea->setOnEndTurn(
+            [this]()
+            {
+                // 处理结束回合逻辑
+                utils::LOG_INFO("结束回合按钮被点击");
+            });
+
+        return m_operationArea;
     }
 
-    static std::shared_ptr<ui::Widget> createPlayerEquipment()
+    // ==================== 初始化测试数据 ====================
+    void initializeTestData()
     {
-        auto equipment = std::make_shared<ui::VBoxLayout>();
-        equipment->setSpacing(4);
-        equipment->addWidget(std::make_shared<ui::Button>("武器: 青釭剑"));
-        equipment->addWidget(std::make_shared<ui::Button>("防具: 八卦阵"));
-        equipment->addWidget(std::make_shared<ui::Button>("坐骑: 的卢"));
-        return equipment;
-    }
+        // 初始化玩家角色
+        if (m_playerCharacter)
+        {
+            m_playerCharacter->setCharacterName("刘备");
+            m_playerCharacter->setIdentity("主公");
+            m_playerCharacter->setFaction("蜀");
+            m_playerCharacter->setHp(4, 4);
 
-    static std::shared_ptr<ui::Widget> createPlayerSkills()
-    {
-        auto skills = std::make_shared<ui::ListArea>(ui::ListDirection::VERTICAL);
-        skills->setItemSpacing(4.0F);
-        skills->addWidget(std::make_shared<ui::Button>("仁德"));
-        skills->addWidget(std::make_shared<ui::Button>("激将"));
-        return skills;
-    }
+            // 添加技能
+            m_playerCharacter->addSkill(
+                {"仁德", "出牌阶段，你可以将任意张手牌交给其他角色，若你在此阶段给出的牌不少于两张，你回复1点体力。"});
+            m_playerCharacter->addSkill({"激将",
+                                         "主公技，当你需要使用或打出【杀】时，你可以令其他蜀势力角色选择是否打出一张【"
+                                         "杀】（视为由你使用或打出）。"});
+        }
 
-    // 创建手牌区域（右侧）
-    static std::shared_ptr<ui::Widget> createHandCardsArea()
-    {
-        auto handCards = std::make_shared<ui::VBoxLayout>();
-        handCards->setBackgroundEnabled(true);
-        handCards->setBackgroundColor(ImVec4(0.11F, 0.14F, 0.17F, 0.85F));
-        handCards->setMargins(10, 10, 10, 10);
-        handCards->setSpacing(8);
+        // 初始化装备
+        if (m_equipmentArea)
+        {
+            m_equipmentArea->equipWeapon("青釭剑", "");
+            m_equipmentArea->equipArmor("八卦阵", "");
+        }
 
-        auto label = std::make_shared<ui::Label>("手牌 (5张)");
-        handCards->addWidget(label);
-        handCards->addWidget(createCardsListArea(), 1);
-        return handCards;
-    }
+        // 初始化牌堆
+        if (m_deckView)
+        {
+            m_deckView->setDeckCount(58);
+            m_deckView->setDiscardCount(12);
+        }
 
-    static std::shared_ptr<ui::Widget> createCardsListArea()
-    {
-        constexpr int CARD_WIDTH = 95;
-        constexpr int CARD_HEIGHT = 135;
+        // 初始化手牌
+        if (m_operationArea)
+        {
+            for (int i = 0; i < 5; ++i)
+            {
+                auto card = std::make_shared<HandCardView>();
+                std::vector<std::string> cardNames = {"杀", "闪", "桃", "决斗", "无懈可击"};
+                std::vector<std::string> suits = {"♠", "♥", "♦", "♣", "♠"};
 
-        auto cardsList = std::make_shared<ui::ListArea>(ui::ListDirection::HORIZONTAL);
-        cardsList->setAlignment(ui::ListAlignment::START); // 左对齐
-        cardsList->setItemSpacing(5.0F);                   // 设置卡牌间距
-        cardsList->setScrollbarEnabled(true);              // 启用滚动条
-        cardsList->setMargins(5.0F);                       // 设置边距
+                card->setCardName(suits[i] + cardNames[i]);
+                card->setCardSuit(suits[i]);
+                card->setCardRank(std::to_string(i + 1));
 
-        // 创建卡牌按钮
-        auto card1 = std::make_shared<ui::Button>("♠杀");
-        card1->setFixedSize(CARD_WIDTH, CARD_HEIGHT);
-        auto card2 = std::make_shared<ui::Button>("♥桃");
-        card2->setFixedSize(CARD_WIDTH, CARD_HEIGHT);
-        auto card3 = std::make_shared<ui::Button>("♦闪");
-        card3->setFixedSize(CARD_WIDTH, CARD_HEIGHT);
-        auto card4 = std::make_shared<ui::Button>("♣决斗");
-        card4->setFixedSize(CARD_WIDTH, CARD_HEIGHT);
-        auto card5 = std::make_shared<ui::Button>("♠无懈");
-        card5->setFixedSize(CARD_WIDTH, CARD_HEIGHT);
-        auto card6 = std::make_shared<ui::Button>("♠无懈");
-        card6->setFixedSize(CARD_WIDTH, CARD_HEIGHT);
-        auto card7 = std::make_shared<ui::Button>("♠无懈");
-        card7->setFixedSize(CARD_WIDTH, CARD_HEIGHT);
-        auto card8 = std::make_shared<ui::Button>("♠无懈");
-        card8->setFixedSize(CARD_WIDTH, CARD_HEIGHT);
-
-        // 添加到ListArea
-        cardsList->addWidget(card1);
-        cardsList->addWidget(card2);
-        cardsList->addWidget(card3);
-        cardsList->addWidget(card4);
-        cardsList->addWidget(card5);
-        cardsList->addWidget(card6);
-        cardsList->addWidget(card7);
-        cardsList->addWidget(card8);
-
-        return cardsList;
+                m_operationArea->addHandCard(card);
+            }
+        }
     }
 };
 // NOLINTEND(cppcoreguidelines-avoid-magic-numbers, readability-magic-numbers)

@@ -64,6 +64,13 @@ public:
     void setModal(bool modal) { m_modal = modal; }
     [[nodiscard]] bool isModal() const { return m_modal; }
 
+    // ===================== 窗口行为 =====================
+    void setResizable(bool resizable) { m_resizable = resizable; }
+    [[nodiscard]] bool isResizable() const { return m_resizable; }
+
+    void setMovable(bool movable) { m_movable = movable; }
+    [[nodiscard]] bool isMovable() const { return m_movable; }
+
     // ===================== 标题和内容 =====================
     void setTitle(const std::string& title) { m_title = title; }
     [[nodiscard]] const std::string& getTitle() const { return m_title; }
@@ -71,6 +78,15 @@ public:
     // ===================== 关闭行为 =====================
     void setCloseOnClickOutside(bool enabled) { m_closeOnClickOutside = enabled; }
     [[nodiscard]] bool getCloseOnClickOutside() const { return m_closeOnClickOutside; }
+
+    void setContent(std::shared_ptr<Widget> content)
+    {
+        if (m_contentLayout)
+        {
+            m_contentLayout->clear();
+            m_contentLayout->addWidget(content, 1);
+        }
+    }
 
     // ===================== 按钮管理 =====================
     void addButton(const std::string& text, std::function<void()> callback = nullptr)
@@ -99,11 +115,15 @@ protected:
 
         // 设置对话框窗口标志
         ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse;
-        if (m_modal)
+
+        if (!m_resizable)
         {
-            flags = static_cast<ImGuiWindowFlags>(
-                static_cast<unsigned>(flags) |
-                static_cast<unsigned>(ImGuiWindowFlags_NoMove)); // 模态对话框不可移动（可选）
+            flags |= ImGuiWindowFlags_NoResize;
+        }
+
+        if (!m_movable || m_modal)
+        {
+            flags |= ImGuiWindowFlags_NoMove;
         }
 
         // 设置对话框位置（居中）
@@ -116,6 +136,10 @@ protected:
         // 开始渲染对话框
         if (ImGui::Begin(m_title.c_str(), &m_open, flags))
         {
+            // 保存窗口位置和大小
+            m_windowPos = ImGui::GetWindowPos();
+            m_windowSize = ImGui::GetWindowSize();
+
             // 渲染自定义内容（子Widget）
             renderChildren(ImVec2(0, 0));
 
@@ -134,18 +158,18 @@ protected:
             handleClose();
         }
 
-        // 检测点击外部关闭
-        if (m_closeOnClickOutside && m_modal && ImGui::IsMouseClicked(0))
+        // 检测点击外部关闭（必须在对话框渲染后）
+        if (m_closeOnClickOutside && m_modal && !windowJustOpened)
         {
-            ImVec2 mousePos = ImGui::GetMousePos();
-            ImVec2 winPos = ImGui::GetWindowPos();
-            ImVec2 winSize = ImGui::GetWindowSize();
-
-            // 检查鼠标是否在对话框外部
-            if (mousePos.x < winPos.x || mousePos.x > winPos.x + winSize.x || mousePos.y < winPos.y ||
-                mousePos.y > winPos.y + winSize.y)
+            if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow))
             {
-                close();
+                // 检查鼠标是否在对话框外部
+                ImVec2 mousePos = ImGui::GetMousePos();
+                if (mousePos.x < m_windowPos.x || mousePos.x > m_windowPos.x + m_windowSize.x ||
+                    mousePos.y < m_windowPos.y || mousePos.y > m_windowPos.y + m_windowSize.y)
+                {
+                    close();
+                }
             }
         }
     }
@@ -228,7 +252,15 @@ private:
     bool m_modal = false;
     bool m_open = false;
     bool m_closeOnClickOutside = true;
+    bool m_resizable = true;
+    bool m_movable = true;
+    bool windowJustOpened = false;
     std::vector<DialogButton> m_buttons;
     std::function<void()> m_onClose;
+    std::shared_ptr<ui::VBoxLayout> m_contentLayout;
+
+    // 用于点击外部关闭检测
+    ImVec2 m_windowPos{0, 0};
+    ImVec2 m_windowSize{0, 0};
 };
 } // namespace ui

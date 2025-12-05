@@ -29,6 +29,7 @@
     - 提供设置布局的方法 setDirection/setAlignment/setItemSpacing/setMargins
     - 提供设置默认项高度的方法 setDefaultItemHeight
     - 提供设置滚动条启用状态的方法 setScrollbarEnabled
+    - 提供设置子组件比例的方法 setItemStretchFactor
  * ************************************************************************
  * @copyright Copyright (c) 2025 AnakinLiu
  * For study and research only, no reprinting.
@@ -190,6 +191,31 @@ public:
         return indices;
     }
 
+    void setOnSelectionChanged(std::function<void(const std::vector<size_t>&)> callback)
+    {
+        m_onSelectionChanged = std::move(callback);
+    }
+
+    // ===================== 滚动控制 =====================
+    void scrollToItem(size_t index)
+    {
+        if (index >= m_items.size())
+        {
+            return;
+        }
+        m_scrollToIndex = static_cast<int>(index);
+    }
+
+    void scrollToTop() { m_scrollToIndex = 0; }
+
+    void scrollToBottom()
+    {
+        if (!m_items.empty())
+        {
+            m_scrollToIndex = static_cast<int>(m_items.size() - 1);
+        }
+    }
+
     // ===================== 布局配置 =====================
     void setDirection(ListDirection direction) { m_direction = direction; }
     [[nodiscard]] ListDirection getDirection() const { return m_direction; }
@@ -337,6 +363,28 @@ protected:
             }
 
             ImGui::BeginChild("##ListAreaScroll", contentSize, ImGuiChildFlags_None, scrollFlags);
+
+            // 处理滚动到指定项
+            if (m_scrollToIndex >= 0 && m_scrollToIndex < static_cast<int>(m_items.size()))
+            {
+                // 计算目标项的位置
+                float targetY = 0.0F;
+                for (int i = 0; i < m_scrollToIndex; ++i)
+                {
+                    if (m_items[i].widget && m_items[i].widget->isVisible())
+                    {
+                        float itemHeight =
+                            m_items[i].customHeight > 0.0F ? m_items[i].customHeight : m_defaultItemHeight;
+                        if (itemHeight == 0.0F)
+                        {
+                            itemHeight = m_items[i].widget->calculateSize().y;
+                        }
+                        targetY += itemHeight + m_itemSpacing;
+                    }
+                }
+                ImGui::SetScrollY(targetY);
+                m_scrollToIndex = -1; // 重置
+            }
 
             // 在子窗口内渲染
             ImVec2 childContentSize = ImGui::GetContentRegionAvail();
@@ -551,6 +599,12 @@ private:
             // 多选模式：切换选择状态
             m_items[index].selected = !m_items[index].selected;
         }
+
+        // 触发选中回调
+        if (m_onSelectionChanged)
+        {
+            m_onSelectionChanged(getSelectedIndices());
+        }
     }
 
     std::vector<ListItem> m_items;
@@ -561,6 +615,9 @@ private:
     float m_defaultItemHeight = 0.0F;         // 0 表示使用widget自身高度
     ImVec4 m_margins{0.0F, 0.0F, 0.0F, 0.0F}; // left, top, right, bottom
     bool m_scrollbarEnabled = true;
+
+    int m_scrollToIndex = -1;                                             // 需要滚动到的索引
+    std::function<void(const std::vector<size_t>&)> m_onSelectionChanged; // 选中回调
 };
 
 } // namespace ui

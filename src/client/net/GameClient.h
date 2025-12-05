@@ -38,7 +38,7 @@
 #include "src/client/utils/ThreadPool.h"
 #include <nlohmann/json.hpp>
 #include <entt/entt.hpp>
-#include "net/IServerMessageHandler.h"
+#include "net/IServerResponseHandler.h"
 
 /**
  * @brief 客户端连接状态
@@ -158,7 +158,7 @@ public:
     /**
      * @brief 设置消息处理器
      */
-    void setMessageHandler(entt::poly<IServerMessageHandler> handler) { m_messageHandler = std::move(handler); }
+    void setMessageHandler(entt::poly<IServerResponseHandler> handler) { m_messageHandler = std::move(handler); }
 
     /**
      * @brief 获取当前状态
@@ -720,7 +720,7 @@ private:
     // ==================== 成员变量 ====================
 
     std::shared_ptr<NetWorkClient> m_networkClient;
-    entt::poly<IServerMessageHandler> m_messageHandler;
+    entt::poly<IServerResponseHandler> m_messageHandler;
 
     std::atomic<ClientState> m_state{ClientState::DISCONNECTED};
 

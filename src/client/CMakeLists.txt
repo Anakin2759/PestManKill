@@ -3,6 +3,7 @@ set(EXET_NAME PestManKillClient)
 # 源文件
 set(SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/main.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/utils/stb_impl.cpp"
 )
 
 add_executable(${EXET_NAME} ${SOURCES})

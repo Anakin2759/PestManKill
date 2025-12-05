@@ -23,12 +23,12 @@
 #include <nlohmann/json.hpp>
 #include "src/client/net/GameClient.h"
 #include "src/client/utils/Logger.h"
-#include "net/IServerMessageHandler.h"
+#include "net/IServerResponseHandler.h"
 
 /**
  * @brief 简单的消息处理器实现
  */
-class TestMessageHandler
+class TestResponseHandler
 {
 public:
     void onConnected() { utils::LOG_INFO("✅ Connected to server"); }
@@ -94,8 +94,8 @@ int main()
     auto gameClient = std::make_shared<GameClient>();
 
     // 设置消息处理器
-    TestMessageHandler messageHandler;
-    gameClient->setMessageHandler(entt::poly<IServerMessageHandler>{std::move(messageHandler)});
+    TestResponseHandler messageHandler;
+    gameClient->setMessageHandler(entt::poly<IServerResponseHandler>{std::move(messageHandler)});
 
     // 连接到服务器（异步执行）
     std::string serverHost = "127.0.0.1";
