@@ -43,10 +43,8 @@ private:
         // 处理接收到的网络消息
         m_context->logger->info("Received network message: {}", event.message);
     }
-
-    
-
-    
+    void StartNetworkService() { m_networkManager->startService(); }
+    void StopNetworkService() { m_networkManager->stopService(); }
 
     GameContext* m_context;
     std::shared_ptr<NetWorkManager> m_networkManager;

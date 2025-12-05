@@ -4,9 +4,9 @@ project(PestMan LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON) #生成compile_commands.json文件
-set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_CXX_EXTENSIONS OFF) #启用编译器扩展
+
 if (MSVC)
-    message(STATUS "MSVC")
     add_compile_options(/utf-8)
     # 对所有 target 都启用异常展开
     add_compile_options(/EHsc)
@@ -39,7 +39,7 @@ add_subdirectory(third_party/abseil-cpp)
 
 # ==================== 静态分析工具 clang-tidy ====================
 # 允许用户通过选项启用或禁用 clang-tidy
-option(ENABLE_CLANG_TIDY "Enable clang-tidy static analysis" ON)
+option(ENABLE_CLANG_TIDY "Enable clang-tidy static analysis" OFF)
 
 # 查找 clang-tidy 可执行文件
 find_program(CLANG_TIDY_EXE
@@ -48,11 +48,9 @@ find_program(CLANG_TIDY_EXE
 if(ENABLE_CLANG_TIDY)
     if(CLANG_TIDY_EXE)
         message(STATUS "clang-tidy found: ${CLANG_TIDY_EXE}")
-
         # clang-tidy 检查选项
         set(CLANG_TIDY_OPTIONS
-            # 排除第三方库，检查项目 src 下的文件
-            "--config-file=${CMAKE_SOURCE_DIR}/.clang-tidy"
+           "--config-file=${CMAKE_SOURCE_DIR}/.clang-tidy"
             "-header-filter=^(?!.*third_party/).*"
         )
 

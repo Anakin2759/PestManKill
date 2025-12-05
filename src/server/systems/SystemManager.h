@@ -1,3 +1,18 @@
+/**
+ * ************************************************************************
+ *
+ * @file SystemManager.h
+ * @author AnakinLiu (azrael2759@qq.com)
+ * @date 2025-12-05
+ * @version 0.1
+ * @brief 系统管理器 注册和注销所有系统的事件
+ *
+ * ************************************************************************
+ * @copyright Copyright (c) 2025 AnakinLiu
+ * For study and research only, no reprinting.
+ * ************************************************************************
+ */
+
 #pragma once
 
 #include <entt/entt.hpp>
