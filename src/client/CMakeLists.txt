@@ -91,3 +91,50 @@ target_link_libraries(${TEST_EXET_NAME} PRIVATE
     absl::hash
     absl::flat_hash_map
     absl::raw_hash_set)
+
+
+set(TEST_EXET_NAME_1 PestManKillClientTestEcs)
+set(TEST_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/main_ecs_ui_test.cpp"
+)
+
+add_executable(${TEST_EXET_NAME_1} ${TEST_SOURCES})
+
+target_compile_options(${TEST_EXET_NAME_1} PRIVATE
+    # GCC
+    $<$<AND:$<CXX_COMPILER_ID:GNU>,$<CONFIG:Debug>>:-Wall -Wextra -Wpedantic -O0 -g>
+    $<$<AND:$<CXX_COMPILER_ID:GNU>,$<CONFIG:Release>>:-Wall -O3 -DNDEBUG>
+
+    # Clang
+    $<$<AND:$<CXX_COMPILER_ID:Clang>,$<CONFIG:Debug>>:-Wall -Wextra -Wpedantic -O0 -g>
+    $<$<AND:$<CXX_COMPILER_ID:Clang>,$<CONFIG:Release>>:-Wall -O3 -DNDEBUG>
+
+    # MSVC
+    $<$<AND:$<CXX_COMPILER_ID:MSVC>,$<CONFIG:Debug>>:/W4 /Od /Zi /EHsc>
+    $<$<AND:$<CXX_COMPILER_ID:MSVC>,$<CONFIG:Release>>:/O2 /DNDEBUG /EHsc>
+
+    $<$<AND:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_FRONTEND_VARIANT:MSVC>,$<CONFIG:Debug>>:/EHsc /Zi /W4>
+    $<$<AND:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_FRONTEND_VARIANT:MSVC>,$<CONFIG:Release>>:/EHsc /O2 /DNDEBUG>
+
+)
+
+target_include_directories(${TEST_EXET_NAME_1} PRIVATE 
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}
+)
+
+target_link_libraries(${TEST_EXET_NAME_1} PRIVATE 
+    mimalloc-static 
+    asio::asio 
+    spdlog::spdlog_header_only  
+    SDL3::SDL3 
+    stb::stb
+    imgui::imgui  
+    EnTT::EnTT 
+    nlohmann_json::nlohmann_json 
+    absl::base 
+    absl::memory 
+    absl::strings
+    absl::hash
+    absl::flat_hash_map
+    absl::raw_hash_set)
