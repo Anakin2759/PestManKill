@@ -36,7 +36,7 @@ protected:
     void setupUI() override
     {
         auto& factory = getUiSystem().getFactory();
-        auto& registry = getUiSystem().getRegistry();
+        auto& registry = utils::Registry::getInstance();
         auto rootEntity = getRootEntity();
 
         // 设置根布局
@@ -46,8 +46,9 @@ protected:
 
         // ===================== 创建标题栏 =====================
         auto titleLabel = factory.createLabel("Welcome to PestManKill");
-        auto& titleLabelComp = registry.get<components::Label>(titleLabel);
-        titleLabelComp.textColor = ImVec4(1.0F, 0.8F, 0.0F, 1.0F);
+        auto& titleText = registry.emplace<components::ShowText>(titleLabel);
+        titleText.text = "Welcome to PestManKill";
+        titleText.textColor = ImVec4(1.0F, 0.8F, 0.0F, 1.0F);
         helper::setFixedSize(registry, titleLabel, 0.0F, 40.0F);
         factory.addWidgetToLayout(rootEntity, titleLabel, 0);
 
@@ -71,8 +72,9 @@ protected:
         factory.addWidgetToLayout(rootEntity, statusLayout, 0);
 
         m_statusLabel = factory.createLabel("Ready");
-        auto& statusLabelComp = registry.get<components::Label>(m_statusLabel);
-        statusLabelComp.textColor = ImVec4(0.7F, 0.7F, 0.7F, 1.0F);
+        auto& statusText = registry.emplace<components::ShowText>(m_statusLabel);
+        statusText.text = "Ready";
+        statusText.textColor = ImVec4(0.7F, 0.7F, 0.7F, 1.0F);
         factory.addWidgetToLayout(statusLayout, m_statusLabel, 1);
 
         // ===================== 设置事件监听 =====================
@@ -86,7 +88,7 @@ protected:
         {
             if (event.key.key == SDLK_ESCAPE)
             {
-                utils::LOG_INFO("ESC key pressed");
+                LOG_INFO("ESC key pressed");
             }
         }
     }
@@ -95,7 +97,7 @@ private:
     void createLeftPanel(entt::entity parentLayout)
     {
         auto& factory = getUiSystem().getFactory();
-        auto& registry = getUiSystem().getRegistry();
+        auto& registry = utils::Registry::getInstance();
 
         auto leftPanel = factory.createVBoxLayout();
         helper::setFixedSize(registry, leftPanel, 250.0F, 0.0F);
@@ -105,19 +107,23 @@ private:
 
         // 标题
         auto panelTitle = factory.createLabel("Menu");
-        auto& titleComp = registry.get<components::Label>(panelTitle);
-        titleComp.textColor = ImVec4(0.8F, 0.9F, 1.0F, 1.0F);
+        auto& titleText = registry.emplace<components::ShowText>(panelTitle);
+        titleText.text = "Menu";
+        titleText.textColor = ImVec4(0.8F, 0.9F, 1.0F, 1.0F);
         factory.addWidgetToLayout(leftPanel, panelTitle, 0);
 
         // 按钮组
-        auto startButton = factory.createButton("Start Game", [this]() { onStartGame(); });
-        factory.addWidgetToLayout(leftPanel, startButton, 0);
+        m_startButton = factory.createButton("Start Game");
+        registry.get<components::Clickable>(m_startButton).text = "Start Game";
+        factory.addWidgetToLayout(leftPanel, m_startButton, 0);
 
-        auto settingsButton = factory.createButton("Settings", [this]() { onSettings(); });
-        factory.addWidgetToLayout(leftPanel, settingsButton, 0);
+        m_settingsButton = factory.createButton("Settings");
+        registry.get<components::Clickable>(m_settingsButton).text = "Settings";
+        factory.addWidgetToLayout(leftPanel, m_settingsButton, 0);
 
-        auto exitButton = factory.createButton("Exit", [this]() { onExit(); });
-        factory.addWidgetToLayout(leftPanel, exitButton, 0);
+        m_exitButton = factory.createButton("Exit");
+        registry.get<components::Clickable>(m_exitButton).text = "Exit";
+        factory.addWidgetToLayout(leftPanel, m_exitButton, 0);
 
         // 弹性空间
         factory.addStretchToLayout(leftPanel, 1);
@@ -126,7 +132,7 @@ private:
     void createCenterPanel(entt::entity parentLayout)
     {
         auto& factory = getUiSystem().getFactory();
-        auto& registry = getUiSystem().getRegistry();
+        auto& registry = utils::Registry::getInstance();
 
         auto centerPanel = factory.createVBoxLayout();
         helper::setLayoutSpacing(registry, centerPanel, 10.0F);
@@ -135,15 +141,17 @@ private:
 
         // 标题
         auto panelTitle = factory.createLabel("Game Area");
-        auto& titleComp = registry.get<components::Label>(panelTitle);
-        titleComp.textColor = ImVec4(0.8F, 0.9F, 1.0F, 1.0F);
+        auto& titleText = registry.emplace<components::ShowText>(panelTitle);
+        titleText.text = "Game Area";
+        titleText.textColor = ImVec4(0.8F, 0.9F, 1.0F, 1.0F);
         factory.addWidgetToLayout(centerPanel, panelTitle, 0);
 
         // 内容文本
         m_contentLabel = factory.createLabel("Select an option from the menu...");
-        auto& contentComp = registry.get<components::Label>(m_contentLabel);
-        contentComp.wordWrap = true;
-        contentComp.textColor = ImVec4(0.9F, 0.9F, 0.9F, 1.0F);
+        auto& contentText = registry.emplace<components::ShowText>(m_contentLabel);
+        contentText.text = "Select an option from the menu...";
+        contentText.wordWrap = true;
+        contentText.textColor = ImVec4(0.9F, 0.9F, 0.9F, 1.0F);
         factory.addWidgetToLayout(centerPanel, m_contentLabel, 1);
 
         // 输入框
@@ -153,18 +161,20 @@ private:
 
         m_textInput = factory.createTextEdit("Type here...", false);
         auto& textEditComp = registry.get<components::TextEdit>(m_textInput);
+        textEditComp.placeholder = "Type here...";
         textEditComp.maxLength = 256;
         textEditComp.onTextChanged = [this](const std::string& text) { onTextChanged(text); };
         factory.addWidgetToLayout(inputLayout, m_textInput, 1);
 
-        auto sendButton = factory.createButton("Send", [this]() { onSendMessage(); });
-        factory.addWidgetToLayout(inputLayout, sendButton, 0);
+        m_sendButton = factory.createButton("Send");
+        registry.get<components::Clickable>(m_sendButton).text = "Send";
+        factory.addWidgetToLayout(inputLayout, m_sendButton, 0);
     }
 
     void createRightPanel(entt::entity parentLayout)
     {
         auto& factory = getUiSystem().getFactory();
-        auto& registry = getUiSystem().getRegistry();
+        auto& registry = utils::Registry::getInstance();
 
         auto rightPanel = factory.createVBoxLayout();
         helper::setFixedSize(registry, rightPanel, 200.0F, 0.0F);
@@ -174,15 +184,17 @@ private:
 
         // 标题
         auto panelTitle = factory.createLabel("Info");
-        auto& titleComp = registry.get<components::Label>(panelTitle);
-        titleComp.textColor = ImVec4(0.8F, 0.9F, 1.0F, 1.0F);
+        auto& titleText = registry.emplace<components::ShowText>(panelTitle);
+        titleText.text = "Info";
+        titleText.textColor = ImVec4(0.8F, 0.9F, 1.0F, 1.0F);
         factory.addWidgetToLayout(rightPanel, panelTitle, 0);
 
         // 信息标签
         m_infoLabel = factory.createLabel("No information available");
-        auto& infoComp = registry.get<components::Label>(m_infoLabel);
-        infoComp.wordWrap = true;
-        infoComp.textColor = ImVec4(0.7F, 0.7F, 0.7F, 1.0F);
+        auto& infoText = registry.emplace<components::ShowText>(m_infoLabel);
+        infoText.text = "No information available";
+        infoText.wordWrap = true;
+        infoText.textColor = ImVec4(0.7F, 0.7F, 0.7F, 1.0F);
         factory.addWidgetToLayout(rightPanel, m_infoLabel, 1);
     }
 
@@ -200,23 +212,41 @@ private:
     // ===================== 事件处理 =====================
     void onButtonClicked(const events::ButtonClicked& event)
     {
-        utils::LOG_INFO("Button clicked: entity {}", static_cast<uint32_t>(event.entity));
-        updateStatus("Button clicked");
+        LOG_INFO("Button clicked: entity {}", static_cast<uint32_t>(event.entity));
+
+        // 根据按钮实体ID调用对应的处理函数
+        if (event.entity == m_startButton)
+        {
+            onStartGame();
+        }
+        else if (event.entity == m_settingsButton)
+        {
+            onSettings();
+        }
+        else if (event.entity == m_exitButton)
+        {
+            onExit();
+        }
+        else if (event.entity == m_sendButton)
+        {
+            onSendMessage();
+        }
+        else
+        {
+            updateStatus("Button clicked");
+        }
     }
 
-    void onTextChangedEvent(const events::TextChanged& event)
-    {
-        utils::LOG_INFO("Text changed event: {}", event.newText);
-    }
+    void onTextChangedEvent(const events::TextChanged& event) { LOG_INFO("Text changed event: {}", event.newText); }
 
     void onStartGame()
     {
-        utils::LOG_INFO("Start Game clicked");
+        LOG_INFO("Start Game clicked");
         updateStatus("Game started!");
 
-        auto& registry = getUiSystem().getRegistry();
-        auto& contentLabel = registry.get<components::Label>(m_contentLabel);
-        contentLabel.text = "Game is starting...\n\nPrepare yourself for battle!";
+        auto& registry = utils::Registry::getInstance();
+        auto& contentText = registry.get<components::ShowText>(m_contentLabel);
+        contentText.text = "Game is starting...\n\nPrepare yourself for battle!";
 
         // 示例：启动淡入动画
         helper::setAlpha(registry, m_contentLabel, 0.0F);
@@ -225,17 +255,17 @@ private:
 
     void onSettings()
     {
-        utils::LOG_INFO("Settings clicked");
+        LOG_INFO("Settings clicked");
         updateStatus("Opening settings...");
 
-        auto& registry = getUiSystem().getRegistry();
-        auto& infoLabel = registry.get<components::Label>(m_infoLabel);
-        infoLabel.text = "Settings panel would appear here.\n\nConfigure your game preferences.";
+        auto& registry = utils::Registry::getInstance();
+        auto& infoText = registry.get<components::ShowText>(m_infoLabel);
+        infoText.text = "Settings panel would appear here.\n\nConfigure your game preferences.";
     }
 
     void onExit()
     {
-        utils::LOG_INFO("Exit clicked");
+        LOG_INFO("Exit clicked");
         updateStatus("Exiting...");
 
         // 触发退出事件
@@ -244,22 +274,22 @@ private:
         SDL_PushEvent(&quitEvent);
     }
 
-    void onTextChanged(const std::string& text) { utils::LOG_INFO("Text input changed: {}", text); }
+    void onTextChanged(const std::string& text) { LOG_INFO("Text input changed: {}", text); }
 
     void onSendMessage()
     {
-        auto& registry = getUiSystem().getRegistry();
+        auto& registry = utils::Registry::getInstance();
         auto& textEdit = registry.get<components::TextEdit>(m_textInput);
 
         std::string message = textEdit.text;
         if (!message.empty())
         {
-            utils::LOG_INFO("Sending message: {}", message);
+            LOG_INFO("Sending message: {}", message);
             updateStatus("Message sent: " + message);
 
             // 更新内容区域
-            auto& contentLabel = registry.get<components::Label>(m_contentLabel);
-            contentLabel.text = "You sent: " + message;
+            auto& contentText = registry.get<components::ShowText>(m_contentLabel);
+            contentText.text = "You sent: " + message;
 
             // 清空输入框
             textEdit.text.clear();
@@ -268,16 +298,23 @@ private:
 
     void updateStatus(const std::string& status)
     {
-        auto& registry = getUiSystem().getRegistry();
-        auto& statusLabel = registry.get<components::Label>(m_statusLabel);
-        statusLabel.text = status;
+        auto& registry = utils::Registry::getInstance();
+        auto& statusText = registry.get<components::ShowText>(m_statusLabel);
+        statusText.text = status;
     }
 
 private:
+    // UI 实体
     entt::entity m_statusLabel = entt::null;
     entt::entity m_contentLabel = entt::null;
     entt::entity m_infoLabel = entt::null;
     entt::entity m_textInput = entt::null;
+
+    // 按钮实体
+    entt::entity m_startButton = entt::null;
+    entt::entity m_settingsButton = entt::null;
+    entt::entity m_exitButton = entt::null;
+    entt::entity m_sendButton = entt::null;
 };
 
 } // namespace ui

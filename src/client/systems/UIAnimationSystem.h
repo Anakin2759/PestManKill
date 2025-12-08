@@ -27,8 +27,6 @@ namespace ui::systems
 class UIAnimationSystem
 {
 public:
-    explicit UIAnimationSystem(entt::registry& registry) : m_registry(registry) {}
-
     /**
      * @brief 更新所有活动的动画
      * @param deltaTime 时间增量（秒）
@@ -36,7 +34,7 @@ public:
     void update(float deltaTime)
     {
         // 更新基础动画
-        auto animationView = m_registry.view<components::Animation>();
+        auto animationView = utils::Registry::getInstance().view<components::Animation>();
         for (auto entity : animationView)
         {
             auto& animation = animationView.get<components::Animation>(entity);
@@ -61,8 +59,8 @@ public:
         }
 
         // 更新位置动画
-        auto posAnimView =
-            m_registry.view<components::PositionAnimation, components::Position, components::Animation>();
+        auto posAnimView = utils::Registry::getInstance()
+                               .view<components::PositionAnimation, components::Position, components::Animation>();
         for (auto entity : posAnimView)
         {
             const auto& animation = posAnimView.get<components::Animation>(entity);
@@ -84,8 +82,8 @@ public:
         }
 
         // 更新透明度动画
-        auto alphaAnimView =
-            m_registry.view<components::AlphaAnimation, components::Visibility, components::Animation>();
+        auto alphaAnimView = utils::Registry::getInstance()
+                                 .view<components::AlphaAnimation, components::Visibility, components::Animation>();
         for (auto entity : alphaAnimView)
         {
             const auto& animation = alphaAnimView.get<components::Animation>(entity);
@@ -105,9 +103,6 @@ public:
             visibility.alpha = alphaAnim.startAlpha + (alphaAnim.endAlpha - alphaAnim.startAlpha) * progress;
         }
     }
-
-private:
-    entt::registry& m_registry;
 };
 
 } // namespace ui::systems

@@ -23,7 +23,7 @@
 #include <imgui_impl_sdlrenderer3.h>
 #include <stdexcept>
 #include "src/client/model/UiSystem.h"
-#include "src/client/utils/Logger.h"
+#include "src/client/utils/utils.h"
 
 namespace ui
 {
@@ -42,22 +42,22 @@ public:
     {
         if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS))
         {
-            utils::LOG_ERROR("SDL_Init Error: {}", SDL_GetError());
+            LOG_ERROR("SDL_Init Error: {}", SDL_GetError());
             throw std::runtime_error(SDL_GetError());
         }
 
         m_window = SDL_CreateWindow(title, width, height, SDL_WINDOW_RESIZABLE);
         if (m_window == nullptr)
         {
-            utils::LOG_ERROR("SDL_CreateWindow Error: {}", SDL_GetError());
+            LOG_ERROR("SDL_CreateWindow Error: {}", SDL_GetError());
             throw std::runtime_error(SDL_GetError());
         }
-        utils::LOG_INFO("Window created: {} ({}x{})", title, width, height);
+        LOG_INFO("Window created: {} ({}x{})", title, width, height);
 
         m_renderer = SDL_CreateRenderer(m_window, nullptr);
         if (m_renderer == nullptr)
         {
-            utils::LOG_ERROR("SDL_CreateRenderer Error: {}", SDL_GetError());
+            LOG_ERROR("SDL_CreateRenderer Error: {}", SDL_GetError());
             throw std::runtime_error(SDL_GetError());
         }
 
@@ -65,15 +65,15 @@ public:
 
         // 创建根UI实体
         m_rootEntity = m_uiSystem.getFactory().createVBoxLayout();
-        auto& rootPos = m_uiSystem.getRegistry().get<components::Position>(m_rootEntity);
-        auto& rootSize = m_uiSystem.getRegistry().get<components::Size>(m_rootEntity);
+        auto& rootPos = utils::Registry::getInstance().get<components::Position>(m_rootEntity);
+        auto& rootSize = utils::Registry::getInstance().get<components::Size>(m_rootEntity);
         rootPos.x = 0.0F;
         rootPos.y = 0.0F;
         rootSize.width = static_cast<float>(width);
         rootSize.height = static_cast<float>(height);
         rootSize.useFixedSize = true;
 
-        auto& rootBg = m_uiSystem.getRegistry().emplace<components::Background>(m_rootEntity);
+        auto& rootBg = utils::Registry::getInstance().emplace<components::Background>(m_rootEntity);
         rootBg.color = ImVec4(20.0F / 255.0F, 25.0F / 255.0F, 33.0F / 255.0F, 1.0F);
         rootBg.enabled = true;
     }
@@ -208,7 +208,7 @@ private:
         ImGui_ImplSDL3_InitForSDLRenderer(m_window, m_renderer);
         ImGui_ImplSDLRenderer3_Init(m_renderer);
 
-        utils::LOG_INFO("ImGui initialized");
+        LOG_INFO("ImGui initialized");
     }
 
     void shutdownImGui()
@@ -216,7 +216,7 @@ private:
         ImGui_ImplSDLRenderer3_Shutdown();
         ImGui_ImplSDL3_Shutdown();
         ImGui::DestroyContext();
-        utils::LOG_INFO("ImGui shutdown");
+        LOG_INFO("ImGui shutdown");
     }
 
     void handleResize(int width, int height)
@@ -225,7 +225,7 @@ private:
         m_windowHeight = height;
 
         // 更新根实体尺寸
-        auto& rootSize = m_uiSystem.getRegistry().get<components::Size>(m_rootEntity);
+        auto& rootSize = utils::Registry::getInstance().get<components::Size>(m_rootEntity);
         rootSize.width = static_cast<float>(width);
         rootSize.height = static_cast<float>(height);
     }

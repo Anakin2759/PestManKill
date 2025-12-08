@@ -1,14 +1,8 @@
 
 #pragma once
 #include <cstdint>
-enum class ButtonType : uint8_t
-{
-    END_TURN,
-    USE_CARD,
-    DRAW_CARD,
-    PLAY_SKILL
-};
+#include <entt/entt.hpp>
 struct ButtonClicked
 {
-    ButtonType type;
+    entt::entity buttonEntity; // 被点击的按钮实体ID
 };

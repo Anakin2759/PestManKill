@@ -72,6 +72,32 @@ struct Background
 };
 
 /**
+ * @brief 圆角组件
+ */
+struct RoundedCorners
+{
+    float radius = 0.0F;
+    bool topLeft = true;
+    bool topRight = true;
+    bool bottomLeft = true;
+    bool bottomRight = true;
+
+    // 便捷构造函数（通过位标志）
+    constexpr explicit RoundedCorners(float r = 0.0F) : radius(r) {}
+
+    // 获取 ImDrawFlags 用于 ImGui 绘制
+    [[nodiscard]] constexpr int getDrawFlags() const noexcept
+    {
+        int flags = 0;
+        if (!topLeft) flags |= ImDrawFlags_RoundCornersTopLeft;
+        if (!topRight) flags |= ImDrawFlags_RoundCornersTopRight;
+        if (!bottomLeft) flags |= ImDrawFlags_RoundCornersBottomLeft;
+        if (!bottomRight) flags |= ImDrawFlags_RoundCornersBottomRight;
+        return flags == 0 ? ImDrawFlags_RoundCornersAll : flags;
+    }
+};
+
+/**
  * @brief 层级关系组件 - 父子关系
  */
 struct Hierarchy
@@ -95,6 +121,17 @@ struct Checkable
 {
     bool checkable = false;
     bool checked = false;
+};
+
+/**
+ * @brief 文本组件
+ */
+struct ShowText
+{
+    std::string text;
+    ImVec4 textColor{1.0F, 1.0F, 1.0F, 1.0F};
+    bool wordWrap = false;
+    float wrapWidth = 0.0F;
 };
 
 // ===================== 布局组件 =====================
@@ -152,35 +189,14 @@ struct Spacer
     bool isHorizontal = true;
 };
 
-// ===================== 交互组件 =====================
-
-/**
- * @brief 按钮组件
- */
-struct Button
+struct Clickable
 {
     std::string text;
     std::string uniqueId;
     std::string tooltip;
-    std::function<void()> onClick;
 
     bool enabled = true;
     bool useCustomColor = false;
-
-    ImVec4 buttonColor{0.26F, 0.59F, 0.98F, 0.40F};
-    ImVec4 hoverColor{0.26F, 0.59F, 0.98F, 1.00F};
-    ImVec4 activeColor{0.06F, 0.53F, 0.98F, 1.00F};
-};
-
-/**
- * @brief 文本标签组件
- */
-struct Label
-{
-    std::string text;
-    ImVec4 textColor{1.0F, 1.0F, 1.0F, 1.0F};
-    bool wordWrap = false;
-    float wrapWidth = 0.0F;
 };
 
 /**

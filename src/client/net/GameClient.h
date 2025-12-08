@@ -78,12 +78,12 @@ public:
     {
         if (m_state != ClientState::DISCONNECTED)
         {
-            utils::LOG_WARN("Already connected or connecting, ignoring duplicate connection request");
+            LOG_WARN("Already connected or connecting, ignoring duplicate connection request");
             co_return;
         }
 
         m_state = ClientState::CONNECTING;
-        utils::LOG_INFO("Connecting to server: {}:{}", host, port);
+        LOG_INFO("Connecting to server: {}:{}", host, port);
 
         // 设置消息处理器
         m_networkClient->setPacketHandler(
@@ -107,7 +107,7 @@ public:
             m_messageHandler->onConnected();
         }
 
-        utils::LOG_INFO("Connection successful");
+        LOG_INFO("Connection successful");
     }
 
     /**
@@ -122,7 +122,7 @@ public:
                 return;
             }
 
-            utils::LOG_INFO("Disconnecting from server");
+            LOG_INFO("Disconnecting from server");
 
             // Stop heartbeat
             stopHeartbeat();
@@ -147,11 +147,11 @@ public:
         }
         catch (const std::exception& e)
         {
-            utils::LOG_ERROR("Exception during disconnect: {}", e.what());
+            LOG_ERROR("Exception during disconnect: {}", e.what());
         }
         catch (...)
         {
-            utils::LOG_ERROR("Unknown exception during disconnect");
+            LOG_ERROR("Unknown exception during disconnect");
         }
     }
 
@@ -163,17 +163,17 @@ public:
     /**
      * @brief 获取当前状态
      */
-    ClientState getState() const { return m_state; }
+    ClientState getState() const noexcept { return m_state; }
 
     /**
      * @brief 获取客户端 ID
      */
-    uint32_t getClientId() const { return m_clientId; }
+    uint32_t getClientId() const noexcept { return m_clientId; }
 
     /**
      * @brief 获取玩家实体 ID
      */
-    uint32_t getPlayerEntity() const { return m_playerEntity; }
+    uint32_t getPlayerEntity() const noexcept { return m_playerEntity; }
 
     // ==================== 登录/登出 ====================
 
@@ -185,11 +185,11 @@ public:
     {
         if (m_state != ClientState::CONNECTED)
         {
-            utils::LOG_ERROR("Cannot login: not connected to server");
+            LOG_ERROR("Cannot login: not connected to server");
             co_return;
         }
 
-        utils::LOG_INFO("Sending login request: {}", playerName);
+        LOG_INFO("Sending login request: {}", playerName);
         m_playerName = playerName;
 
         // 构造登录消息（简单的字符串）
@@ -201,7 +201,7 @@ public:
 
         if (!success)
         {
-            utils::LOG_ERROR("Failed to send login request");
+            LOG_ERROR("Failed to send login request");
             if (m_messageHandler)
             {
                 m_messageHandler->onLoginFailed("Network error");
@@ -224,7 +224,7 @@ public:
             return;
         }
 
-        utils::LOG_INFO("Sending logout message");
+        LOG_INFO("Sending logout message");
 
         std::vector<uint8_t> emptyPayload;
 
@@ -244,7 +244,7 @@ public:
     {
         if (m_state != ClientState::IN_GAME)
         {
-            utils::LOG_ERROR("Cannot send use card message: not in game");
+            LOG_ERROR("Cannot send use card message: not in game");
             co_return false;
         }
 
@@ -261,14 +261,14 @@ public:
             if (i < targets.size() - 1) targetsStr += ",";
         }
         targetsStr += "]";
-        utils::LOG_INFO("Sending use card: card={}, targets={}", card, targetsStr);
+        LOG_INFO("Sending use card: card={}, targets={}", card, targetsStr);
 
         bool success =
             co_await m_networkClient->sendReliablePacket(static_cast<uint16_t>(RequestType::USE_CARD), payload);
 
         if (!success)
         {
-            utils::LOG_ERROR("Failed to send use card message");
+            LOG_ERROR("Failed to send use card message");
         }
 
         co_return success;
@@ -281,7 +281,7 @@ public:
     {
         if (m_state != ClientState::IN_GAME)
         {
-            utils::LOG_ERROR("Cannot send discard card message: not in game");
+            LOG_ERROR("Cannot send discard card message: not in game");
             co_return false;
         }
 
@@ -298,14 +298,14 @@ public:
             if (i < cards.size() - 1) cardsStr += ",";
         }
         cardsStr += "]";
-        utils::LOG_INFO("Sending discard cards: cards={}", cardsStr);
+        LOG_INFO("Sending discard cards: cards={}", cardsStr);
 
         bool success =
             co_await m_networkClient->sendReliablePacket(static_cast<uint16_t>(RequestType::DISCARD_CARD), payload);
 
         if (!success)
         {
-            utils::LOG_ERROR("Failed to send discard card message");
+            LOG_ERROR("Failed to send discard card message");
         }
 
         co_return success;
@@ -318,11 +318,11 @@ public:
     {
         if (m_state != ClientState::IN_GAME)
         {
-            utils::LOG_ERROR("Cannot send end turn message: not in game");
+            LOG_ERROR("Cannot send end turn message: not in game");
             co_return false;
         }
 
-        utils::LOG_INFO("Sending end turn");
+        LOG_INFO("Sending end turn");
 
         std::vector<uint8_t> emptyPayload;
 
@@ -357,7 +357,7 @@ public:
         m_heartbeatInterval = interval;
         scheduleHeartbeat();
 
-        utils::LOG_INFO("Heartbeat started, interval: {}s", interval.count());
+        LOG_INFO("Heartbeat started, interval: {}s", interval.count());
     }
 
     /**
@@ -392,7 +392,7 @@ private:
                           size_t size,
                           [[maybe_unused]] const asio::ip::udp::endpoint& sender)
     {
-        utils::LOG_DEBUG("Received message: type={}, size={}", msgType, size);
+        LOG_DEBUG("Received message: type={}, size={}", msgType, size);
 
         // 根据值范围判断消息类型：
         // ResponseType: 0x0000~0x0FFF
@@ -412,7 +412,7 @@ private:
                     break;
 
                 default:
-                    utils::LOG_WARN("Unhandled event type: 0x{:04X}", msgType);
+                    LOG_WARN("Unhandled event type: 0x{:04X}", msgType);
             }
         }
         else if (msgType <= 0x0FFF)
@@ -430,12 +430,12 @@ private:
                     break;
 
                 default:
-                    utils::LOG_WARN("Unhandled response type: 0x{:04X}", msgType);
+                    LOG_WARN("Unhandled response type: 0x{:04X}", msgType);
             }
         }
         else
         {
-            utils::LOG_WARN("Unknown message type: 0x{:04X}", msgType);
+            LOG_WARN("Unknown message type: 0x{:04X}", msgType);
         }
     }
 
@@ -454,12 +454,12 @@ private:
         else if (size == 0 || (size > 0 && data[0] == 0))
         {
             // 空响应或心跳确认
-            utils::LOG_DEBUG("♥ Heartbeat acknowledged by server ({}:{})", sender.address().to_string(), sender.port());
+            LOG_DEBUG("♥ Heartbeat acknowledged by server ({}:{})", sender.address().to_string(), sender.port());
         }
         else
         {
             // 其他 OK 响应，尝试解析
-            utils::LOG_DEBUG("Received OK response: size={}", size);
+            LOG_DEBUG("Received OK response: size={}", size);
         }
     }
 
@@ -476,7 +476,7 @@ private:
             m_clientId = json.at("clientId").get<uint32_t>();
             m_playerEntity = json.at("entityId").get<uint32_t>();
 
-            utils::LOG_INFO("Login successful: clientId={}, playerEntity={}", m_clientId, m_playerEntity);
+            LOG_INFO("Login successful: clientId={}, playerEntity={}", m_clientId, m_playerEntity);
 
             m_state = ClientState::AUTHENTICATED;
 
@@ -490,7 +490,7 @@ private:
         }
         catch (const std::exception& e)
         {
-            utils::LOG_ERROR("Failed to parse login response: {}", e.what());
+            LOG_ERROR("Failed to parse login response: {}", e.what());
             if (m_messageHandler)
             {
                 m_messageHandler->onLoginFailed("Invalid server response format");
@@ -508,7 +508,7 @@ private:
             std::string jsonStr(reinterpret_cast<const char*>(data), size);
             nlohmann::json json = nlohmann::json::parse(jsonStr);
 
-            utils::LOG_DEBUG("Received game state update");
+            LOG_DEBUG("Received game state update");
 
             if (m_state == ClientState::AUTHENTICATED)
             {
@@ -527,7 +527,7 @@ private:
         }
         catch (const std::exception& e)
         {
-            utils::LOG_ERROR("Failed to parse game state: {}", e.what());
+            LOG_ERROR("Failed to parse game state: {}", e.what());
         }
     }
 
@@ -544,7 +544,7 @@ private:
             bool success = json.value("success", false);
             std::string message = json.value("message", "");
 
-            utils::LOG_INFO("Use card response: success={}, message={}", success, message);
+            LOG_INFO("Use card response: success={}, message={}", success, message);
 
             if (m_messageHandler)
             {
@@ -553,7 +553,7 @@ private:
         }
         catch (const std::exception& e)
         {
-            utils::LOG_ERROR("Failed to parse use card response: {}", e.what());
+            LOG_ERROR("Failed to parse use card response: {}", e.what());
         }
     }
 
@@ -563,7 +563,7 @@ private:
     void handleBroadcastEvent(const uint8_t* data, size_t size)
     {
         std::string message(reinterpret_cast<const char*>(data), size);
-        utils::LOG_INFO("Broadcast event: {}", message);
+        LOG_INFO("Broadcast event: {}", message);
 
         if (m_messageHandler)
         {
@@ -615,7 +615,7 @@ private:
     void handleErrorMessage(const uint8_t* data, size_t size)
     {
         std::string errorMessage(reinterpret_cast<const char*>(data), size);
-        utils::LOG_ERROR("Server error: {}", errorMessage);
+        LOG_ERROR("Server error: {}", errorMessage);
 
         if (m_messageHandler)
         {
@@ -637,7 +637,7 @@ private:
             uint32_t sender = json.value("sender", 0u);
             std::string chatMessage = json.value("chatMessage", "");
 
-            utils::LOG_INFO("Chat message from player {}: {}", sender, chatMessage);
+            LOG_INFO("Chat message from player {}: {}", sender, chatMessage);
 
             // 触发 SendMessageToChatResponded 事件（如果有事件系统）
             // 这里先通过 message handler 处理
@@ -653,9 +653,9 @@ private:
         catch (const nlohmann::json::exception& e)
         {
             // 如果不是 JSON 格式，可能是旧格式的纯文本
-            utils::LOG_WARN("Failed to parse chat message as JSON: {}, treating as plain text", e.what());
+            LOG_WARN("Failed to parse chat message as JSON: {}, treating as plain text", e.what());
             std::string message(reinterpret_cast<const char*>(data), size);
-            utils::LOG_INFO("Chat message (plain text): {}", message);
+            LOG_INFO("Chat message (plain text): {}", message);
 
             if (m_messageHandler)
             {
@@ -664,7 +664,7 @@ private:
         }
         catch (const std::exception& e)
         {
-            utils::LOG_ERROR("Failed to handle chat message: {}", e.what());
+            LOG_ERROR("Failed to handle chat message: {}", e.what());
         }
     }
 
@@ -704,7 +704,7 @@ private:
             return;
         }
 
-        utils::LOG_DEBUG("♥ Sending heartbeat to server");
+        LOG_DEBUG("♥ Sending heartbeat to server");
         std::vector<uint8_t> emptyPayload;
 
         asio::co_spawn(

@@ -267,7 +267,7 @@ private:
     {
         // TODO: 实现技能描述对话框
         // 这里需要一个模态对话框系统，暂时使用日志输出
-        utils::LOG_INFO("技能: {} - {}", skill.name, skill.description);
+        LOG_INFO("技能: {} - {}", skill.name, skill.description);
     }
 
     entt::registry& m_registry;

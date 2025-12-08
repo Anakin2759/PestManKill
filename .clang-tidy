@@ -14,7 +14,6 @@ Checks: >
   misc-*,
   concurrency-*,
   -bugprone-easily-swappable-parameters,
-  -bugprone-exception-escape,
   -modernize-use-trailing-return-type,
   -modernize-avoid-c-arrays,
   -performance-avoid-endl,
@@ -26,7 +25,6 @@ Checks: >
   -fuchsia-header-anon-namespaces,
   -fuchsia-multiple-inheritance,
   -misc-non-private-member-variables-in-classes,
-  -clang-diagnostic-unknown-argument,
 
 
 CheckOptions:

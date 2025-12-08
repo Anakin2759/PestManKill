@@ -20,11 +20,12 @@
 #include "src/client/model/UIFactory.h"
 #include "src/client/model/UIHelper.h"
 #include "src/client/components/UIComponents.h"
+#include "src/client/events/UIEvents.h"
+#include "src/client/utils/Dispatcher.h"
 #include "HandCardViewECS.h"
 #include <entt/entt.hpp>
 #include <string>
 #include <vector>
-#include <functional>
 #include <memory>
 
 // NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers, readability-magic-numbers)
@@ -57,11 +58,9 @@ public:
         m_cards.push_back(card);
         UIHelper::addChild(m_registry, m_cardContainer, card->getContainer());
 
-        // 触发卡牌添加回调
-        if (m_onCardAdded)
-        {
-            m_onCardAdded(card);
-        }
+        // 通过全局事件分发器发布事件
+        utils::Dispatcher::getInstance().enqueue<ui::events::CardMovedToProcessing>(
+            ui::events::CardMovedToProcessing{card->getContainer(), card->getCardName()});
     }
 
     void removeCard(std::shared_ptr<HandCardViewECS> card)
@@ -87,21 +86,22 @@ public:
 
             m_cards.erase(it);
 
-            // 触发卡牌移除回调
-            if (m_onCardRemoved)
-            {
-                m_onCardRemoved(card);
-            }
+            // 通过全局事件分发器发布事件
+            utils::Dispatcher::getInstance().enqueue<ui::events::CardRemovedFromProcessing>(
+                ui::events::CardRemovedFromProcessing{card->getContainer(), card->getCardName()});
         }
     }
 
     void clearAllCards()
     {
-        // 触发清空前回调
-        if (m_onBeforeClear)
+        // 通过全局事件分发器发布清空前事件
+        std::vector<entt::entity> cardEntities;
+        for (const auto& card : m_cards)
         {
-            m_onBeforeClear(m_cards);
+            cardEntities.push_back(card->getContainer());
         }
+        utils::Dispatcher::getInstance().enqueue<ui::events::ProcessingAreaBeforeClear>(
+            ui::events::ProcessingAreaBeforeClear{cardEntities});
 
         // 清空所有卡牌
         if (m_registry.valid(m_cardContainer) && m_registry.all_of<Children>(m_cardContainer))
@@ -112,34 +112,14 @@ public:
 
         m_cards.clear();
 
-        // 触发清空后回调
-        if (m_onAfterClear)
-        {
-            m_onAfterClear();
-        }
+        // 通过全局事件分发器发布清空后事件
+        utils::Dispatcher::getInstance().enqueue<ui::events::ProcessingAreaAfterClear>(
+            ui::events::ProcessingAreaAfterClear{});
     }
 
     [[nodiscard]] size_t getCardCount() const { return m_cards.size(); }
 
     [[nodiscard]] const std::vector<std::shared_ptr<HandCardViewECS>>& getCards() const { return m_cards; }
-
-    // ===================== 回调设置 =====================
-    void setOnCardAdded(std::function<void(std::shared_ptr<HandCardViewECS>)> callback)
-    {
-        m_onCardAdded = std::move(callback);
-    }
-
-    void setOnCardRemoved(std::function<void(std::shared_ptr<HandCardViewECS>)> callback)
-    {
-        m_onCardRemoved = std::move(callback);
-    }
-
-    void setOnBeforeClear(std::function<void(const std::vector<std::shared_ptr<HandCardViewECS>>&)> callback)
-    {
-        m_onBeforeClear = std::move(callback);
-    }
-
-    void setOnAfterClear(std::function<void()> callback) { m_onAfterClear = std::move(callback); }
 
     [[nodiscard]] entt::entity getContainer() const { return m_container; }
 
@@ -168,11 +148,6 @@ private:
     entt::entity m_cardContainer;
 
     std::vector<std::shared_ptr<HandCardViewECS>> m_cards;
-
-    std::function<void(std::shared_ptr<HandCardViewECS>)> m_onCardAdded;
-    std::function<void(std::shared_ptr<HandCardViewECS>)> m_onCardRemoved;
-    std::function<void(const std::vector<std::shared_ptr<HandCardViewECS>>&)> m_onBeforeClear;
-    std::function<void()> m_onAfterClear;
 };
 
 } // namespace ui

@@ -20,9 +20,10 @@
 #include "src/client/model/UIFactory.h"
 #include "src/client/model/UIHelper.h"
 #include "src/client/components/UIComponents.h"
+#include "src/client/events/UIEvents.h"
+#include "src/client/utils/Dispatcher.h"
 #include <entt/entt.hpp>
 #include <string>
-#include <functional>
 
 // NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers, readability-magic-numbers)
 
@@ -82,17 +83,14 @@ public:
         m_selected = selected;
         updateSelectionStyle();
 
-        if (m_onSelectCallback)
-        {
-            m_onSelectCallback(m_selected);
-        }
+        // 通过全局事件分发器发布事件
+        utils::Dispatcher::getInstance().enqueue<ui::events::CardSelectionChanged>(
+            ui::events::CardSelectionChanged{m_container, m_selected, m_cardName});
     }
 
     void toggleSelect() { setSelected(!m_selected); }
 
     [[nodiscard]] bool isSelected() const { return m_selected; }
-
-    void setOnSelectCallback(std::function<void(bool)> callback) { m_onSelectCallback = std::move(callback); }
 
     [[nodiscard]] entt::entity getContainer() const { return m_container; }
     [[nodiscard]] const std::string& getCardName() const { return m_cardName; }
@@ -177,7 +175,6 @@ private:
     std::string m_cardSuit;
     std::string m_cardRank;
     bool m_selected;
-    std::function<void(bool)> m_onSelectCallback;
 };
 
 } // namespace ui

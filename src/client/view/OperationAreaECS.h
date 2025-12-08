@@ -20,11 +20,12 @@
 #include "src/client/model/UIFactory.h"
 #include "src/client/model/UIHelper.h"
 #include "src/client/components/UIComponents.h"
+#include "src/client/events/UIEvents.h"
+#include "src/client/utils/Dispatcher.h"
 #include "HandCardViewECS.h"
 #include <entt/entt.hpp>
 #include <string>
 #include <vector>
-#include <functional>
 #include <memory>
 
 // NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers, readability-magic-numbers)
@@ -123,14 +124,10 @@ public:
         return selected;
     }
 
-    // ===================== 按钮回调设置 =====================
-    void setOnUseCard(std::function<void()> callback) { m_onUseCard = std::move(callback); }
+    // ===================== 按钮回调设置（已弃用，使用全局事件分发器） =====================
+    // 保留这些方法以保持兼容性，但内部不再使用回调
 
-    void setOnCancel(std::function<void()> callback) { m_onCancel = std::move(callback); }
-
-    void setOnEndTurn(std::function<void()> callback) { m_onEndTurn = std::move(callback); }
-
-    // ===================== 按钮状态控制 =====================
+    [[nodiscard]] entt::entity getContainer() const { return m_container; }
     void setUseCardEnabled(bool enabled)
     {
         if (m_registry.valid(m_useCardBtn) && m_registry.all_of<Button>(m_useCardBtn))
@@ -174,42 +171,40 @@ private:
         UIHelper::addChild(m_registry, m_container, buttonContainer);
 
         // 使用卡牌按钮
-        m_useCardBtn = m_factory.createButton({0.0F, 0.0F},
-                                              {120.0F, 40.0F},
-                                              "使用卡牌",
-                                              [this]()
-                                              {
-                                                  if (m_onUseCard)
-                                                  {
-                                                      m_onUseCard();
-                                                  }
-                                              });
+        m_useCardBtn = m_factory.createButton(
+            {0.0F, 0.0F},
+            {120.0F, 40.0F},
+            "使用卡牌",
+            [this]()
+            {
+                auto selected = getSelectedCard();
+                if (selected)
+                {
+                    utils::Dispatcher::getInstance().enqueue<ui::events::UseCardEvent>(
+                        ui::events::UseCardEvent{selected->getContainer(), selected->getCardName()});
+                }
+            });
         UIHelper::addChild(m_registry, buttonContainer, m_useCardBtn);
 
         // 取消按钮
-        m_cancelBtn = m_factory.createButton({0.0F, 0.0F},
-                                             {120.0F, 40.0F},
-                                             "取消",
-                                             [this]()
-                                             {
-                                                 if (m_onCancel)
-                                                 {
-                                                     m_onCancel();
-                                                 }
-                                             });
+        m_cancelBtn =
+            m_factory.createButton({0.0F, 0.0F},
+                                   {120.0F, 40.0F},
+                                   "取消",
+                                   [this]()
+                                   {
+                                       utils::Dispatcher::getInstance().enqueue<ui::events::CancelOperationEvent>(
+                                           ui::events::CancelOperationEvent{});
+                                   });
         UIHelper::addChild(m_registry, buttonContainer, m_cancelBtn);
 
         // 结束回合按钮
-        m_endTurnBtn = m_factory.createButton({0.0F, 0.0F},
-                                              {120.0F, 40.0F},
-                                              "结束回合",
-                                              [this]()
-                                              {
-                                                  if (m_onEndTurn)
-                                                  {
-                                                      m_onEndTurn();
-                                                  }
-                                              });
+        m_endTurnBtn = m_factory.createButton(
+            {0.0F, 0.0F},
+            {120.0F, 40.0F},
+            "结束回合",
+            [this]()
+            { utils::Dispatcher::getInstance().enqueue<ui::events::EndTurnEvent>(ui::events::EndTurnEvent{}); });
         UIHelper::addChild(m_registry, buttonContainer, m_endTurnBtn);
 
         // 下方手牌区域
@@ -229,10 +224,6 @@ private:
     entt::entity m_handCardContainer;
 
     std::vector<std::shared_ptr<HandCardViewECS>> m_handCards;
-
-    std::function<void()> m_onUseCard;
-    std::function<void()> m_onCancel;
-    std::function<void()> m_onEndTurn;
 };
 
 } // namespace ui

@@ -27,7 +27,7 @@
 #include "src/client/utils/Dispatcher.h"
 #include "src/client/components/UIComponents.h"
 #include "src/client/events/UIEvents.h"
-
+#include "src/client/utils/utils.h"
 namespace ui
 {
 
@@ -40,10 +40,7 @@ namespace ui
 class UiSystem
 {
 public:
-    UiSystem() : m_renderSystem(m_registry), m_animationSystem(m_registry), m_factory(m_registry)
-    {
-        setupEventHandlers();
-    }
+    UiSystem() { setupEventHandlers(); }
 
     ~UiSystem() = default;
 
@@ -63,22 +60,12 @@ public:
 
         // 处理事件队列
         utils::Dispatcher::getInstance().update();
-    } /**
-       * @brief 渲染所有UI元素
-       */
+    }
+
+    /**
+     * @brief 渲染所有UI元素
+     */
     void render() { m_renderSystem.update(); }
-
-    /**
-     * @brief 获取注册表
-     */
-    [[nodiscard]] entt::registry& getRegistry() { return m_registry; }
-    [[nodiscard]] const entt::registry& getRegistry() const { return m_registry; }
-
-    /**
-     * @brief 获取事件分发器
-     */
-    [[nodiscard]] entt::dispatcher& getDispatcher() { return utils::Dispatcher::getInstance(); }
-    [[nodiscard]] const entt::dispatcher& getDispatcher() const { return utils::Dispatcher::getInstance(); }
 
     /**
      * @brief 获取UI工厂
@@ -101,7 +88,7 @@ public:
     /**
      * @brief 清空所有UI元素
      */
-    void clear() { m_registry.clear(); }
+    void clear() { utils::Registry::getInstance().clear(); }
 
 private:
     /**
@@ -114,8 +101,6 @@ private:
     }
 
 private:
-    entt::registry m_registry;
-
     systems::UIRenderSystem m_renderSystem;
     systems::UIAnimationSystem m_animationSystem;
 

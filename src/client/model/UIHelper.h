@@ -150,10 +150,10 @@ inline void setButtonText(entt::registry& registry, entt::entity entity, const s
         return;
     }
 
-    auto* button = registry.try_get<components::Button>(entity);
-    if (button)
+    auto* clickable = registry.try_get<components::Clickable>(entity);
+    if (clickable)
     {
-        button->text = text;
+        clickable->text = text;
     }
 }
 
@@ -167,10 +167,10 @@ inline void setButtonEnabled(entt::registry& registry, entt::entity entity, bool
         return;
     }
 
-    auto* button = registry.try_get<components::Button>(entity);
-    if (button)
+    auto* clickable = registry.try_get<components::Clickable>(entity);
+    if (clickable)
     {
-        button->enabled = enabled;
+        clickable->enabled = enabled;
     }
 }
 
@@ -184,10 +184,10 @@ inline void setLabelText(entt::registry& registry, entt::entity entity, const st
         return;
     }
 
-    auto* label = registry.try_get<components::Label>(entity);
-    if (label)
+    auto* ShowText = registry.try_get<components::ShowText>(entity);
+    if (ShowText)
     {
-        label->text = text;
+        ShowText->text = text;
     }
 }
 
@@ -201,9 +201,9 @@ inline void setTextColor(entt::registry& registry, entt::entity entity, const Im
         return;
     }
 
-    if (auto* label = registry.try_get<components::Label>(entity))
+    if (auto* showText = registry.try_get<components::ShowText>(entity))
     {
-        label->textColor = color;
+        showText->textColor = color;
     }
     else if (auto* textEdit = registry.try_get<components::TextEdit>(entity))
     {

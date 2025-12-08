@@ -8,6 +8,16 @@
  * @brief UI渲染系统
  *
  * 负责渲染所有UI元素的ECS系统
+    遍历所有可见的UI实体，根据其组件类型调用相应的渲染函数
+    使用ImGui进行实际绘制
+    支持按钮、标签、文本编辑框、图像等常用UI组件
+    处理层级关系，递归渲染子元素
+    防止重入，确保渲染过程安全
+    可扩展以支持更多UI组件类型
+    集成背景绘制和透明度控制
+    使用ECS模式管理UI状态和属性
+    提供清晰的渲染流程，易于维护和扩展
+    确保UI渲染性能和响应速度
  *
  * ************************************************************************
  * @copyright Copyright (c) 2025 AnakinLiu
@@ -20,27 +30,25 @@
 #include <imgui.h>
 #include "src/client/components/UIComponents.h"
 #include "src/client/events/UIEvents.h"
-#include "src/client/utils/Dispatcher.h"
-
+#include "src/client/utils/utils.h"
 namespace ui::systems
 {
 
 class UIRenderSystem
 {
 public:
-    explicit UIRenderSystem(entt::registry& registry) : m_registry(registry) {}
-
     /**
      * @brief 渲染所有可见的UI元素
      */
-    void update()
+    void update() noexcept
     {
         // 渲染顶层元素（没有父节点的元素）
-        auto view = m_registry.view<components::Position, components::Size, components::Visibility>();
+        auto view =
+            utils::Registry::getInstance().view<components::Position, components::Size, components::Visibility>();
 
         for (auto entity : view)
         {
-            const auto& hierarchy = m_registry.try_get<components::Hierarchy>(entity);
+            const auto& hierarchy = utils::Registry::getInstance().try_get<components::Hierarchy>(entity);
 
             // 只渲染顶层元素（没有父节点或父节点为null）
             if (!hierarchy || hierarchy->parent == entt::null)
@@ -54,19 +62,20 @@ private:
     /**
      * @brief 递归渲染UI元素及其子元素
      */
-    void renderWidget(entt::entity entity)
+    void renderWidget(entt::entity entity) noexcept
     {
-        auto* visibility = m_registry.try_get<components::Visibility>(entity);
+        auto& registry = utils::Registry::getInstance();
+
+        const auto* visibility = registry.try_get<components::Visibility>(entity);
         if (!visibility || !visibility->visible || visibility->alpha <= 0.0F)
         {
             return;
         }
 
-        auto* renderState = m_registry.try_get<components::RenderState>(entity);
+        auto* renderState = registry.try_get<components::RenderState>(entity);
         if (!renderState)
         {
-            m_registry.emplace<components::RenderState>(entity);
-            renderState = m_registry.try_get<components::RenderState>(entity);
+            renderState = &registry.emplace<components::RenderState>(entity);
         }
 
         // 防止重入
@@ -78,50 +87,56 @@ private:
         renderState->isRendering = true;
 
         // 获取位置和尺寸
-        const auto& position = m_registry.get<components::Position>(entity);
-        const auto& size = m_registry.get<components::Size>(entity);
+        const auto* position = registry.try_get<components::Position>(entity);
+        const auto* size = registry.try_get<components::Size>(entity);
 
-        ImVec2 pos{position.x, position.y};
-        ImVec2 sz{size.width, size.height};
+        if (!position || !size)
+        {
+            renderState->isRendering = false;
+            return;
+        }
+
+        ImVec2 pos{position->x, position->y};
+        ImVec2 sz{size->width, size->height};
 
         // 渲染背景
-        if (auto* bg = m_registry.try_get<components::Background>(entity); bg && bg->enabled)
+        if (const auto* bg = registry.try_get<components::Background>(entity); bg && bg->enabled)
         {
-            renderBackground(pos, sz, bg->color, visibility->alpha);
+            renderBackground(entity, pos, sz, bg->color, visibility->alpha);
         }
 
         // 根据组件类型渲染
-        if (m_registry.all_of<components::Button>(entity))
+        if (registry.all_of<components::ButtonTag>(entity))
         {
             renderButton(entity, pos, sz);
         }
-        else if (m_registry.all_of<components::Label>(entity))
+        else if (registry.all_of<components::LabelTag>(entity))
         {
             renderLabel(entity, pos, sz);
         }
-        else if (m_registry.all_of<components::TextEdit>(entity))
+        else if (registry.all_of<components::TextEditTag>(entity))
         {
             renderTextEdit(entity, pos, sz);
         }
-        else if (m_registry.all_of<components::Image>(entity))
+        else if (registry.all_of<components::ImageTag>(entity))
         {
             renderImage(entity, pos, sz);
         }
-        else if (m_registry.all_of<components::Arrow>(entity))
+        else if (registry.all_of<components::ArrowTag>(entity))
         {
             renderArrow(entity, pos, sz);
         }
-        else if (m_registry.all_of<components::Layout>(entity))
+        else if (registry.all_of<components::LayoutTag>(entity))
         {
             renderLayout(entity, pos, sz);
         }
 
         // 渲染子元素
-        if (auto* hierarchy = m_registry.try_get<components::Hierarchy>(entity))
+        if (const auto* hierarchy = registry.try_get<components::Hierarchy>(entity))
         {
             for (auto child : hierarchy->children)
             {
-                if (m_registry.valid(child))
+                if (registry.valid(child))
                 {
                     renderWidget(child);
                 }
@@ -134,7 +149,7 @@ private:
     /**
      * @brief 渲染背景
      */
-    void renderBackground(const ImVec2& pos, const ImVec2& size, const ImVec4& color, float alpha)
+    void renderBackground(const ImVec2& pos, const ImVec2& size, const ImVec4& color, float alpha) noexcept
     {
         ImDrawList* drawList = ImGui::GetWindowDrawList();
         ImVec4 finalColor = color;
@@ -144,78 +159,95 @@ private:
     }
 
     /**
+     * @brief 渲染带圆角的背景
+     */
+    void renderBackground(
+        entt::entity entity, const ImVec2& pos, const ImVec2& size, const ImVec4& color, float alpha) noexcept
+    {
+        auto& registry = utils::Registry::getInstance();
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        ImVec4 finalColor = color;
+        finalColor.w *= alpha;
+
+        const ImVec2 endPos(pos.x + size.x, pos.y + size.y);
+        const auto* rounded = registry.try_get<components::RoundedCorners>(entity);
+
+        if (rounded && rounded->radius > 0.0F)
+        {
+            drawList->AddRectFilled(
+                pos, endPos, ImGui::ColorConvertFloat4ToU32(finalColor), rounded->radius, rounded->getDrawFlags());
+        }
+        else
+        {
+            drawList->AddRectFilled(pos, endPos, ImGui::ColorConvertFloat4ToU32(finalColor));
+        }
+    }
+
+    /**
      * @brief 渲染按钮
      */
-    void renderButton(entt::entity entity, const ImVec2& pos, const ImVec2& size)
+    void renderButton(entt::entity entity, const ImVec2& pos, const ImVec2& size) noexcept
     {
-        auto& button = m_registry.get<components::Button>(entity);
+        auto* clickable = utils::Registry::getInstance().try_get<components::Clickable>(entity);
+        if (!clickable)
+        {
+            return;
+        }
 
         ImGui::SetCursorPos(pos);
 
-        // 应用自定义颜色
-        int colorsPushed = 0;
-        if (button.useCustomColor)
-        {
-            ImGui::PushStyleColor(ImGuiCol_Button, button.buttonColor);
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, button.hoverColor);
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, button.activeColor);
-            colorsPushed = 3;
-        }
-
         // 禁用状态样式
-        if (!button.enabled)
+        if (!clickable->enabled)
         {
             constexpr float DISABLED_ALPHA = 0.5F;
             ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * DISABLED_ALPHA);
         }
 
-        std::string label = button.text + button.uniqueId;
+        std::string label = clickable->text + clickable->uniqueId;
         bool clicked = ImGui::Button(label.c_str(), size);
 
         // 处理点击
-        if (clicked && button.enabled && button.onClick)
+        if (clicked && clickable->enabled)
         {
-            button.onClick();
             utils::Dispatcher::getInstance().enqueue<events::ButtonClicked>(entity);
         }
 
         // 显示提示文本
-        if (!button.tooltip.empty() && ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+        if (!clickable->tooltip.empty() && ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
         {
-            ImGui::SetTooltip("%s", button.tooltip.c_str());
+            ImGui::SetTooltip("%s", clickable->tooltip.c_str());
         }
 
         // 恢复样式
-        if (!button.enabled)
+        if (!clickable->enabled)
         {
             ImGui::PopStyleVar();
-        }
-
-        if (colorsPushed > 0)
-        {
-            ImGui::PopStyleColor(colorsPushed);
         }
     }
 
     /**
      * @brief 渲染文本标签
      */
-    void renderLabel(entt::entity entity, const ImVec2& pos, const ImVec2& size)
+    void renderLabel(entt::entity entity, const ImVec2& pos, const ImVec2& size) noexcept
     {
-        auto& label = m_registry.get<components::Label>(entity);
+        auto* showText = utils::Registry::getInstance().try_get<components::ShowText>(entity);
+        if (!showText)
+        {
+            return;
+        }
 
         ImGui::SetCursorPos(pos);
-        ImGui::PushStyleColor(ImGuiCol_Text, label.textColor);
+        ImGui::PushStyleColor(ImGuiCol_Text, showText->textColor);
 
-        if (label.wordWrap)
+        if (showText->wordWrap)
         {
-            ImGui::PushTextWrapPos(label.wrapWidth > 0 ? pos.x + label.wrapWidth : pos.x + size.x);
-            ImGui::TextWrapped("%s", label.text.c_str());
+            ImGui::PushTextWrapPos(showText->wrapWidth > 0 ? pos.x + showText->wrapWidth : pos.x + size.x);
+            ImGui::TextWrapped("%s", showText->text.c_str());
             ImGui::PopTextWrapPos();
         }
         else
         {
-            ImGui::Text("%s", label.text.c_str());
+            ImGui::Text("%s", showText->text.c_str());
         }
 
         ImGui::PopStyleColor();
@@ -224,9 +256,9 @@ private:
     /**
      * @brief 渲染文本编辑框
      */
-    void renderTextEdit(entt::entity entity, const ImVec2& pos, const ImVec2& size)
+    void renderTextEdit(entt::entity entity, const ImVec2& pos, const ImVec2& size) noexcept
     {
-        auto& textEdit = m_registry.get<components::TextEdit>(entity);
+        auto& textEdit = utils::Registry::getInstance().get<components::TextEdit>(entity);
 
         ImGui::SetCursorPos(pos);
 
@@ -269,7 +301,7 @@ private:
      */
     void renderImage(entt::entity entity, const ImVec2& pos, const ImVec2& size)
     {
-        auto& image = m_registry.get<components::Image>(entity);
+        auto& image = utils::Registry::getInstance().get<components::Image>(entity);
 
         ImGui::SetCursorPos(pos);
 
@@ -284,7 +316,7 @@ private:
      */
     void renderArrow(entt::entity entity, const ImVec2& pos, const ImVec2& /* size */)
     {
-        auto& arrow = m_registry.get<components::Arrow>(entity);
+        auto& arrow = utils::Registry::getInstance().get<components::Arrow>(entity);
 
         ImDrawList* drawList = ImGui::GetWindowDrawList();
 
@@ -320,7 +352,7 @@ private:
      */
     void renderLayout(entt::entity entity, const ImVec2& pos, const ImVec2& size)
     {
-        auto& layout = m_registry.get<components::Layout>(entity);
+        auto& layout = utils::Registry::getInstance().get<components::Layout>(entity);
 
         if (layout.items.empty())
         {
@@ -355,11 +387,11 @@ private:
 
         for (const auto& item : layout.items)
         {
-            if (item.widget != entt::null && m_registry.valid(item.widget))
+            if (item.widget != entt::null && utils::Registry::getInstance().valid(item.widget))
             {
                 if (item.stretchFactor == 0)
                 {
-                    const auto* itemSize = m_registry.try_get<components::Size>(item.widget);
+                    const auto* itemSize = utils::Registry::getInstance().try_get<components::Size>(item.widget);
                     if (itemSize)
                     {
                         totalFixedWidth += itemSize->width;
@@ -376,10 +408,11 @@ private:
             }
         }
 
-        size_t widgetCount = std::count_if(layout.items.begin(),
-                                           layout.items.end(),
-                                           [this](const components::LayoutItem& item)
-                                           { return item.widget != entt::null && m_registry.valid(item.widget); });
+        size_t widgetCount =
+            std::count_if(layout.items.begin(),
+                          layout.items.end(),
+                          [this](const components::LayoutItem& item)
+                          { return item.widget != entt::null && utils::Registry::getInstance().valid(item.widget); });
         float totalSpacing = widgetCount > 1 ? layout.spacing * static_cast<float>(widgetCount - 1) : 0.0F;
         float stretchWidth = totalStretch > 0
                                  ? (availableWidth - totalFixedWidth - totalSpacing) / static_cast<float>(totalStretch)
@@ -389,14 +422,14 @@ private:
 
         for (const auto& item : layout.items)
         {
-            if (item.widget == entt::null || !m_registry.valid(item.widget))
+            if (item.widget == entt::null || !utils::Registry::getInstance().valid(item.widget))
             {
                 currentX += stretchWidth * static_cast<float>(item.stretchFactor);
                 continue;
             }
 
-            auto* itemPos = m_registry.try_get<components::Position>(item.widget);
-            auto* itemSize = m_registry.try_get<components::Size>(item.widget);
+            auto* itemPos = utils::Registry::getInstance().try_get<components::Position>(item.widget);
+            auto* itemSize = utils::Registry::getInstance().try_get<components::Size>(item.widget);
 
             if (!itemPos || !itemSize)
             {
@@ -436,11 +469,11 @@ private:
 
         for (const auto& item : layout.items)
         {
-            if (item.widget != entt::null && m_registry.valid(item.widget))
+            if (item.widget != entt::null && utils::Registry::getInstance().valid(item.widget))
             {
                 if (item.stretchFactor == 0)
                 {
-                    const auto* itemSize = m_registry.try_get<components::Size>(item.widget);
+                    const auto* itemSize = utils::Registry::getInstance().try_get<components::Size>(item.widget);
                     if (itemSize)
                     {
                         totalFixedHeight += itemSize->height;
@@ -457,10 +490,11 @@ private:
             }
         }
 
-        size_t widgetCount = std::count_if(layout.items.begin(),
-                                           layout.items.end(),
-                                           [this](const components::LayoutItem& item)
-                                           { return item.widget != entt::null && m_registry.valid(item.widget); });
+        size_t widgetCount =
+            std::count_if(layout.items.begin(),
+                          layout.items.end(),
+                          [this](const components::LayoutItem& item)
+                          { return item.widget != entt::null && utils::Registry::getInstance().valid(item.widget); });
         float totalSpacing = widgetCount > 1 ? layout.spacing * static_cast<float>(widgetCount - 1) : 0.0F;
         float stretchHeight =
             totalStretch > 0 ? (availableHeight - totalFixedHeight - totalSpacing) / static_cast<float>(totalStretch)
@@ -470,14 +504,14 @@ private:
 
         for (const auto& item : layout.items)
         {
-            if (item.widget == entt::null || !m_registry.valid(item.widget))
+            if (item.widget == entt::null || !utils::Registry::getInstance().valid(item.widget))
             {
                 currentY += stretchHeight * static_cast<float>(item.stretchFactor);
                 continue;
             }
 
-            auto* itemPos = m_registry.try_get<components::Position>(item.widget);
-            auto* itemSize = m_registry.try_get<components::Size>(item.widget);
+            auto* itemPos = utils::Registry::getInstance().try_get<components::Position>(item.widget);
+            auto* itemSize = utils::Registry::getInstance().try_get<components::Size>(item.widget);
 
             if (!itemPos || !itemSize)
             {
@@ -498,9 +532,6 @@ private:
             currentY += itemHeight + layout.spacing;
         }
     }
-
-private:
-    entt::registry& m_registry;
 };
 
 } // namespace ui::systems

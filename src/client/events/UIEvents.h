@@ -101,4 +101,79 @@ struct VisibilityChanged
     bool visible;
 };
 
+/**
+ * @brief 按钮点击事件（带标识）
+ */
+struct ButtonClickEvent
+{
+    entt::entity entity;
+    std::string buttonId;
+};
+
+/**
+ * @brief 手牌选中状态改变事件
+ */
+struct CardSelectionChanged
+{
+    entt::entity cardEntity;
+    bool selected;
+    std::string cardName;
+};
+
+/**
+ * @brief 手牌移动到处理区事件
+ */
+struct CardMovedToProcessing
+{
+    entt::entity cardEntity;
+    std::string cardName;
+};
+
+/**
+ * @brief 卡牌从处理区移除事件
+ */
+struct CardRemovedFromProcessing
+{
+    entt::entity cardEntity;
+    std::string cardName;
+};
+
+/**
+ * @brief 处理区清空前事件
+ */
+struct ProcessingAreaBeforeClear
+{
+    std::vector<entt::entity> cardEntities;
+};
+
+/**
+ * @brief 处理区清空后事件
+ */
+struct ProcessingAreaAfterClear
+{
+};
+
+/**
+ * @brief 使用卡牌事件
+ */
+struct UseCardEvent
+{
+    entt::entity cardEntity;
+    std::string cardName;
+};
+
+/**
+ * @brief 取消操作事件
+ */
+struct CancelOperationEvent
+{
+};
+
+/**
+ * @brief 结束回合事件
+ */
+struct EndTurnEvent
+{
+};
+
 } // namespace ui::events

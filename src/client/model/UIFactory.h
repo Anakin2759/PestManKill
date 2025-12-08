@@ -30,25 +30,21 @@ namespace ui
 class UIFactory
 {
 public:
-    explicit UIFactory(entt::registry& registry) : m_registry(registry) {}
-
     /**
      * @brief 创建按钮
      */
-    entt::entity createButton(const std::string& text, std::function<void()> onClick = nullptr)
+    entt::entity createButton(const std::string& text)
     {
-        auto entity = m_registry.create();
+        auto& registry = utils::Registry::getInstance();
+        auto entity = registry.create();
 
-        m_registry.emplace<components::Position>(entity);
-        m_registry.emplace<components::Size>(entity);
-        m_registry.emplace<components::Visibility>(entity);
-        m_registry.emplace<components::RenderState>(entity);
-        m_registry.emplace<components::ButtonTag>(entity);
-
-        auto& button = m_registry.emplace<components::Button>(entity);
-        button.text = text;
-        button.onClick = std::move(onClick);
-        button.uniqueId = "##Button_" + std::to_string(m_buttonIdCounter++);
+        registry.emplace<components::Position>(entity);
+        registry.emplace<components::Size>(entity);
+        registry.emplace<components::Visibility>(entity);
+        registry.emplace<components::RenderState>(entity);
+        registry.emplace<components::ButtonTag>(entity);
+        registry.emplace<components::Clickable>(entity);
+        registry.get<components::ShowText>(entity);
 
         utils::Dispatcher::getInstance().enqueue<events::WidgetCreated>(entity);
         return entity;
@@ -59,16 +55,13 @@ public:
      */
     entt::entity createLabel(const std::string& text)
     {
-        auto entity = m_registry.create();
+        auto entity = utils::Registry::getInstance().create();
 
-        m_registry.emplace<components::Position>(entity);
-        m_registry.emplace<components::Size>(entity);
-        m_registry.emplace<components::Visibility>(entity);
-        m_registry.emplace<components::RenderState>(entity);
-        m_registry.emplace<components::LabelTag>(entity);
-
-        auto& label = m_registry.emplace<components::Label>(entity);
-        label.text = text;
+        utils::Registry::getInstance().emplace<components::Position>(entity);
+        utils::Registry::getInstance().emplace<components::Size>(entity);
+        utils::Registry::getInstance().emplace<components::Visibility>(entity);
+        utils::Registry::getInstance().emplace<components::RenderState>(entity);
+        utils::Registry::getInstance().emplace<components::LabelTag>(entity);
 
         utils::Dispatcher::getInstance().enqueue<events::WidgetCreated>(entity);
         return entity;
@@ -79,15 +72,15 @@ public:
      */
     entt::entity createTextEdit(const std::string& placeholder = "", bool multiline = false)
     {
-        auto entity = m_registry.create();
+        auto entity = utils::Registry::getInstance().create();
 
-        m_registry.emplace<components::Position>(entity);
-        m_registry.emplace<components::Size>(entity);
-        m_registry.emplace<components::Visibility>(entity);
-        m_registry.emplace<components::RenderState>(entity);
-        m_registry.emplace<components::TextEditTag>(entity);
+        utils::Registry::getInstance().emplace<components::Position>(entity);
+        utils::Registry::getInstance().emplace<components::Size>(entity);
+        utils::Registry::getInstance().emplace<components::Visibility>(entity);
+        utils::Registry::getInstance().emplace<components::RenderState>(entity);
+        utils::Registry::getInstance().emplace<components::TextEditTag>(entity);
 
-        auto& textEdit = m_registry.emplace<components::TextEdit>(entity);
+        auto& textEdit = utils::Registry::getInstance().emplace<components::TextEdit>(entity);
         textEdit.placeholder = placeholder;
         textEdit.multiline = multiline;
         textEdit.uniqueId = "##TextEdit_" + std::to_string(m_textEditIdCounter++);
@@ -101,15 +94,15 @@ public:
      */
     entt::entity createImage(void* textureId)
     {
-        auto entity = m_registry.create();
+        auto entity = utils::Registry::getInstance().create();
 
-        m_registry.emplace<components::Position>(entity);
-        m_registry.emplace<components::Size>(entity);
-        m_registry.emplace<components::Visibility>(entity);
-        m_registry.emplace<components::RenderState>(entity);
-        m_registry.emplace<components::ImageTag>(entity);
+        utils::Registry::getInstance().emplace<components::Position>(entity);
+        utils::Registry::getInstance().emplace<components::Size>(entity);
+        utils::Registry::getInstance().emplace<components::Visibility>(entity);
+        utils::Registry::getInstance().emplace<components::RenderState>(entity);
+        utils::Registry::getInstance().emplace<components::ImageTag>(entity);
 
-        auto& image = m_registry.emplace<components::Image>(entity);
+        auto& image = utils::Registry::getInstance().emplace<components::Image>(entity);
         image.textureId = textureId;
 
         utils::Dispatcher::getInstance().enqueue<events::WidgetCreated>(entity);
@@ -121,15 +114,15 @@ public:
      */
     entt::entity createArrow(const ImVec2& start, const ImVec2& end)
     {
-        auto entity = m_registry.create();
+        auto entity = utils::Registry::getInstance().create();
 
-        m_registry.emplace<components::Position>(entity);
-        m_registry.emplace<components::Size>(entity);
-        m_registry.emplace<components::Visibility>(entity);
-        m_registry.emplace<components::RenderState>(entity);
-        m_registry.emplace<components::ArrowTag>(entity);
+        utils::Registry::getInstance().emplace<components::Position>(entity);
+        utils::Registry::getInstance().emplace<components::Size>(entity);
+        utils::Registry::getInstance().emplace<components::Visibility>(entity);
+        utils::Registry::getInstance().emplace<components::RenderState>(entity);
+        utils::Registry::getInstance().emplace<components::ArrowTag>(entity);
 
-        auto& arrow = m_registry.emplace<components::Arrow>(entity);
+        auto& arrow = utils::Registry::getInstance().emplace<components::Arrow>(entity);
         arrow.startPoint = start;
         arrow.endPoint = end;
 
@@ -142,15 +135,15 @@ public:
      */
     entt::entity createHBoxLayout()
     {
-        auto entity = m_registry.create();
+        auto entity = utils::Registry::getInstance().create();
 
-        m_registry.emplace<components::Position>(entity);
-        m_registry.emplace<components::Size>(entity);
-        m_registry.emplace<components::Visibility>(entity);
-        m_registry.emplace<components::RenderState>(entity);
-        m_registry.emplace<components::LayoutTag>(entity);
+        utils::Registry::getInstance().emplace<components::Position>(entity);
+        utils::Registry::getInstance().emplace<components::Size>(entity);
+        utils::Registry::getInstance().emplace<components::Visibility>(entity);
+        utils::Registry::getInstance().emplace<components::RenderState>(entity);
+        utils::Registry::getInstance().emplace<components::LayoutTag>(entity);
 
-        auto& layout = m_registry.emplace<components::Layout>(entity);
+        auto& layout = utils::Registry::getInstance().emplace<components::Layout>(entity);
         layout.direction = components::LayoutDirection::HORIZONTAL;
 
         utils::Dispatcher::getInstance().enqueue<events::WidgetCreated>(entity);
@@ -162,15 +155,15 @@ public:
      */
     entt::entity createVBoxLayout()
     {
-        auto entity = m_registry.create();
+        auto entity = utils::Registry::getInstance().create();
 
-        m_registry.emplace<components::Position>(entity);
-        m_registry.emplace<components::Size>(entity);
-        m_registry.emplace<components::Visibility>(entity);
-        m_registry.emplace<components::RenderState>(entity);
-        m_registry.emplace<components::LayoutTag>(entity);
+        utils::Registry::getInstance().emplace<components::Position>(entity);
+        utils::Registry::getInstance().emplace<components::Size>(entity);
+        utils::Registry::getInstance().emplace<components::Visibility>(entity);
+        utils::Registry::getInstance().emplace<components::RenderState>(entity);
+        utils::Registry::getInstance().emplace<components::LayoutTag>(entity);
 
-        auto& layout = m_registry.emplace<components::Layout>(entity);
+        auto& layout = utils::Registry::getInstance().emplace<components::Layout>(entity);
         layout.direction = components::LayoutDirection::VERTICAL;
 
         utils::Dispatcher::getInstance().enqueue<events::WidgetCreated>(entity);
@@ -182,14 +175,14 @@ public:
      */
     entt::entity createSpacer(int stretchFactor = 1, bool horizontal = true)
     {
-        auto entity = m_registry.create();
+        auto entity = utils::Registry::getInstance().create();
 
-        m_registry.emplace<components::Position>(entity);
-        m_registry.emplace<components::Size>(entity);
-        m_registry.emplace<components::Visibility>(entity);
-        m_registry.emplace<components::SpacerTag>(entity);
+        utils::Registry::getInstance().emplace<components::Position>(entity);
+        utils::Registry::getInstance().emplace<components::Size>(entity);
+        utils::Registry::getInstance().emplace<components::Visibility>(entity);
+        utils::Registry::getInstance().emplace<components::SpacerTag>(entity);
 
-        auto& spacer = m_registry.emplace<components::Spacer>(entity);
+        auto& spacer = utils::Registry::getInstance().emplace<components::Spacer>(entity);
         spacer.stretchFactor = stretchFactor;
         spacer.isHorizontal = horizontal;
 
@@ -202,15 +195,15 @@ public:
      */
     entt::entity createDialog(const std::string& title)
     {
-        auto entity = m_registry.create();
+        auto entity = utils::Registry::getInstance().create();
 
-        m_registry.emplace<components::Position>(entity);
-        m_registry.emplace<components::Size>(entity);
-        m_registry.emplace<components::Visibility>(entity);
-        m_registry.emplace<components::RenderState>(entity);
-        m_registry.emplace<components::DialogTag>(entity);
+        utils::Registry::getInstance().emplace<components::Position>(entity);
+        utils::Registry::getInstance().emplace<components::Size>(entity);
+        utils::Registry::getInstance().emplace<components::Visibility>(entity);
+        utils::Registry::getInstance().emplace<components::RenderState>(entity);
+        utils::Registry::getInstance().emplace<components::DialogTag>(entity);
 
-        auto& dialog = m_registry.emplace<components::Dialog>(entity);
+        auto& dialog = utils::Registry::getInstance().emplace<components::Dialog>(entity);
         dialog.title = title;
 
         utils::Dispatcher::getInstance().enqueue<events::WidgetCreated>(entity);
@@ -222,7 +215,7 @@ public:
      */
     void addChild(entt::entity parent, entt::entity child)
     {
-        if (!m_registry.valid(parent) || !m_registry.valid(child))
+        if (!utils::Registry::getInstance().valid(parent) || !utils::Registry::getInstance().valid(child))
         {
             return;
         }
@@ -233,8 +226,8 @@ public:
             return;
         }
 
-        auto& parentHierarchy = m_registry.get_or_emplace<components::Hierarchy>(parent);
-        auto& childHierarchy = m_registry.get_or_emplace<components::Hierarchy>(child);
+        auto& parentHierarchy = utils::Registry::getInstance().get_or_emplace<components::Hierarchy>(parent);
+        auto& childHierarchy = utils::Registry::getInstance().get_or_emplace<components::Hierarchy>(child);
 
         // 如果子元素已经有父元素，先移除
         if (childHierarchy.parent != entt::null)
@@ -251,12 +244,12 @@ public:
      */
     void removeChild(entt::entity parent, entt::entity child)
     {
-        if (!m_registry.valid(parent) || !m_registry.valid(child))
+        if (!utils::Registry::getInstance().valid(parent) || !utils::Registry::getInstance().valid(child))
         {
             return;
         }
 
-        auto* parentHierarchy = m_registry.try_get<components::Hierarchy>(parent);
+        auto* parentHierarchy = utils::Registry::getInstance().try_get<components::Hierarchy>(parent);
         if (!parentHierarchy)
         {
             return;
@@ -268,7 +261,7 @@ public:
             parentHierarchy->children.erase(it);
         }
 
-        auto* childHierarchy = m_registry.try_get<components::Hierarchy>(child);
+        auto* childHierarchy = utils::Registry::getInstance().try_get<components::Hierarchy>(child);
         if (childHierarchy)
         {
             childHierarchy->parent = entt::null;
@@ -283,12 +276,12 @@ public:
                            int stretch = 0,
                            components::Alignment alignment = components::Alignment::LEFT)
     {
-        if (!m_registry.valid(layout) || !m_registry.valid(widget))
+        if (!utils::Registry::getInstance().valid(layout) || !utils::Registry::getInstance().valid(widget))
         {
             return;
         }
 
-        auto* layoutComp = m_registry.try_get<components::Layout>(layout);
+        auto* layoutComp = utils::Registry::getInstance().try_get<components::Layout>(layout);
         if (!layoutComp)
         {
             return;
@@ -303,12 +296,12 @@ public:
      */
     void addStretchToLayout(entt::entity layout, int stretch = 1)
     {
-        if (!m_registry.valid(layout))
+        if (!utils::Registry::getInstance().valid(layout))
         {
             return;
         }
 
-        auto* layoutComp = m_registry.try_get<components::Layout>(layout);
+        auto* layoutComp = utils::Registry::getInstance().try_get<components::Layout>(layout);
         if (!layoutComp)
         {
             return;
@@ -322,13 +315,13 @@ public:
      */
     void destroyWidget(entt::entity entity)
     {
-        if (!m_registry.valid(entity))
+        if (!utils::Registry::getInstance().valid(entity))
         {
             return;
         }
 
         // 递归销毁子元素
-        if (auto* hierarchy = m_registry.try_get<components::Hierarchy>(entity))
+        if (auto* hierarchy = utils::Registry::getInstance().try_get<components::Hierarchy>(entity))
         {
             auto children = hierarchy->children; // 复制一份避免迭代器失效
             for (auto child : children)
@@ -338,12 +331,10 @@ public:
         }
 
         utils::Dispatcher::getInstance().enqueue<events::WidgetDestroyed>(entity);
-        m_registry.destroy(entity);
+        utils::Registry::getInstance().destroy(entity);
     }
 
 private:
-    entt::registry& m_registry;
-
     size_t m_buttonIdCounter = 0;
     size_t m_textEditIdCounter = 0;
 };

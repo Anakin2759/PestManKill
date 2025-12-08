@@ -1,4 +1,6 @@
-#include "view/MainWindow.h"
+#include "view/MainWindowECS.h"
+#include "utils"
+#define STB_IMAGE_IMPLEMENTATION
 int main()
 {
 #if defined(_MSC_VER)
@@ -7,7 +9,7 @@ int main()
     SetConsoleCP(CP_UTF8);
 #endif
     // NOLINTNEXTLINE(cppcoreguidelines-avoid-magic-numbers, readability-magic-numbers)
-    MainWindow app("PestManKill", 1200, 800);
+    MainWindowECS app("PestManKill", 1200, 800);
     app.run();
     return 0;
 }
