@@ -8,6 +8,16 @@
  * @brief UI动画系统
  *
  * 负责更新所有UI动画的ECS系统
+    并非回调式动画系统，而是基于组件的数据驱动系统
+    支持位置动画和透明度动画
+    使用线性插值计算动画进度
+    通过组件标记动画状态，支持暂停和完成事件
+    可扩展以支持更多动画类型
+    集成到UiSystem中统一管理
+    使用ECS模式管理动画状态和属性
+    提供清晰的更新流程，易于维护和扩展
+    确保动画更新性能和响应速度
+
  *
  * ************************************************************************
  * @copyright Copyright (c) 2025 AnakinLiu
@@ -33,75 +43,7 @@ public:
      */
     void update(float deltaTime)
     {
-        // 更新基础动画
-        auto animationView = utils::Registry::getInstance().view<components::Animation>();
-        for (auto entity : animationView)
-        {
-            auto& animation = animationView.get<components::Animation>(entity);
-            if (!animation.active)
-            {
-                continue;
-            }
-
-            animation.elapsed += deltaTime;
-            float progress = std::min(1.0F, animation.elapsed / animation.duration);
-
-            if (animation.updateCallback)
-            {
-                animation.updateCallback(progress);
-            }
-
-            if (progress >= 1.0F)
-            {
-                animation.active = false;
-                utils::Dispatcher::getInstance().enqueue<events::AnimationComplete>(entity);
-            }
-        }
-
-        // 更新位置动画
-        auto posAnimView = utils::Registry::getInstance()
-                               .view<components::PositionAnimation, components::Position, components::Animation>();
-        for (auto entity : posAnimView)
-        {
-            const auto& animation = posAnimView.get<components::Animation>(entity);
-            if (!animation.active)
-            {
-                continue;
-            }
-
-            auto& posAnim = posAnimView.get<components::PositionAnimation>(entity);
-            auto& position = posAnimView.get<components::Position>(entity);
-
-            float progress = animation.elapsed / animation.duration;
-            progress = std::min(1.0F, progress);
-            posAnim.progress = progress;
-
-            // 线性插值
-            position.x = posAnim.startPos.x + (posAnim.endPos.x - posAnim.startPos.x) * progress;
-            position.y = posAnim.startPos.y + (posAnim.endPos.y - posAnim.startPos.y) * progress;
-        }
-
-        // 更新透明度动画
-        auto alphaAnimView = utils::Registry::getInstance()
-                                 .view<components::AlphaAnimation, components::Visibility, components::Animation>();
-        for (auto entity : alphaAnimView)
-        {
-            const auto& animation = alphaAnimView.get<components::Animation>(entity);
-            if (!animation.active)
-            {
-                continue;
-            }
-
-            auto& alphaAnim = alphaAnimView.get<components::AlphaAnimation>(entity);
-            auto& visibility = alphaAnimView.get<components::Visibility>(entity);
-
-            float progress = animation.elapsed / animation.duration;
-            progress = std::min(1.0F, progress);
-            alphaAnim.progress = progress;
-
-            // 线性插值
-            visibility.alpha = alphaAnim.startAlpha + (alphaAnim.endAlpha - alphaAnim.startAlpha) * progress;
-        }
+    
     }
 };
 

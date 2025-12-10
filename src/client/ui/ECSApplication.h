@@ -64,7 +64,7 @@ public:
         initImGui();
 
         // 创建根UI实体
-        m_rootEntity = m_uiSystem.getFactory().createVBoxLayout();
+        m_rootEntity = ui::factory::CreateVBoxLayout();
         auto& rootPos = utils::Registry::getInstance().get<components::Position>(m_rootEntity);
         auto& rootSize = utils::Registry::getInstance().get<components::Size>(m_rootEntity);
         rootPos.x = 0.0F;
@@ -135,29 +135,7 @@ public:
             m_uiSystem.update(deltaTime);
 
             // 渲染
-            ImGui_ImplSDLRenderer3_NewFrame();
-            ImGui_ImplSDL3_NewFrame();
-            ImGui::NewFrame();
-
-            // 创建全屏窗口
-            ImGui::SetNextWindowPos(ImVec2(0, 0));
-            ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
-            ImGui::Begin("MainWindow",
-                         nullptr,
-                         ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
-                             ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus |
-                             ImGuiWindowFlags_NoNavFocus);
-
-            // 渲染UI系统
-            m_uiSystem.render();
-
-            ImGui::End();
-
-            ImGui::Render();
-            SDL_SetRenderDrawColor(m_renderer, 20, 25, 33, 255);
-            SDL_RenderClear(m_renderer);
-            ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), m_renderer);
-            SDL_RenderPresent(m_renderer);
+            m_uiSystem.render(m_renderer);
         }
     }
 

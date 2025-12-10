@@ -35,7 +35,7 @@ public:
 protected:
     void setupUI() override
     {
-        auto& factory = getUiSystem().getFactory();
+        
         auto& registry = utils::Registry::getInstance();
         auto rootEntity = getRootEntity();
 
@@ -45,7 +45,7 @@ protected:
         rootLayout.margins = ImVec4(20.0F, 20.0F, 20.0F, 20.0F);
 
         // ===================== 创建标题栏 =====================
-        auto titleLabel = factory.createLabel("Welcome to PestManKill");
+        auto titleLabel = ui::factory::CreateLabel("Welcome to PestManKill");
         auto& titleText = registry.emplace<components::ShowText>(titleLabel);
         titleText.text = "Welcome to PestManKill";
         titleText.textColor = ImVec4(1.0F, 0.8F, 0.0F, 1.0F);
@@ -53,7 +53,7 @@ protected:
         factory.addWidgetToLayout(rootEntity, titleLabel, 0);
 
         // ===================== 创建主内容区 =====================
-        auto contentLayout = factory.createHBoxLayout();
+        auto contentLayout = ui::factory::CreateHBoxLayout();
         helper::setLayoutSpacing(registry, contentLayout, 15.0F);
         factory.addWidgetToLayout(rootEntity, contentLayout, 1);
 
@@ -67,11 +67,11 @@ protected:
         createRightPanel(contentLayout);
 
         // ===================== 创建底部状态栏 =====================
-        auto statusLayout = factory.createHBoxLayout();
+        auto statusLayout = ui::factory::CreateHBoxLayout();
         helper::setLayoutSpacing(registry, statusLayout, 10.0F);
         factory.addWidgetToLayout(rootEntity, statusLayout, 0);
 
-        m_statusLabel = factory.createLabel("Ready");
+        m_statusLabel = ui::factory::CreateLabel("Ready");
         auto& statusText = registry.emplace<components::ShowText>(m_statusLabel);
         statusText.text = "Ready";
         statusText.textColor = ImVec4(0.7F, 0.7F, 0.7F, 1.0F);
@@ -96,32 +96,32 @@ protected:
 private:
     void createLeftPanel(entt::entity parentLayout)
     {
-        auto& factory = getUiSystem().getFactory();
+        
         auto& registry = utils::Registry::getInstance();
 
-        auto leftPanel = factory.createVBoxLayout();
+        auto leftPanel = ui::factory::CreateVBoxLayout();
         helper::setFixedSize(registry, leftPanel, 250.0F, 0.0F);
         helper::setLayoutSpacing(registry, leftPanel, 8.0F);
         helper::setBackgroundColor(registry, leftPanel, ImVec4(0.15F, 0.15F, 0.2F, 1.0F));
         factory.addWidgetToLayout(parentLayout, leftPanel, 0);
 
         // 标题
-        auto panelTitle = factory.createLabel("Menu");
+        auto panelTitle = ui::factory::CreateLabel("Menu");
         auto& titleText = registry.emplace<components::ShowText>(panelTitle);
         titleText.text = "Menu";
         titleText.textColor = ImVec4(0.8F, 0.9F, 1.0F, 1.0F);
         factory.addWidgetToLayout(leftPanel, panelTitle, 0);
 
         // 按钮组
-        m_startButton = factory.createButton("Start Game");
+        m_startButton = ui::factory::CreateButton("Start Game");
         registry.get<components::Clickable>(m_startButton).text = "Start Game";
         factory.addWidgetToLayout(leftPanel, m_startButton, 0);
 
-        m_settingsButton = factory.createButton("Settings");
+        m_settingsButton = ui::factory::CreateButton("Settings");
         registry.get<components::Clickable>(m_settingsButton).text = "Settings";
         factory.addWidgetToLayout(leftPanel, m_settingsButton, 0);
 
-        m_exitButton = factory.createButton("Exit");
+        m_exitButton = ui::factory::CreateButton("Exit");
         registry.get<components::Clickable>(m_exitButton).text = "Exit";
         factory.addWidgetToLayout(leftPanel, m_exitButton, 0);
 
@@ -131,23 +131,22 @@ private:
 
     void createCenterPanel(entt::entity parentLayout)
     {
-        auto& factory = getUiSystem().getFactory();
         auto& registry = utils::Registry::getInstance();
 
-        auto centerPanel = factory.createVBoxLayout();
+        auto centerPanel = CreateVBoxLayout();
         helper::setLayoutSpacing(registry, centerPanel, 10.0F);
         helper::setBackgroundColor(registry, centerPanel, ImVec4(0.1F, 0.12F, 0.15F, 1.0F));
         factory.addWidgetToLayout(parentLayout, centerPanel, 1);
 
         // 标题
-        auto panelTitle = factory.createLabel("Game Area");
+        auto panelTitle = ui::factory::CreateLabel("Game Area");
         auto& titleText = registry.emplace<components::ShowText>(panelTitle);
         titleText.text = "Game Area";
         titleText.textColor = ImVec4(0.8F, 0.9F, 1.0F, 1.0F);
         factory.addWidgetToLayout(centerPanel, panelTitle, 0);
 
         // 内容文本
-        m_contentLabel = factory.createLabel("Select an option from the menu...");
+        m_contentLabel = ui::factory::CreateLabel("Select an option from the menu...");
         auto& contentText = registry.emplace<components::ShowText>(m_contentLabel);
         contentText.text = "Select an option from the menu...";
         contentText.wordWrap = true;
@@ -155,42 +154,41 @@ private:
         factory.addWidgetToLayout(centerPanel, m_contentLabel, 1);
 
         // 输入框
-        auto inputLayout = factory.createHBoxLayout();
+        auto inputLayout = CreateHBoxLayout();
         helper::setLayoutSpacing(registry, inputLayout, 10.0F);
-        factory.addWidgetToLayout(centerPanel, inputLayout, 0);
+        AddWidgetToLayout(centerPanel, inputLayout, 0);
 
-        m_textInput = factory.createTextEdit("Type here...", false);
+        m_textInput = ui::factory::CreateTextEdit("Type here...", false);
         auto& textEditComp = registry.get<components::TextEdit>(m_textInput);
         textEditComp.placeholder = "Type here...";
         textEditComp.maxLength = 256;
         textEditComp.onTextChanged = [this](const std::string& text) { onTextChanged(text); };
         factory.addWidgetToLayout(inputLayout, m_textInput, 1);
 
-        m_sendButton = factory.createButton("Send");
+        m_sendButton = ui::factory::CreateButton("Send");
         registry.get<components::Clickable>(m_sendButton).text = "Send";
         factory.addWidgetToLayout(inputLayout, m_sendButton, 0);
     }
 
     void createRightPanel(entt::entity parentLayout)
     {
-        auto& factory = getUiSystem().getFactory();
         auto& registry = utils::Registry::getInstance();
 
-        auto rightPanel = factory.createVBoxLayout();
+        auto rightPanel = ui::factory::CreateVBoxLayout();
         helper::setFixedSize(registry, rightPanel, 200.0F, 0.0F);
         helper::setLayoutSpacing(registry, rightPanel, 8.0F);
         helper::setBackgroundColor(registry, rightPanel, ImVec4(0.15F, 0.15F, 0.2F, 1.0F));
         factory.addWidgetToLayout(parentLayout, rightPanel, 0);
 
         // 标题
-        auto panelTitle = factory.createLabel("Info");
+        auto panelTitle = ui::factory::CreateLabel("Info");
         auto& titleText = registry.emplace<components::ShowText>(panelTitle);
         titleText.text = "Info";
         titleText.textColor = ImVec4(0.8F, 0.9F, 1.0F, 1.0F);
         factory.addWidgetToLayout(rightPanel, panelTitle, 0);
 
         // 信息标签
-        m_infoLabel = factory.createLabel("No information available");
+        m_infoLabel = ui::factory::CreateLabel("No information available");
         auto& infoText = registry.emplace<components::ShowText>(m_infoLabel);
         infoText.text = "No information available";
         infoText.wordWrap = true;

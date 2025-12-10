@@ -8,7 +8,22 @@
  * @brief UI ECS 组件定义
  *
  * 所有UI元素的数据组件
- * 遵循ECS模式：纯数据结构，无行为逻辑
+ * 遵循ECS模式：纯数据结构，无行为逻辑，只包含属性
+ * 不使用继承和回调函数，确保组件的纯粹性和独立性
+
+  - 尺寸组件：管理尺寸属性
+  - 位置组件：管理坐标属性
+  - 滚动条组件：支持内容滚动和滚动条显示
+  - 圆角组件：配置圆角效果
+  - 父子关系组件：管理UI元素的层级关系，决定渲染顺序和位置计算
+  - 布局组件：支持水平和垂直布局，包含间隔和对齐方式
+  - 可见性组件：控制元素的显示与隐藏，以及透明度
+  - 位置和尺寸组件：定义元素的坐标和大小，支持固定尺寸和自适应
+  - 背景和圆角组件：支持背景颜色和圆角效果的配置
+  - 文本显示组件：显示和存储文本内容和样式信息
+  - 文本编辑器组件：支持单行和多行文本输入
+  - tag组件：标记不同类型的UI元素（按钮、标签、文本框等）作为索引
+  - 渲染状态组件：防止渲染重入，确保渲染过程安全
  *
  * ************************************************************************
  * @copyright Copyright (c) 2025 AnakinLiu
@@ -22,11 +37,25 @@
 #include <vector>
 #include <functional>
 #include <entt/entt.hpp>
+#include <entt/core/type_traits.hpp>
 
 namespace ui::components
 {
 
 // ===================== 基础组件 =====================
+/**
+ * @brief
+ */
+struct Size
+{
+    float width = 0.0F;
+    float height = 0.0F;
+    float minWidth = 0.0F;
+    float minHeight = 0.0F;
+    float maxWidth = FLT_MAX;
+    float maxHeight = FLT_MAX;
+    bool autoSize = true; // 是否自动根据内容调整大小
+};
 
 /**
  * @brief UI元素的位置组件
@@ -35,22 +64,8 @@ struct Position
 {
     float x = 0.0F;
     float y = 0.0F;
-    bool useCustomPosition = false;
-};
 
-/**
- * @brief UI元素的尺寸组件
- */
-struct Size
-{
-    float width = 0.0F;
-    float height = 0.0F;
-    bool useFixedSize = false;
-
-    float minWidth = 0.0F;
-    float minHeight = 0.0F;
-    float maxWidth = FLT_MAX;
-    float maxHeight = FLT_MAX;
+    bool useCustomPosition = false; // 是否使用自定义位置，默认为 false（由布局管理）
 };
 
 /**
@@ -58,8 +73,9 @@ struct Size
  */
 struct Visibility
 {
-    bool visible = true;
     float alpha = 1.0F;
+    bool isRendering = false;
+    bool visible = true;
 };
 
 /**
@@ -70,31 +86,27 @@ struct Background
     ImVec4 color{0.0F, 0.0F, 0.0F, 0.0F};
     bool enabled = false;
 };
+/**
+ * @brief
+ */
+struct ScrollArea
+{
+    ImVec2 scrollOffset{0.0f, 0.0f}; // 当前滚动位置
+    ImVec2 contentSize{0.0f, 0.0f};  // 内容区域大小
+    bool horizontalScroll = false;   // 是否启用水平滚动
+    bool verticalScroll = true;      // 是否启用垂直滚动
+    bool showScrollbars = true;      // 是否显示滚动条
+
+    // 滚动速度
+    float scrollSpeed = 10.0f;
+};
 
 /**
  * @brief 圆角组件
  */
 struct RoundedCorners
 {
-    float radius = 0.0F;
-    bool topLeft = true;
-    bool topRight = true;
-    bool bottomLeft = true;
-    bool bottomRight = true;
-
-    // 便捷构造函数（通过位标志）
-    constexpr explicit RoundedCorners(float r = 0.0F) : radius(r) {}
-
-    // 获取 ImDrawFlags 用于 ImGui 绘制
-    [[nodiscard]] constexpr int getDrawFlags() const noexcept
-    {
-        int flags = 0;
-        if (!topLeft) flags |= ImDrawFlags_RoundCornersTopLeft;
-        if (!topRight) flags |= ImDrawFlags_RoundCornersTopRight;
-        if (!bottomLeft) flags |= ImDrawFlags_RoundCornersBottomLeft;
-        if (!bottomRight) flags |= ImDrawFlags_RoundCornersBottomRight;
-        return flags == 0 ? ImDrawFlags_RoundCornersAll : flags;
-    }
+    float radius = 0.0F; // 圆角半径
 };
 
 /**
@@ -102,16 +114,9 @@ struct RoundedCorners
  */
 struct Hierarchy
 {
-    entt::entity parent = entt::null;
-    std::vector<entt::entity> children;
-};
-
-/**
- * @brief 渲染状态组件 - 防止重入
- */
-struct RenderState
-{
-    bool isRendering = false;
+    entt::entity parent = entt::null;      // 父节点
+    entt::entity firstChild = entt::null;  // 第一个子节点
+    entt::entity nextSibling = entt::null; // 下一个兄弟节点
 };
 
 /**
@@ -124,60 +129,33 @@ struct Checkable
 };
 
 /**
- * @brief 文本组件
+ * @brief 文本显示组件
  */
 struct ShowText
 {
-    std::string text;
     ImVec4 textColor{1.0F, 1.0F, 1.0F, 1.0F};
     bool wordWrap = false;
     float wrapWidth = 0.0F;
+};
+/**
+ * @brief 点击信息组件
+ */
+struct Clickable
+{
+    bool enabled = true;
+    bool useCustomColor = false;
 };
 
 // ===================== 布局组件 =====================
 
 /**
- * @brief 布局方向枚举
- */
-enum class LayoutDirection : uint8_t
-{
-    HORIZONTAL,
-    VERTICAL
-};
-
-/**
- * @brief 对齐方式枚举
- */
-enum class Alignment : uint8_t
-{
-    LEFT = 0x01,
-    RIGHT = 0x02,
-    TOP = 0x04,
-    BOTTOM = 0x08,
-    H_CENTER = 0x10,
-    V_CENTER = 0x20,
-    CENTER = H_CENTER | V_CENTER
-};
-
-/**
- * @brief 布局项数据
- */
-struct LayoutItem
-{
-    entt::entity widget = entt::null;
-    int stretchFactor = 0;
-    Alignment alignment = Alignment::LEFT;
-};
-
-/**
  * @brief 布局容器组件
  */
-struct Layout
+struct LayoutInfo
 {
     LayoutDirection direction = LayoutDirection::HORIZONTAL;
-    std::vector<LayoutItem> items;
-    float spacing = 5.0F;
-    ImVec4 margins{0, 0, 0, 0}; // left, top, right, bottom
+    float spacing = 5.0F;       // 元素间距
+    ImVec4 margins{0, 0, 0, 0}; // 内边距
 };
 
 /**
@@ -185,18 +163,8 @@ struct Layout
  */
 struct Spacer
 {
-    int stretchFactor = 1;
-    bool isHorizontal = true;
-};
-
-struct Clickable
-{
-    std::string text;
-    std::string uniqueId;
-    std::string tooltip;
-
-    bool enabled = true;
-    bool useCustomColor = false;
+    uint8_t stretchFactor = 1; // 默认拉伸因子
+    bool horizontal = true;    // 是否为水平间隔器
 };
 
 /**
@@ -207,7 +175,6 @@ struct TextEdit
     std::string text;
     std::string placeholder;
     std::string uniqueId;
-    std::function<void(const std::string&)> onTextChanged;
 
     bool multiline = false;
     bool readOnly = false;
@@ -232,12 +199,13 @@ struct Image
 };
 
 /**
- * @brief 对话框组件
+ * @brief 窗口组件
  */
-struct Dialog
+struct Window
 {
     std::string title;
-    bool isOpen = false;
+    bool hasTitleBar = true;
+    bool hasToolbar = false;
     bool modal = true;
     ImVec2 minSize{300.0F, 200.0F};
     ImVec2 maxSize{FLT_MAX, FLT_MAX};
@@ -270,7 +238,7 @@ struct ListArea
 /**
  * @brief 表格组件
  */
-struct Table
+struct TableInfo
 {
     std::vector<std::string> headers;
     std::vector<std::vector<std::string>> rows;
@@ -281,79 +249,110 @@ struct Table
     bool sortAscending = true;
 };
 
+struct LineInfo
+{
+    ImVec2 startPoint{0.0F, 0.0F};
+    ImVec2 endPoint{100.0F, 0.0F};
+    ImVec4 color{1.0F, 1.0F, 1.0F, 1.0F};
+    float thickness = 2.0F; // 线条粗细
+};
+
 // ===================== 动画组件 =====================
 
 /**
- * @brief 动画状态组件
+ * @brief 动画时间组件
  */
 struct Animation
 {
-    bool active = false;
-    float duration = 1.0F;
-    float elapsed = 0.0F;
-    std::function<void(float)> updateCallback;
+    float duration = 1.0F; // 动画持续时间
+    float elapsed = 0.0F;  // 已经过去的时间
+};
+
+struct AnimationPosition
+{
+    ImVec2 from; // 起始位置
+    ImVec2 to;   // 目标位置
+};
+
+struct AnimationAlpha
+{
+    float from = 1.0F; // 起始透明度
+    float to = 0.0F;   // 目标透明度
+};
+
+struct AnimationMode
+{
+    PlayMode mode = PlayMode::ONCE;
 };
 
 /**
- * @brief 位置动画组件
+ * @brief 动画缓动组件
  */
-struct PositionAnimation
+struct AnimationEase
 {
-    ImVec2 startPos{0.0F, 0.0F};
-    ImVec2 endPos{0.0F, 0.0F};
-    float progress = 0.0F;
+    EasingType type = EasingType::Linear;
+    // 可选：自定义曲线函数指针或 lambda
+    std::function<float(float)> customCurve = nullptr;
 };
+
+// ===================== 样式组件 =====================
+/**
+ * @brief 样式组件
+ */
+struct Style
+{
+    struct Colors
+    {
+        ImVec4 text{1.0f, 1.0f, 1.0f, 1.0f};
+        ImVec4 background{0.0f, 0.0f, 0.0f, 0.0f};
+        ImVec4 border{0.0f, 0.0f, 0.0f, 0.0f};
+        ImVec4 hover{0.0f, 0.0f, 0.0f, 0.0f};
+        ImVec4 active{0.0f, 0.0f, 0.0f, 0.0f};
+    };
+
+    Colors colors;
+    ImVec2 padding{0.0f, 0.0f};
+    ImVec2 margin{0.0f, 0.0f};
+    float borderRadius = 0.0f;
+    ImVec2 borderSize{0.0f, 0.0f};
+
+    // 标记哪些样式需要应用
+    bool hasBackground = false;
+    bool hasBorder = false;
+};
+
+// ===================== 交互与事件相关组件 =====================
 
 /**
- * @brief 透明度动画组件
+ * @brief 可选中/目标化组件
+ * 标记某个 UI 元素或游戏实体为可作为目标。
  */
-struct AlphaAnimation
+struct Targetable
 {
-    float startAlpha = 1.0F;
-    float endAlpha = 0.0F;
-    float progress = 0.0F;
+    bool selectable = false; // 是否可被选中为目标
+    int priority = 0;        // 目标优先级（UI 高亮/自动选择时使用）
 };
 
-// ===================== 标签组件 =====================
-
+// ===================== 渲染与状态组件 =====================
 /**
- * @brief UI元素类型标签
+ * @brief 渲染/状态组件，防止渲染重入与并发问题
  */
-struct WidgetTag
+struct RenderGuard
 {
+    bool inRender = false; // 渲染过程中置为 true，避免重入
 };
-struct LayoutTag
+
+struct ButtonState
 {
+    ButtonVisualState visual = ButtonVisualState::Idle;
+    bool triggered = false; // 本帧是否触发过动作
 };
-struct ButtonTag
+/**
+ * @brief 标题组件
+ */
+struct Title
 {
-};
-struct LabelTag
-{
-};
-struct TextEditTag
-{
-};
-struct ImageTag
-{
-};
-struct DialogTag
-{
-};
-struct ArrowTag
-{
-};
-struct ListAreaTag
-{
-};
-struct TableTag
-{
-};
-struct SpacerTag
-{
-};
-struct ApplicationTag
-{
+    std::string text;
 };
 
 } // namespace ui::components

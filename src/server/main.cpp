@@ -26,6 +26,10 @@
 #include "src/server/net/NetWorkManager.h"
 #include "src/server/net/ClientSessionManager.h"
 #include "src/shared/common/Common.h"
+#include "src/shared/messages/request/UseCardRequest.h"
+#include "src/shared/messages/request/SettlementRequest.h"
+#include "src/shared/messages/response/UseCardResponse.h"
+#include "src/shared/messages/response/SettlementResponse.h"
 #include <nlohmann/json.hpp>
 #include <entt/entt.hpp>
 
@@ -154,6 +158,120 @@ int main()
                         if (entity.has_value())
                         {
                             sessionManager->removeClient(sender);
+                        }
+                        break;
+                    }
+
+                    case RequestType::USE_CARD:
+                    {
+                        // 解析使用卡牌请求
+                        if (size == 0U)
+                        {
+                            logger->warn("UseCard request missing payload");
+                            break;
+                        }
+
+                        std::string jsonStr(reinterpret_cast<const char*>(payload), size);
+                        try
+                        {
+                            auto json = nlohmann::json::parse(jsonStr);
+                            auto request = UseCardRequest::fromJson(json);
+
+                            logger->info("UseCard request: player={}, card={}, targets={}",
+                                         request.player,
+                                         request.card,
+                                         request.targets.size());
+
+                            // TODO: 验证请求有效性（玩家是否拥有该卡牌、目标是否有效等）
+
+                            // 创建响应消息
+                            UseCardResponse response{.player = request.player,
+                                                     .card = request.card,
+                                                     .targets = request.targets,
+                                                     .success = true,
+                                                     .message = "Card used successfully"};
+
+                            std::string responseJson = response.toJson().dump();
+                            std::vector<uint8_t> responsePayload(responseJson.begin(), responseJson.end());
+
+                            // 广播给所有客户端
+                            auto endpoints = sessionManager->getAllEndpoints(true);
+                            for (const auto& endpoint : endpoints)
+                            {
+                                asio::co_spawn(
+                                    threadPool.get_executor(),
+                                    [networkManager, endpoint, responsePayload]() -> asio::awaitable<void>
+                                    {
+                                        co_await networkManager->sendReliablePacket(
+                                            endpoint,
+                                            static_cast<uint16_t>(ResponseType::USE_CARD_RESULT),
+                                            responsePayload);
+                                    },
+                                    asio::detached);
+                            }
+
+                            logger->info("UseCard response broadcasted to {} clients", endpoints.size());
+                        }
+                        catch (const std::exception& e)
+                        {
+                            logger->error("Failed to parse UseCard request: {}", e.what());
+                        }
+                        break;
+                    }
+
+                    case RequestType::SETTLEMENT:
+                    {
+                        // 解析结算请求
+                        if (size == 0U)
+                        {
+                            logger->warn("Settlement request missing payload");
+                            break;
+                        }
+
+                        std::string jsonStr(reinterpret_cast<const char*>(payload), size);
+                        try
+                        {
+                            auto json = nlohmann::json::parse(jsonStr);
+                            auto request = SettlementRequest::fromJson(json);
+
+                            logger->info("Settlement request: player={}, card={}, target={}",
+                                         request.player,
+                                         request.card,
+                                         request.target);
+
+                            // TODO: 执行实际的结算逻辑
+
+                            // 创建结算响应
+                            SettlementResponse response{.player = request.player,
+                                                        .card = request.card,
+                                                        .target = request.target,
+                                                        .success = true,
+                                                        .message = "Settlement completed"};
+
+                            std::string responseJson = response.toJson().dump();
+                            std::vector<uint8_t> responsePayload(responseJson.begin(), responseJson.end());
+
+                            // 广播给所有客户端
+                            auto endpoints = sessionManager->getAllEndpoints(true);
+                            for (const auto& endpoint : endpoints)
+                            {
+                                asio::co_spawn(
+                                    threadPool.get_executor(),
+                                    [networkManager, endpoint, responsePayload]() -> asio::awaitable<void>
+                                    {
+                                        co_await networkManager->sendReliablePacket(
+                                            endpoint,
+                                            static_cast<uint16_t>(ResponseType::SETTLEMENT_RESULT),
+                                            responsePayload);
+                                    },
+                                    asio::detached);
+                            }
+
+                            logger->info("Settlement response broadcasted to {} clients", endpoints.size());
+                        }
+                        catch (const std::exception& e)
+                        {
+                            logger->error("Failed to parse Settlement request: {}", e.what());
                         }
                         break;
                     }

@@ -33,6 +33,7 @@
 #include "src/client/net/NetWorkClient.h"
 #include "src/shared/messages/request/UseCardRequest.h"
 #include "src/shared/messages/request/DiscardCardRequest.h"
+#include "src/shared/messages/request/SettlementRequest.h"
 #include "src/shared/common/Common.h"
 #include "src/client/utils/Logger.h"
 #include "src/client/utils/ThreadPool.h"
@@ -328,6 +329,35 @@ public:
 
         bool success =
             co_await m_networkClient->sendReliablePacket(static_cast<uint16_t>(RequestType::END_TURN), emptyPayload);
+
+        co_return success;
+    }
+
+    /**
+     * @brief 发送结算请求
+     */
+    asio::awaitable<bool> sendSettlement(uint32_t card, uint32_t target)
+    {
+        if (m_state != ClientState::IN_GAME)
+        {
+            LOG_ERROR("Cannot send settlement request: not in game");
+            co_return false;
+        }
+
+        SettlementRequest msg{.player = m_playerEntity, .card = card, .target = target};
+
+        std::string jsonStr = msg.toJson().dump();
+        std::vector<uint8_t> payload(jsonStr.begin(), jsonStr.end());
+
+        LOG_INFO("Sending settlement request: card={}, target={}", card, target);
+
+        bool success =
+            co_await m_networkClient->sendReliablePacket(static_cast<uint16_t>(RequestType::SETTLEMENT), payload);
+
+        if (!success)
+        {
+            LOG_ERROR("Failed to send settlement request");
+        }
 
         co_return success;
     }

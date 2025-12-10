@@ -64,14 +64,9 @@ public:
 
     /**
      * @brief 渲染所有UI元素
+     * @param renderer SDL渲染器指针
      */
-    void render() { m_renderSystem.update(); }
-
-    /**
-     * @brief 获取UI工厂
-     */
-    [[nodiscard]] UIFactory& getFactory() { return m_factory; }
-    [[nodiscard]] const UIFactory& getFactory() const { return m_factory; }
+    void render(SDL_Renderer* renderer) { m_renderSystem.update(renderer); }
 
     /**
      * @brief 获取渲染系统
@@ -103,7 +98,5 @@ private:
 private:
     systems::UIRenderSystem m_renderSystem;
     systems::UIAnimationSystem m_animationSystem;
-
-    UIFactory m_factory;
 };
 } // namespace ui

@@ -145,6 +145,7 @@ enum class RequestType : uint16_t
     NEXT_PHASE,        // 下一个阶段
 
     CHOOSING_TARGET = 0x0110, // 选择目标
+    SETTLEMENT,               // 结算请求
 
     CHAT_MESSAGE = 0x0200 // 聊天消息
 };
@@ -155,9 +156,11 @@ enum class RequestType : uint16_t
 // NOLINTNEXTLINE
 enum class ResponseType : uint16_t
 {
-    OK = 0x0000,           // 通用成功（可选）
-    ERROR_MESSAGE = 0x0F00 // 通用错误消息
-    // 后续可扩展：LOGIN_SUCCESS / LOGIN_FAILED / USE_CARD_RESULT 等专用响应码
+    OK = 0x0000,                // 通用成功（可选）
+    USE_CARD_RESULT = 0x0101,   // 使用卡牌结果响应
+    SETTLEMENT_RESULT = 0x0111, // 结算结果响应
+    ERROR_MESSAGE = 0x0F00      // 通用错误消息
+    // 后续可扩展：LOGIN_SUCCESS / LOGIN_FAILED 等专用响应码
 };
 
 /**

@@ -254,14 +254,12 @@ inline void startPositionAnimation(
     }
 
     auto& animation = registry.get_or_emplace<components::Animation>(entity);
-    animation.active = true;
     animation.duration = duration;
     animation.elapsed = 0.0F;
 
-    auto& posAnim = registry.get_or_emplace<components::PositionAnimation>(entity);
-    posAnim.startPos = startPos;
-    posAnim.endPos = endPos;
-    posAnim.progress = 0.0F;
+    auto& posAnim = registry.get_or_emplace<components::AnimationPosition>(entity);
+    posAnim.from = startPos;
+    posAnim.to = endPos;
 }
 
 /**
@@ -276,14 +274,13 @@ inline void
     }
 
     auto& animation = registry.get_or_emplace<components::Animation>(entity);
-    animation.active = true;
+
     animation.duration = duration;
     animation.elapsed = 0.0F;
 
-    auto& alphaAnim = registry.get_or_emplace<components::AlphaAnimation>(entity);
-    alphaAnim.startAlpha = startAlpha;
-    alphaAnim.endAlpha = endAlpha;
-    alphaAnim.progress = 0.0F;
+    auto& alphaAnim = registry.get_or_emplace<components::AnimationAlpha>(entity);
+    alphaAnim.from = startAlpha;
+    alphaAnim.to = endAlpha;
 }
 
 /**
@@ -299,7 +296,7 @@ inline void stopAnimation(entt::registry& registry, entt::entity entity)
     auto* animation = registry.try_get<components::Animation>(entity);
     if (animation)
     {
-        animation->active = false;
+        animation->duration = animation->elapsed; // 立即完成动画
     }
 }
 
@@ -310,5 +307,6 @@ inline bool hasAlignment(components::Alignment value, components::Alignment flag
 {
     return (static_cast<uint8_t>(value) & static_cast<uint8_t>(flag)) != 0;
 }
+
 
 } // namespace ui::helper
