@@ -26,7 +26,7 @@
 #include "src/shared/common/Common.h"
 #include "src/server/components/Player.h"
 
-class GameFlowSystem
+class GameFlowSystem : public EnableRegister<GameFlowSystem>
 {
 public:
     static constexpr int MAX_PLAYERS = 8;
@@ -49,11 +49,13 @@ public:
         m_phaseHandlers[TurnPhase::GAME_OVER] =
             entt::delegate<void()>{entt::connect_arg<&GameFlowSystem::handleGameOver>, this};
     };
-    void registerEvents()
+
+private:
+    void registerEventsImpl()
     {
         m_context->dispatcher.sink<events::GameStart>().connect<&GameFlowSystem::onGameStart>(this);
     };
-    void unregisterEvents()
+    void unregisterEventsImpl()
     {
         m_context->dispatcher.sink<events::GameStart>().disconnect<&GameFlowSystem::onGameStart>(this);
     };
@@ -75,17 +77,15 @@ public:
 
     void onLogin()
     {
-        // 处理玩家登录事件的逻辑
-        m_playerQueue.add(CreatePlayer(m_context->registry,
-                                       MetaPlayerInfo{.playerName = "Player1", .playerID = 1},
-                                       CharacterInfo{.characterCard = entt::null},
-                                       HandCards{},
-                                       Equipments{},
-                                       LiveStatus{true}));
-        
+        // // 处理玩家登录事件的逻辑
+        // m_playerQueue.push_back(CreatePlayer(m_context->registry,
+        //                                      MetaPlayerInfo{.playerName = "Player1", .playerID = 1},
+        //                                      CharacterInfo{.characterCard = entt::null},
+        //                                      HandCards{},
+        //                                      Equipments{},
+        //                                      LiveStatus{true}));
     };
 
-private:
     /**
      * @brief 执行当前阶段的处理逻辑
      */
@@ -199,9 +199,7 @@ private:
         // 清理资源，显示结算信息
     }
 
-    void
-
-        GameContext* m_context;
+    GameContext* m_context;
     utils::RoundRobin<entt::entity> m_playerQueue;
     TurnPhase m_currentPhase{TurnPhase::GAME_START};
     absl::flat_hash_map<TurnPhase, entt::delegate<void()>> m_phaseHandlers;

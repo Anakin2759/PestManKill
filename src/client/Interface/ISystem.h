@@ -23,17 +23,9 @@ struct ISystem : entt::type_list<>
     template <typename Base>
     struct type : Base
     {
-        void registerEvents() { entt::poly_call<0>(*this); }
-        void unregisterEvents() { entt::poly_call<1>(*this); }
+        void update(float deltaTime) {}
     };
 
     template <typename T>
-    using impl = entt::value_list<&T::registerEvents, &T::unregisterEvents>;
-};
-
-template <typename Derived>
-struct EnableRegister
-{
-    void registerEvents() { static_cast<Derived*>(this)->registerEventsImpl(); }
-    void unregisterEvents() { static_cast<Derived*>(this)->unregisterEventsImpl(); }
+    using impl = entt::value_list<&T::update>;
 };

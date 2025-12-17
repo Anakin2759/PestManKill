@@ -38,4 +38,9 @@ target_link_libraries(${EXET_NAME} PRIVATE
     absl::strings
     absl::hash
     absl::flat_hash_map
-    absl::raw_hash_set)
+    absl::raw_hash_set
+    absl::random_random
+    absl::random_seed_sequences
+    absl::random_distributions
+    kcp
+    )

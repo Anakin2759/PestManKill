@@ -34,6 +34,7 @@ add_subdirectory(third_party/stb)
 
 add_subdirectory(third_party/imgui)
 add_subdirectory(third_party/abseil-cpp)
+add_subdirectory(third_party/kcp)
 
 
 
@@ -68,5 +69,7 @@ endif()
 
 
 # ===================== 项目主程序 ====================
+add_subdirectory(src/net)
 add_subdirectory(src/client)
 add_subdirectory(src/server)
+add_subdirectory(tests/unittest)

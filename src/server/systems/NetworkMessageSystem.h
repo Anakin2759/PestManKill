@@ -18,15 +18,12 @@
 #include <asio.hpp>
 #include <memory>
 #include "src/server/context/GameContext.h"
-#include "src/server/net/NetWorkManager.h"
 #include "src/server/events/NetWorkEvents.h"
 
 class NetworkMessageSystem
 {
 public:
-    explicit NetworkMessageSystem(GameContext& context)
-        : m_context(&context),
-          m_networkManager(std::make_shared<NetWorkManager>(context.threadPool, context.logger)) {};
+    explicit NetworkMessageSystem(GameContext& context) : m_context(&context) {};
     void registerEvents()
     {
         // 注册网络消息处理事件
@@ -43,9 +40,8 @@ private:
         // 处理接收到的网络消息
         m_context->logger->info("Received network message: {}", event.message);
     }
-    void StartNetworkService() { m_networkManager->startService(); }
-    void StopNetworkService() { m_networkManager->stopService(); }
+    void StartNetworkService() {}
+    void StopNetworkService() {}
 
     GameContext* m_context;
-    std::shared_ptr<NetWorkManager> m_networkManager;
 };

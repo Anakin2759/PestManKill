@@ -15,7 +15,6 @@
 #pragma once
 #include <entt/entt.hpp>
 #include <absl/random/random.h>
-#include <absl/random/shuffle.h>
 #include <algorithm>
 #include "src/server/context/GameContext.h"
 #include "src/server/components/Deck.h"
@@ -24,7 +23,10 @@
 #include "src/server/components/Card.h"
 #include "src/server/events/DeckEvents.h"
 #include "src/server/events/GameFlowEvents.h"
-class DeckSystem
+#include "src/server/Interface/ISystem.h"
+#include "absl/container/flat_hash_set.h"
+
+class DeckSystem : public EnableRegister<DeckSystem>
 {
 public:
     explicit DeckSystem(GameContext& context) : m_context(&context) { m_context->logger->info("DeckSystem 初始化"); }
@@ -35,12 +37,13 @@ public:
     DeckSystem(DeckSystem&&) = default;
     DeckSystem& operator=(DeckSystem&& other) = delete;
     ~DeckSystem() = default;
-    void registerEvents() { initDeck(); };
-    void unregisterEvents() {
+
+private:
+    void registerEventsImpl() { initDeck(); };
+    void unregisterEventsImpl() {
 
     };
 
-private:
     /**
      * @brief 初始化牌堆
      */
@@ -66,7 +69,7 @@ private:
         auto newEnd = std::ranges::remove_if(handCards, [&](entt::entity card) { return cardSet.contains(card); });
         handCards.erase(newEnd.begin(), newEnd.end());
 
-        auto checkDiscarded = [](entt::entity& equipments, std::unordered_set<entt::entity>& cardSet)
+        auto checkDiscarded = [](entt::entity& equipments, absl::flat_hash_set<entt::entity>& cardSet)
         {
             if (equipments != entt::null && cardSet.contains(equipments))
             {
@@ -92,7 +95,7 @@ private:
         absl::BitGen gen; // 自动使用系统随机源初始化
 
         // 打乱弃牌堆
-        absl::Shuffle(gen, m_deck.discardPile);
+        std::shuffle(m_deck.discardPile.begin(), m_deck.discardPile.end(), gen);
 
         // 将弃牌堆放入抽牌堆
         m_deck.drawPile.insert(m_deck.drawPile.end(), m_deck.discardPile.begin(), m_deck.discardPile.end());

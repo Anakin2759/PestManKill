@@ -3,73 +3,70 @@
  *
  * @file UIEvents.h
  * @author AnakinLiu (azrael2759@qq.com)
- * @date 2025-12-05
- * @version 0.1
- * @brief UI ECS 事件定义
+ * @date 2025-12-11 (Optimized)
+ * @version 0.2
+ * @brief UI ECS 事件定义：优化后的通用事件与游戏特定事件分离。
  *
- * UI系统中使用的所有事件类型
- * 通过entt::dispatcher进行事件分发
- *
- * ************************************************************************
- * @copyright Copyright (c) 2025 AnakinLiu
- * For study and research only, no reprinting.
  * ************************************************************************
  */
 
 #pragma once
 #include <entt/entt.hpp>
-#include <imgui.h>
 #include <string>
+#include <vector>
+
+// 注意：ImGui.h 通常只在渲染系统和组件中使用，事件可以不依赖它。
 
 namespace ui::events
 {
 
-/**
- * @brief 渲染请求事件
- */
-struct RenderRequest
-{
-    entt::entity entity;
-    ImVec2 position;
-    ImVec2 size;
-};
+// =====================================================================
+// A. 核心 ECS / 生命周期事件 (由 Application/Engine 触发)
+// =====================================================================
 
 /**
- * @brief 按钮点击事件
+ * @brief 在 Application 完成底层初始化 (SDL/ImGui/ECS根实体) 后触发。
+ * 驱动 UI 结构初始化系统 (SetupSystem) 开始工作。
  */
-struct ButtonClicked
+struct ApplicationReadyEvent
 {
-    entt::entity entity;
+    entt::entity rootEntity;
 };
 
-/**
- * @brief 文本改变事件
- */
-struct TextChanged
-{
-    entt::entity entity;
-    std::string newText;
-};
+// =====================================================================
+// B. 通用 UI 结构 / 动画 / 渲染事件 (由 Systems 触发)
+// =====================================================================
 
 /**
- * @brief 选择改变事件
+ * @brief ECS 实体创建完成事件。
+ * 替代 WidgetCreated。
  */
-struct SelectionChanged
-{
-    entt::entity entity;
-    int selectedIndex;
-};
-
-/**
- * @brief 布局更新事件
- */
-struct LayoutUpdate
+struct EntityCreated
 {
     entt::entity entity;
 };
 
 /**
- * @brief 动画完成事件
+ * @brief ECS 实体销毁事件。
+ * 替代 WidgetDestroyed。
+ */
+struct EntityDestroyed
+{
+    entt::entity entity;
+};
+
+/**
+ * @brief 布局更新事件。
+ * 触发 LayoutSystem 重新计算布局。
+ * 替代 LayoutUpdate。
+ */
+struct LayoutRecalculate
+{
+    entt::entity entity;
+};
+
+/**
+ * @brief 动画完成事件。
  */
 struct AnimationComplete
 {
@@ -77,23 +74,7 @@ struct AnimationComplete
 };
 
 /**
- * @brief UI元素创建事件
- */
-struct WidgetCreated
-{
-    entt::entity entity;
-};
-
-/**
- * @brief UI元素销毁事件
- */
-struct WidgetDestroyed
-{
-    entt::entity entity;
-};
-
-/**
- * @brief 可见性改变事件
+ * @brief 可见性改变事件。
  */
 struct VisibilityChanged
 {
@@ -101,76 +82,97 @@ struct VisibilityChanged
     bool visible;
 };
 
+// =====================================================================
+// C. 通用 UI 交互事件 (由 InteractionSystem 触发)
+// =====================================================================
+
 /**
- * @brief 按钮点击事件（带标识）
+ * @brief 按钮点击事件。
+ * 合并 ButtonClicked 和 ButtonClickEvent，只保留核心信息。
  */
-struct ButtonClickEvent
+struct ButtonClick
 {
     entt::entity entity;
-    std::string buttonId;
+    // 如果需要标识，InteractionSystem 应负责查询该实体的 Name/ID 组件。
 };
 
 /**
- * @brief 手牌选中状态改变事件
+ * @brief 文本内容改变事件 (TextEdit/Input)。
+ * 替代 TextChanged。
+ */
+struct ValueChangedText
+{
+    entt::entity entity;
+    std::string newText;
+};
+
+/**
+ * @brief 选择索引改变事件 (Dropdown/List)。
+ * 替代 SelectionChanged。
+ */
+struct ValueChangedSelection
+{
+    entt::entity entity;
+    int selectedIndex;
+};
+
+// =====================================================================
+// D. 游戏特定事件 (Card Game Logic)
+// ---------------------------------------------------------------------
+// 推荐将这些事件移动到独立的 GameEvents.h 中，以保持 UI 系统的纯净性。
+// =====================================================================
+
+/**
+ * @brief 手牌选中状态改变事件。
+ * 移除 cardName，系统应通过 cardEntity 查询其名称组件。
  */
 struct CardSelectionChanged
 {
     entt::entity cardEntity;
     bool selected;
-    std::string cardName;
 };
 
 /**
- * @brief 手牌移动到处理区事件
+ * @brief 卡牌移动到处理区事件。
  */
 struct CardMovedToProcessing
 {
     entt::entity cardEntity;
-    std::string cardName;
 };
 
 /**
- * @brief 卡牌从处理区移除事件
+ * @brief 卡牌从处理区移除事件。
  */
 struct CardRemovedFromProcessing
 {
     entt::entity cardEntity;
-    std::string cardName;
 };
 
 /**
- * @brief 处理区清空前事件
+ * @brief 处理区清空前事件。
  */
 struct ProcessingAreaBeforeClear
 {
-    std::vector<entt::entity> cardEntities;
+    std::vector<entt::entity> cardEntities; // 携带待清除的实体列表
 };
 
 /**
- * @brief 处理区清空后事件
- */
-struct ProcessingAreaAfterClear
-{
-};
-
-/**
- * @brief 使用卡牌事件
+ * @brief 玩家明确执行使用卡牌事件。
  */
 struct UseCardEvent
 {
-    entt::entity cardEntity;
-    std::string cardName;
+    entt::entity cardEntity; // 如果是单卡使用
 };
 
 /**
- * @brief 取消操作事件
+ * @brief 玩家明确执行取消操作事件。
  */
 struct CancelOperationEvent
 {
 };
 
 /**
- * @brief 结束回合事件
+ * @brief 玩家明确执行结束回合事件。
  */
 struct EndTurnEvent
 {

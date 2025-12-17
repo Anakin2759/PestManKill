@@ -7,9 +7,11 @@ int main()
     // 设置控制台为 UTF-8 编码（Windows 特有）
     SetConsoleOutputCP(CP_UTF8);
     SetConsoleCP(CP_UTF8);
+    std::setlocale(LC_ALL, "C");
+    // 强制 C++ I/O 流语言环境为 "C" (英文)
+    std::locale::global(std::locale("C"));
 #endif
-    // NOLINTNEXTLINE(cppcoreguidelines-avoid-magic-numbers, readability-magic-numbers)
-    MainWindowECS app("PestManKill", 1200, 800);
+
     app.run();
     return 0;
 }

@@ -4,6 +4,7 @@
 #include <memory>
 #include <spdlog/sinks/rotating_file_sink.h>
 #include <filesystem>
+#include <spdlog/sinks/stdout_color_sinks.h>
 static constexpr size_t MAX_LOG_FILE_SIZE = static_cast<size_t>(1024 * 1024 * 5); // 5MB
 static constexpr size_t MAX_LOG_FILES = 1;
 inline std::shared_ptr<spdlog::logger> CreateRollingLogger()
