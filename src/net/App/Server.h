@@ -1,78 +1,80 @@
-/**
- * ************************************************************************
- *
- * @file KcpServer.h
- * @author AnakinLiu (azrael2759@qq.com)
- * @date 2025-12-17
- * @version 0.1
- * @brief KCP 服务器端点定义
- *
- * ************************************************************************
- * @copyright Copyright (c) 2025 AnakinLiu
- * For study and research only, no reprinting.
- * ************************************************************************
- */
-
 #pragma once
 #include "KcpEndpoint.h"
-#include <cstring>
-#include <bit>
-
-#include <bit>
-#include <endian.h>
-
-inline uint32_t peekConv(std::span<const uint8_t> data)
-{
-    if (data.size() < 4) [[unlikely]]
-        return 0;
-
-    uint32_t conv;
-    std::memcpy(&conv, data.data(), sizeof(uint32_t));
-
-    // 如果当前原生机器是 大端序，则需要翻转字节以匹配 KCP 的小端序
-    if constexpr (std::endian::native == std::endian::big)
-    {
-        return std::byteswap(conv); // C++23 提供的标准字节交换
-    }
-    return conv;
-}
+#include <asio.hpp>
+#include <iostream>
 
 class Server final : public KcpEndpoint
 {
 public:
-    explicit Server(IUdpTransport& transport) : KcpEndpoint(transport) {}
+    // 构造函数：需要 IO 执行器（用于 KCP）和 线程池大小
+    Server(IUdpTransport& transport, asio::any_io_executor io_exec, size_t thread_count)
+        : KcpEndpoint(transport, std::move(io_exec)), m_pool(thread_count)
+    {
+    }
+
+    // 停止服务器，等待线程池结束
+    void stop() { m_pool.join(); }
 
 protected:
     uint32_t selectConv(const asio::ip::udp::endpoint&, std::span<const uint8_t> data) override
     {
         return peekConv(data);
     }
+
     /**
-     * @brief 会话创建回调
-     * @param conv 会话 ID
-     * @param session 新创建的 KCP 会话对象
+     * @brief 核心调整：不再写回调，直接派生协程
      */
     void onSession(uint32_t conv, std::shared_ptr<KcpSession> session) override
     {
-        // 1. 业务逻辑：创建一个玩家对象
-        auto newPlayer = std::make_shared<Player>(conv, session);
+        // 1. 为每个玩家创建一个 Strand，保证该玩家的协程在线程池中是线程安全的
+        auto player_executor = asio::make_strand(m_pool.get_executor());
 
-        // 2. 绑定回调：当 KCP 收到应用层数据时，通知玩家对象
-        session->setDataCallback([newPlayer](std::span<const uint8_t> data) { newPlayer->handleMessage(data); });
+        // 2. 启动玩家业务协程
+        // 注意：这里将协程派发到线程池执行，而 KCP 的 input/update 依然在 IO 线程
+        asio::co_spawn(player_executor, playerRoutine(conv, std::move(session)), asio::detached);
 
-        // 3. 保存到你的玩家管理器中
-        m_players[conv] = newPlayer;
-
-        std::cout << "Log: New player joined. Conv ID: " << conv << std::endl;
+        std::cout << "Log: Player " << conv << " connected. Business logic moved to thread pool." << std::endl;
     }
 
+private:
     /**
-     * @brief 会话关闭回调
-     * @param conv 会话 ID
+     * @brief 玩家业务“例程”：纯协程写法
      */
-    void onSessionClosed(uint32_t conv) override
+    static asio::awaitable<void> playerRoutine(uint32_t conv, std::shared_ptr<KcpSession> session)
     {
-        m_players.erase(conv);
-        std::cout << "Log: Player left. Conv ID: " << conv << std::endl;
+        try
+        {
+            // 业务逻辑可以在此直接写，例如：
+            // auto login_data = co_await session->recv();
+            // if (!verify(login_data)) co_return;
+
+            while (true)
+            {
+                // 挂起协程，等待 KCP 层通过 channel 传来的数据
+                auto result = co_await session->recv();
+
+                if (!result)
+                {
+                    break; // 连接断开或超时
+                }
+
+                const auto& msg = *result;
+
+                // 处理业务逻辑（此时运行在线程池中）
+                // ... handle(msg) ...
+
+                // 发送回执
+                session->send(msg);
+            }
+        }
+        catch (const std::exception& e)
+        {
+            std::cerr << "Player " << conv << " exception: " << e.what() << std::endl;
+        }
+
+        std::cout << "Log: Player " << conv << " disconnected." << std::endl;
     }
+
+private:
+    asio::thread_pool m_pool;
 };
