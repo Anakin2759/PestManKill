@@ -5,10 +5,12 @@
  * @author AnakinLiu (azrael2759@qq.com)
  * @date 2025-12-11 (Updated)
  * @version 0.2
- * @brief ECS化的应用程序类 (协调者)
+ * @brief ui上下文管理类
  *
  * 负责主循环、输入事件处理、图形上下文管理以及驱动所有ECS系统。
     存在一个单例指针，方便全局访问。
+    不是根实体，也不管理根实体
+    只负责驱动UiSystem和处理SDL/ImGui集成
  *
  * ************************************************************************
  * @copyright Copyright (c) 2025 AnakinLiu
@@ -28,36 +30,22 @@
 #include "src/client/systems/WindowSystem.h" // 假设存在一个处理窗口尺寸变化的系统
 #include "src/client/utils/utils.h"          // 包含 Registry, Dispatcher, GraphicsContext
 
-// 假设 utils::GraphicsContext 存在并管理 SDL_Window/Renderer
-namespace utils
-{
-class GraphicsContext;
-}
-
 namespace ui
 {
 class Application
 {
 private:
     // 核心 ECS 系统封装
-    UiSystem m_uiSystem;
+    SystemManager m_systems;
 
-    // 特定于窗口管理的系统 (处理 resize event 并更新根实体尺寸)
-    systems::WindowSystem m_windowSystem;
+    //ImGui 上下文管理
+    
 
     // ECS 根实体，代表整个屏幕/应用区域
     entt::entity m_rootEntity = entt::null;
 
-    // 外部资源和上下文
-    utils::GraphicsContext& m_context;
-
     bool running = true;
     SDL_Event event{};
-
-    // 时间循环变量
-    using Clock = std::chrono::high_resolution_clock;
-    using TimePoint = Clock::time_point;
-    TimePoint m_lastTime;
 
     // 阻止拷贝和移动（通常 Application 是单例或独占资源）
     Application(const Application&) = delete;
@@ -71,8 +59,8 @@ public:
      * 假设 GraphicsContext 已经实例化且可通过 utils::getInstance() 获取
      */
     explicit Application()
-        : m_context(utils::GraphicsContext::getInstance()), // 假设单例
-          m_lastTime(Clock::now())
+
+        m_lastTime(Clock::now())
     {
         if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) < 0)
         {
@@ -192,29 +180,6 @@ private:
         ImGui_ImplSDLRenderer3_Shutdown();
         ImGui_ImplSDL3_Shutdown();
         ImGui::DestroyContext();
-    }
-
-    /**
-     * @brief 初始化 ECS 根实体：所有 UI 元素的祖先
-     */
-    void setupRootEntity()
-    {
-        auto& registry = utils::Registry::getInstance();
-        m_rootEntity = registry.create();
-
-        // 根实体总是占据整个屏幕
-        registry.emplace<components::Position>(m_rootEntity, 0.0f, 0.0f);
-
-        // 使用 WindowSystem 获取的尺寸
-        registry.emplace<components::Size>(m_rootEntity, (float)m_context.getWidth(), (float)m_context.getHeight());
-
-        // 根实体是布局容器
-        registry.emplace<components::LayoutInfo>(m_rootEntity);
-        registry.emplace<components::Hierarchy>(m_rootEntity);
-        registry.emplace<components::VisibleTag>(m_rootEntity);
-
-        // 确保根实体尺寸变化时能触发布局系统
-        registry.emplace<components::LayoutDirtyTag>(m_rootEntity);
     }
 };
 

@@ -1,7 +1,7 @@
 /**
  * ************************************************************************
  *
- * @file UIDefine.h
+ * @file Define.h
  * @author AnakinLiu (azrael2759@qq.com)
  * @date 2025-12-05
  * @brief UI 相关的全局定义 (优化后)
@@ -42,7 +42,7 @@ enum class Alignment : uint8_t
 
     // 组合常用对齐方式 (可选，但非常实用)
     CENTER = HCENTER | VCENTER, // 0x12
-    TOP_LEFT = TOP | LEFT,       // 0x09
+    TOP_LEFT = TOP | LEFT,      // 0x09
 };
 
 /**

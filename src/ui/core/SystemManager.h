@@ -1,7 +1,7 @@
 /**
  * ************************************************************************
  *
- * @file UiSystem.h
+ * @file SystemManager.h
  * @author AnakinLiu (azrael2759@qq.com)
  * @date 2025-12-11 (Updated)
  * @version 0.2
@@ -22,18 +22,16 @@
 #include <memory>
 
 // 引入所有子系统头文件
-#include "src/client/systems/UIRenderSystem.h"
-#include "src/client/systems/UIAnimationSystem.h"
-#include "src/client/systems/InteractionSystem.h"
-#include "src/client/systems/UILayoutSystem.h"
-#include "src/client/systems/WindowSystem.h" // 保持与 Application.h 中的一致
-
+#include "src/ui/systems/UIRenderSystem.h"
+#include "src/ui/systems/UIAnimationSystem.h"
+#include "src/ui/systems/InteractionSystem.h"
+#include "src/ui/systems/UILayoutSystem.h"
+#include "src/ui/systems/WindowsSystem.h" // 保持与 Application.h 中的一致
 // 引入其他依赖
-#include "src/client/model/UIFactory.h"
-#include "src/client/utils/Dispatcher.h"
-#include "src/client/components/UIComponents.h"
-#include "src/client/events/UIEvents.h"
-#include "src/client/utils/utils.h"
+#include "src/ui/ui/UIFactory.h"
+#include "src/ui/components/UIComponents.h"
+#include "src/ui/ui/UIEvents.h"
+#include <utils.h>
 
 namespace ui
 {
@@ -41,19 +39,19 @@ namespace ui
 /**
  * @brief UI系统管理器：定义ECS系统的执行流程
  */
-class UiSystem
+class SystemManager
 {
 public:
     // 构造函数：初始化所有子系统
-    UiSystem() { setupEventHandlers(); }
+    SystemManager() { setupEventHandlers(); }
 
-    ~UiSystem() = default;
+    ~SystemManager() = default;
 
     // 禁用拷贝和移动
-    UiSystem(const UiSystem&) = delete;
-    UiSystem& operator=(const UiSystem&) = delete;
-    UiSystem(UiSystem&&) = delete;
-    UiSystem& operator=(UiSystem&&) = delete;
+    SystemManager(const SystemManager&) = delete;
+    SystemManager& operator=(const SystemManager&) = delete;
+    SystemManager(SystemManager&&) = delete;
+    SystemManager& operator=(SystemManager&&) = delete;
 
     /**
      * @brief 更新UI系统：按固定流程顺序执行所有System
@@ -122,6 +120,6 @@ private:
     systems::UIAnimationSystem m_animationSystem;   // 2. 动画/状态更新
     systems::UILayoutSystem m_layoutSystem;         // 3. 布局计算
     systems::UIRenderSystem m_renderSystem;         // 4. 渲染绘制
-    // systems::WindowSystem m_windowSystem; // WindowSystem 通常放在 Application 或专门的初始化层
+    systems::WindowSystem m_windowSystem;           // 窗口管理系统
 };
 } // namespace ui

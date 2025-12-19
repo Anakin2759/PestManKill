@@ -1,3 +1,18 @@
+/**
+ * ************************************************************************
+ *
+ * @file KcpSession.h
+ * @author AnakinLiu (azrael2759@qq.com)
+ * @date 2025-12-18
+ * @version 0.1
+ * @brief KCP 会话层抽象
+
+ *
+ * ************************************************************************
+ * @copyright Copyright (c) 2025 AnakinLiu
+ * For study and research only, no reprinting.
+ * ************************************************************************
+ */
 #pragma once
 #include "../transport/IUdpTransport.h"
 #include <ikcp.h>
@@ -15,21 +30,16 @@ class KcpSession : public std::enable_shared_from_this<KcpSession>
     using DataChannel = asio::experimental::channel<asio::any_io_executor, void(std::error_code, Packet)>;
 
 public:
-    KcpSession(uint32_t conv, IUdpTransport& transport, asio::ip::udp::endpoint peer, asio::any_io_executor exec)
-        : m_transport(transport), m_peer(peer), m_channel(exec, 64) // 缓冲区容量 64
-    {
-        m_kcp = ikcp_create(conv, this);
-        m_kcp->output = &KcpSession::kcpOutput;
+    /**
+     * @brief 构造函数
+     * @param conv 会话的 Conv ID
+     * @param transport 底层 UDP 传输实现
+     * @param peer 对端 UDP 地址
+     * @param exec 执行器（通常是 IO 上下文的执行器）
+     */
+    KcpSession(uint32_t conv, IUdpTransport& transport, asio::ip::udp::endpoint peer, asio::any_io_executor exec);
 
-        // 默认配置优化（可根据需求调整）
-        ikcp_nodelay(m_kcp, 1, 10, 2, 1);
-        m_kcp->rx_minrto = 10;
-    }
-
-    ~KcpSession()
-    {
-        if (m_kcp) ikcp_release(m_kcp);
-    }
+    ~KcpSession();
 
     // 禁止拷贝
     KcpSession(const KcpSession&) = delete;
@@ -38,59 +48,34 @@ public:
     /**
      * @brief 供 Endpoint 调用：喂入底层 UDP 数据
      */
-    void input(std::span<const uint8_t> data)
-    {
-        ikcp_input(m_kcp, reinterpret_cast<const char*>(data.data()), static_cast<long>(data.size()));
-
-        // 尝试从 KCP 提取完整包并推入协程通道
-        std::vector<uint8_t> buf(2048);
-        int n = 0;
-        while ((n = ikcp_recv(m_kcp, reinterpret_cast<char*>(buf.data()), static_cast<int>(buf.size()))) > 0)
-        {
-            buf.resize(n);
-            // try_send 是非阻塞的，如果通道满了会返回 false
-            m_channel.try_send(std::error_code{}, std::move(buf));
-            buf.resize(2048);
-        }
-    }
+    void input(std::span<const uint8_t> data);
 
     /**
      * @brief 协程接口：异步接收一个 KCP 完整包
      * @return C++23 std::expected，成功返回数据，失败返回错误码
      */
-    asio::awaitable<std::expected<Packet, std::error_code>> recv()
-    {
-        try
-        {
-            Packet data = co_await m_channel.async_receive(asio::use_awaitable);
-            co_return data;
-        }
-        catch (const std::system_error& e)
-        {
-            co_return std::unexpected(e.code());
-        }
-    }
+    asio::awaitable<std::expected<Packet, std::error_code>> recv();
 
-    void send(std::span<const uint8_t> data)
-    {
-        ikcp_send(m_kcp, reinterpret_cast<const char*>(data.data()), static_cast<int>(data.size()));
-    }
+    void send(std::span<const uint8_t> data);
     /**
      * @brief 更新 KCP 状态，需定期调用
      * @param now 当前时间戳（毫秒）
      */
-    void update(uint32_t now) { ikcp_update(m_kcp, now); }
+    void update(uint32_t now);
 
     // 获取下一次更新的时间点
-    uint32_t check(uint32_t now) const { return ikcp_check(m_kcp, now); }
+    uint32_t check(uint32_t now) const;
 
 private:
-    static int kcpOutput(const char* buf, int len, ikcpcb* kcp, void* user)
-    {
-        auto* self = static_cast<KcpSession*>(user);
-        self->m_transport.send(self->m_peer, std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(buf), len));
-        return 0;
-    }
+    /**
+     * @brief KCP 输出回调，将 KCP 数据发送到底层 UDP
+     * @param buf 数据缓冲区
+     * @param len 数据长度
+     * @param kcp KCP 控制块指针
+     * @param user 用户指针，指向当前 KcpSession 实例
+     * @return int 0 表示成功，非 0 表示失败
+     */
+    static int kcpOutput(const char* buf, int len, ikcpcb* kcp, void* user);
 
 private:
     ikcpcb* m_kcp{nullptr};

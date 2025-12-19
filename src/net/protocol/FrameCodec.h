@@ -29,6 +29,9 @@ enum class CodecError
 
 /**
  * @brief 编码帧数据包
+ * @param buffer 输出缓冲区
+ * @param cmd 命令ID
+ * @param payload 载荷数据
  * @return 成功返回编码后的子切片，失败返回错误码
  */
 inline std::expected<std::span<uint8_t>, CodecError>
@@ -42,7 +45,7 @@ inline std::expected<std::span<uint8_t>, CodecError>
     }
 
     // 优化：直接在目标缓冲区构造 Header，避免中间变量拷贝
-    auto* header = reinterpret_cast<FrameHeader*>(buffer.data());
+    auto* header = reinterpret_cast<FrameHeader*>(buffer.data()); // NOLINT
     *header = FrameHeader{.cmd = cmd, .length = static_cast<uint16_t>(payload.size())};
 
     // 拷贝 payload
@@ -56,7 +59,8 @@ inline std::expected<std::span<uint8_t>, CodecError>
 
 /**
  * @brief 解码帧数据包
- * @return 成功返回解出的 Payload span
+ * @param buffer 输入缓冲区
+ * @return 成功返回解出的 Payload span 和命令ID
  */
 struct DecodeResult
 {
@@ -72,9 +76,10 @@ inline std::expected<DecodeResult, CodecError> decodeFrame(std::span<const uint8
     }
 
     // 使用 bit_cast 或指针映射，避免 memcpy 整个结构体
-    const auto& header = *reinterpret_cast<const FrameHeader*>(buffer.data());
+    const auto& header = *reinterpret_cast<const FrameHeader*>(buffer.data()); // NOLINT
 
-    if (header.magic != 0x55AA) [[unlikely]]
+    constexpr uint16_t EXPECTED_MAGIC = 0x55AA;
+    if (header.magic != EXPECTED_MAGIC) [[unlikely]]
     {
         return std::unexpected(CodecError::InvalidMagic);
     }

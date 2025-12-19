@@ -3,12 +3,9 @@
  *
  * @file SettlementRequest.h
  * @author AnakinLiu (azrael2759@qq.com)
- * @date 2025-12-09
- * @version 0.1
- * @brief 结算请求消息定义
- *
- * 客户端向服务器发送的结算请求
- * 用于请求对卡牌效果进行结算
+ * @date 2025-12-18
+ * @version 0.2
+ * @brief 结算请求消息
  *
  * ************************************************************************
  * @copyright Copyright (c) 2025 AnakinLiu
@@ -17,21 +14,42 @@
  */
 
 #pragma once
+#include "../MessageBase.h"
+#include "src/shared/common/CommandID.h"
 #include <cstdint>
-#include <nlohmann/json.hpp>
 
-struct SettlementRequest
+struct SettlementRequest : public MessageBase<SettlementRequest>
 {
+    static constexpr uint16_t CMD_ID = CommandID::SETTLEMENT_REQ;
     uint32_t player; // 请求结算的玩家
     uint32_t card;   // 要结算的卡牌
     uint32_t target; // 结算目标
 
-    [[nodiscard]] nlohmann::json toJson() const { return {{"player", player}, {"card", card}, {"target", target}}; }
+    [[nodiscard]] nlohmann::json toJsonImpl() const { return {{"player", player}, {"card", card}, {"target", target}}; }
 
-    static SettlementRequest fromJson(const nlohmann::json& json)
+    static std::expected<SettlementRequest, MessageError> fromJsonImpl(const nlohmann::json& json)
     {
-        return {.player = json.at("player").get<uint32_t>(),
-                .card = json.at("card").get<uint32_t>(),
-                .target = json.at("target").get<uint32_t>()};
+        try
+        {
+            SettlementRequest req;
+            req.player = json.at("player").get<uint32_t>();
+            req.card = json.at("card").get<uint32_t>();
+            req.target = json.at("target").get<uint32_t>();
+            return req;
+        }
+        catch (...)
+        {
+            return std::unexpected(MessageError::DeserializeFailed);
+        }
+    }
+
+    std::expected<std::span<uint8_t>, MessageError> serializeImpl(std::span<uint8_t>) const
+    {
+        return std::unexpected(MessageError::SerializeFailed);
+    }
+
+    static std::expected<SettlementRequest, MessageError> deserializeImpl(std::span<const uint8_t>)
+    {
+        return std::unexpected(MessageError::DeserializeFailed);
     }
 };

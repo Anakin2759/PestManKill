@@ -17,10 +17,10 @@
 
 #pragma once
 #include <entt/entt.hpp>
-#include <algorithm>                            // For std::clamp
-#include "src/client/components/UIComponents.h" // 包含所有数据组件
-#include "src/client/components/UITags.h"       // 包含所有 Tag 组件
-#include "src/client/components/UIDefine.h"     // 包含所有枚举
+#include <algorithm>                 // For std::clamp
+#include "components/UIComponents.h" // 包含所有数据组件
+#include "components/UITags.h"       // 包含所有 Tag 组件
+#include "components/UIDefine.h"     // 包含所有枚举
 
 namespace ui::helper
 {
@@ -118,6 +118,23 @@ inline void setBackgroundColor(entt::registry& registry, entt::entity entity, co
     bg.enabled = true;
 }
 
+/**
+ * @brief 设置圆角（Background/Border）
+ */
+inline void setBorderRadius(entt::registry& registry, entt::entity entity, float radius)
+{
+    if (!registry.valid(entity)) return;
+
+    auto& bg = registry.get_or_emplace<components::Background>(entity);
+    bg.borderRadius = std::max(0.0f, radius);
+    bg.enabled = true;
+
+    if (auto* border = registry.try_get<components::Border>(entity))
+    {
+        border->borderRadius = std::max(0.0f, radius);
+    }
+}
+
 // ===================== 布局配置 =====================
 
 /**
@@ -133,6 +150,12 @@ inline void setLayoutSpacing(entt::registry& registry, entt::entity entity, floa
         layout->spacing = std::max(0.0F, spacing);
         markLayoutDirty(registry, entity);
     }
+}
+
+// 兼容旧命名
+inline void setSpacing(entt::registry& registry, entt::entity entity, float spacing)
+{
+    setLayoutSpacing(registry, entity, spacing);
 }
 
 /**
@@ -251,6 +274,27 @@ inline void setTextEditContent(entt::registry& registry, entt::entity entity, co
     }
 }
 
+/**
+ * @brief 设置密码模式（TextEdit.password）
+ */
+inline void setPasswordMode(entt::registry& registry, entt::entity entity, bool enabled)
+{
+    if (!registry.valid(entity)) return;
+    if (auto* textEdit = registry.try_get<components::TextEdit>(entity))
+    {
+        textEdit->password = enabled;
+    }
+}
+
+/**
+ * @brief 将实体在父级内居中（当前最小实现：仅标记布局脏，由布局系统或外部定位处理）
+ */
+inline void centerInParent(entt::registry& registry, entt::entity entity)
+{
+    if (!registry.valid(entity)) return;
+    markLayoutDirty(registry, entity);
+}
+
 // ===================== 动画操作 =====================
 
 /**
@@ -357,6 +401,29 @@ inline void removeChild(entt::registry& registry, entt::entity parent, entt::ent
 
         // 3. 标记父级为脏
         markLayoutDirty(registry, parent);
+    }
+}
+
+/**
+ * @brief 遍历某实体的所有后代节点（后序遍历：先子后父）
+ *
+ * 典型用途：清理/销毁 UI 树。后序遍历可避免在访问子节点前就销毁父节点导致的层级信息丢失。
+ */
+template <typename Func>
+inline void traverseChildren(entt::registry& registry, entt::entity parent, Func visitor)
+{
+    if (!registry.valid(parent)) return;
+
+    const auto* hierarchy = registry.try_get<components::Hierarchy>(parent);
+    if (!hierarchy || hierarchy->children.empty()) return;
+
+    // visitor 可能会 destroy 实体，先拷贝 children，避免迭代过程中容器被修改。
+    const auto childrenCopy = hierarchy->children;
+    for (const entt::entity child : childrenCopy)
+    {
+        if (!registry.valid(child)) continue;
+        traverseChildren(registry, child, visitor);
+        visitor(child);
     }
 }
 

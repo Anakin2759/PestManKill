@@ -1,7 +1,7 @@
 /**
  * ************************************************************************
  *
- * @file UIRenderSystem.h
+ * @file RenderSystem.h
  * @author AnakinLiu (azrael2759@qq.com)
  * @date 2025-12-11 (Final)
  * @version 0.3
@@ -9,6 +9,14 @@
  *
  * 负责渲染所有UI元素的ECS系统，通过递归遍历和ImGui DrawList实现纯绘制。
  * 特别处理 Window/Dialog 容器，将其映射为 ImGui 窗口实例。
+    查找MainWidgetTag标记的主实体作为渲染起点。
+    渲染所有具有VisibleTag的实体。
+    处理透明度继承和计算。
+    使用ImGui DrawList进行低级绘制，避免使用ImGui控件函数。
+    递归渲染子实体，支持嵌套布局。
+    支持背景色、边框、文本、图像等多种UI元素。
+    优化渲染顺序，确保正确的层级关系。
+    易于扩展以支持更多UI组件和效果。
  *
  * ************************************************************************
  */
@@ -17,16 +25,15 @@
 #include <entt/entt.hpp>
 #include <imgui.h>
 #include <functional>
-#include "src/client/components/UIComponents.h"
-#include "src/client/components/UITags.h"
-#include "src/client/events/UIEvents.h"
-#include "src/client/utils/utils.h"
+#include "components/UIComponents.h"
+#include "components/UITags.h"
+#include <utils.h>
 #include <SDL3/SDL.h>
 
 namespace ui::systems
 {
 
-class UIRenderSystem
+class RenderSystem
 {
 public:
     void update(SDL_Renderer* renderer) noexcept
@@ -168,7 +175,7 @@ private:
         if (windowComp.noResize) flags |= ImGuiWindowFlags_NoResize;
         if (windowComp.noMove) flags |= ImGuiWindowFlags_NoMove;
         if (windowComp.noCollapse) flags |= ImGuiWindowFlags_NoCollapse;
-        if (windowComp.modal) flags |= ImGuiWindowFlags_Modal;
+        // ImGui 的“模态”语义通常通过 BeginPopupModal 实现；此处使用普通 Begin，不设置不存在的 WindowFlags。
 
         // 标记：如果 ECS 窗口/对话框没有 Background 组件，则使用 ImGui 默认背景。
         // 如果有 Background 组件，则设置 ImGuiWindowFlags_NoBackground，并在 ECS 中绘制。
@@ -252,7 +259,37 @@ private:
                 ImVec4 finalColor = textComp->color;
                 finalColor.w *= globalAlpha;
                 ImU32 color = ImGui::GetColorU32(finalColor);
-                draw_list->AddText(pos, color, textComp->content.c_str());
+
+                ImVec2 textPos = pos;
+                const ImVec2 textSize = ImGui::CalcTextSize(textComp->content.c_str());
+
+                const uint8_t align = static_cast<uint8_t>(textComp->alignment);
+                if (align & static_cast<uint8_t>(components::Alignment::HCENTER))
+                {
+                    textPos.x = pos.x + (size.x - textSize.x) * 0.5f;
+                }
+                else if (align & static_cast<uint8_t>(components::Alignment::RIGHT))
+                {
+                    textPos.x = pos.x + (size.x - textSize.x);
+                }
+
+                if (align & static_cast<uint8_t>(components::Alignment::VCENTER))
+                {
+                    textPos.y = pos.y + (size.y - textSize.y) * 0.5f;
+                }
+                else if (align & static_cast<uint8_t>(components::Alignment::BOTTOM))
+                {
+                    textPos.y = pos.y + (size.y - textSize.y);
+                }
+
+                if (textComp->fontSize > 0.0f)
+                {
+                    draw_list->AddText(ImGui::GetFont(), textComp->fontSize, textPos, color, textComp->content.c_str());
+                }
+                else
+                {
+                    draw_list->AddText(textPos, color, textComp->content.c_str());
+                }
             }
         }
 
@@ -266,9 +303,12 @@ private:
                 draw_list->AddImage(imageComp.textureId,
                                     pos,
                                     endPos,
-                                    imageComp.uv0,
-                                    imageComp.uv1,
-                                    ImGui::GetColorU32(ImVec4(1, 1, 1, globalAlpha)));
+                                    imageComp.uvMin,
+                                    imageComp.uvMax,
+                                    ImGui::GetColorU32(ImVec4(imageComp.tintColor.x,
+                                                              imageComp.tintColor.y,
+                                                              imageComp.tintColor.z,
+                                                              imageComp.tintColor.w * globalAlpha)));
             }
         }
 
@@ -297,9 +337,10 @@ private:
         if (registry.any_of<components::ArrowTag>(entity))
         {
             const auto& arrowComp = registry.get<const components::Arrow>(entity);
-            ImVec4 finalColor = ImVec4(1.0f, 0.0f, 0.0f, globalAlpha);
+            ImVec4 finalColor = arrowComp.color;
+            finalColor.w *= globalAlpha;
             ImU32 color = ImGui::GetColorU32(finalColor);
-            draw_list->AddLine(arrowComp.startPoint, arrowComp.endPoint, color, 2.0f);
+            draw_list->AddLine(arrowComp.startPoint, arrowComp.endPoint, color, arrowComp.thickness);
         }
     }
 };

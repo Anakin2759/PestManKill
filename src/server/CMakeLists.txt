@@ -29,9 +29,9 @@ target_include_directories(${EXET_NAME} PRIVATE
 
 target_link_libraries(${EXET_NAME} PRIVATE 
     mimalloc-static 
+    utils
+    shared
     asio::asio 
-    spdlog::spdlog_header_only  
-    EnTT::EnTT 
     nlohmann_json::nlohmann_json 
     absl::base 
     absl::memory 

@@ -22,6 +22,13 @@ namespace ui::components
 // ===================== I. UI 类型标记 (用于 RenderSystem 视图查询) =====================
 
 /**
+ * @brief 主组件标记，通常是根实体或主要容器
+ */
+struct MainWidgetTag
+{
+};
+
+/**
  * @brief 按钮标记
  */
 struct ButtonTag
@@ -32,6 +39,13 @@ struct ButtonTag
  * @brief 文本标签标记
  */
 struct LabelTag
+{
+};
+
+/**
+ * @brief 文本通用标记（兼容旧渲染逻辑）
+ */
+struct TextTag
 {
 };
 
@@ -133,6 +147,14 @@ struct ActiveTag
  * @brief 运行时状态：元素被禁用标记
  */
 struct DisabledTag
+{
+};
+
+/**
+ * @brief 运行时状态：元素可见标记
+ * 默认情况下元素是可见的，只有明确需要隐藏时才移除此 Tag
+ */
+struct VisibleTag
 {
 };
 

@@ -16,14 +16,21 @@
  */
 
 #pragma once
-#include "KcpSession.h"
+#include "../Session/KcpSession.h"
 #include <unordered_map>
 #include <chrono>
+#include <iostream>
+#include <utility>
 
 class KcpEndpoint
 {
+protected:
+    explicit KcpEndpoint(asio::any_io_executor exec, IUdpTransport& transport)
+        : m_exec(std::move(exec)), m_transport(transport)
+    {
+    }
+
 public:
-    KcpEndpoint(asio::any_io_executor exec) : m_exec(exec) {}
     virtual ~KcpEndpoint() = default;
 
     /**
@@ -32,20 +39,22 @@ public:
     void input(const asio::ip::udp::endpoint& from, std::span<const uint8_t> data)
     {
         if (data.size() < 4) [[unlikely]]
+        {
             return;
+        }
 
         uint32_t conv = selectConv(from, data);
 
         // 优化：try_emplace 避免了重复查找和冗余构造
-        auto [it, inserted] = m_sessions.try_emplace(conv);
+        auto [iter, inserted] = m_sessions.try_emplace(conv);
 
         if (inserted) [[unlikely]]
         {
-            it->second = std::make_shared<KcpSession>(conv, m_transport, from, m_exec);
-            onSession(conv, it->second); // 传递 shared_ptr 保证生命周期
+            iter->second = std::make_shared<KcpSession>(conv, m_transport, from, m_exec);
+            onSession(conv, iter->second); // 传递 shared_ptr 保证生命周期
         }
 
-        it->second->input(data);
+        iter->second->input(data);
         m_lastActive[conv] = std::chrono::steady_clock::now(); // 更新活跃时间
     }
 
@@ -57,11 +66,9 @@ public:
     void update(uint32_t now_ms, std::chrono::seconds timeout_sec = std::chrono::seconds(30))
     {
         auto now_tp = std::chrono::steady_clock::now();
-
-        // 遍历更新并标记过期
-        for (auto it = m_sessions.begin(); it != m_sessions.end();)
+        for (auto iter = m_sessions.begin(); iter != m_sessions.end();)
         {
-            auto& [conv, sess] = *it;
+            auto& [conv, sess] = *iter;
 
             // 驱动 KCP
             sess->update(now_ms);
@@ -71,33 +78,37 @@ public:
             {
                 onSessionClosed(conv);
                 m_lastActive.erase(conv);
-                it = m_sessions.erase(it); // 安全删除
+                iter = m_sessions.erase(iter); // 安全删除
             }
             else
             {
-                ++it;
+                ++iter;
             }
         }
     }
 
 protected:
-    explicit KcpEndpoint(IUdpTransport& transport) : m_transport(transport) {}
     /**
      * @brief 选择 KCP Conv ID 的方法
      * @return uint32_t 选中的 Conv ID
      */
     virtual uint32_t selectConv(const asio::ip::udp::endpoint&, std::span<const uint8_t>) = 0;
+
     /**
      * @brief 会话创建回调
      * @param conv 会话的 Conv ID
      * @param session 新创建的 KCP 会话
      */
-    virtual void onSession(uint32_t, std::shared_ptr<KcpSession>) {}
+    virtual void onSession([[maybe_unused]] uint32_t conv, [[maybe_unused]] std::shared_ptr<KcpSession> session)
+    {
+        std::cout << "Log: New KCP session created with Conv " << conv << std::endl;
+    }
+
     /**
      * @brief 会话关闭回调
      * @param conv 会话的 Conv ID
      */
-    virtual void onSessionClosed(uint32_t) {}
+    virtual void onSessionClosed([[maybe_unused]] uint32_t conv) {}
 
 protected:
     IUdpTransport& m_transport;

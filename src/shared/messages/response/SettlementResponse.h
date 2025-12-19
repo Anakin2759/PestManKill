@@ -3,12 +3,9 @@
  *
  * @file SettlementResponse.h
  * @author AnakinLiu (azrael2759@qq.com)
- * @date 2025-12-09
- * @version 0.1
- * @brief 结算响应消息定义
- *
- * 服务器广播给所有客户端的结算响应
- * 包含结算结果和相关信息
+ * @date 2025-12-18
+ * @version 0.2
+ * @brief 结算响应消息
  *
  * ************************************************************************
  * @copyright Copyright (c) 2025 AnakinLiu
@@ -17,29 +14,51 @@
  */
 
 #pragma once
+#include "../MessageBase.h"
+#include "src/shared/common/CommandID.h"
 #include <cstdint>
 #include <string>
-#include <nlohmann/json.hpp>
 
-struct SettlementResponse
+struct SettlementResponse : public MessageBase<SettlementResponse>
 {
+    static constexpr uint16_t CMD_ID = CommandID::SETTLEMENT_RESP;
+
     uint32_t player;     // 发起结算的玩家
     uint32_t card;       // 结算的卡牌
     uint32_t target;     // 结算目标
     bool success;        // 结算是否成功
     std::string message; // 结算结果描述
 
-    [[nodiscard]] nlohmann::json toJson() const
+    [[nodiscard]] nlohmann::json toJsonImpl() const
     {
         return {{"player", player}, {"card", card}, {"target", target}, {"success", success}, {"message", message}};
     }
 
-    static SettlementResponse fromJson(const nlohmann::json& json)
+    static std::expected<SettlementResponse, MessageError> fromJsonImpl(const nlohmann::json& json)
     {
-        return {.player = json.at("player").get<uint32_t>(),
-                .card = json.at("card").get<uint32_t>(),
-                .target = json.at("target").get<uint32_t>(),
-                .success = json.at("success").get<bool>(),
-                .message = json.at("message").get<std::string>()};
+        try
+        {
+            SettlementResponse resp;
+            resp.player = json.at("player").get<uint32_t>();
+            resp.card = json.at("card").get<uint32_t>();
+            resp.target = json.at("target").get<uint32_t>();
+            resp.success = json.at("success").get<bool>();
+            resp.message = json.at("message").get<std::string>();
+            return resp;
+        }
+        catch (...)
+        {
+            return std::unexpected(MessageError::DeserializeFailed);
+        }
+    }
+
+    std::expected<std::span<uint8_t>, MessageError> serializeImpl(std::span<uint8_t>) const
+    {
+        return std::unexpected(MessageError::SerializeFailed);
+    }
+
+    static std::expected<SettlementResponse, MessageError> deserializeImpl(std::span<const uint8_t>)
+    {
+        return std::unexpected(MessageError::DeserializeFailed);
     }
 };

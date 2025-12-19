@@ -1,11 +1,23 @@
 cmake_minimum_required(VERSION 3.31)
 project(PestMan LANGUAGES CXX)
+include(CheckIPOSupported)
+#==================== IPO / LTO 设置 ====================
+check_ipo_supported(RESULT ipo_supported OUTPUT ipo_error)
 
+if(ipo_supported)
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO TRUE)
+    message(STATUS "IPO / LTO enabled for Release configs")
+else()
+    message(WARNING "IPO / LTO not supported: ${ipo_error}")
+endif()
+#==================== 全局设置 ====================
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON) #生成compile_commands.json文件
-set(CMAKE_CXX_EXTENSIONS OFF) #启用编译器扩展
-
+set(CMAKE_CXX_EXTENSIONS OFF) #禁用编译器扩展
+#==================== 编译选项 ====================
+# 通用警告选项
 if (MSVC)
     add_compile_options(/utf-8)
     # 对所有 target 都启用异常展开
@@ -40,7 +52,7 @@ add_subdirectory(third_party/kcp)
 
 # ==================== 静态分析工具 clang-tidy ====================
 # 允许用户通过选项启用或禁用 clang-tidy
-option(ENABLE_CLANG_TIDY "Enable clang-tidy static analysis" ON)
+option(ENABLE_CLANG_TIDY "Enable clang-tidy static analysis" OFF)
 
 # 查找 clang-tidy 可执行文件
 find_program(CLANG_TIDY_EXE
@@ -69,6 +81,9 @@ endif()
 
 
 # ===================== 项目主程序 ====================
+add_subdirectory(src/utils)
+add_subdirectory(src/shared)
+add_subdirectory(src/ui)
 add_subdirectory(src/net)
 add_subdirectory(src/client)
 add_subdirectory(src/server)

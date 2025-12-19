@@ -1,0 +1,69 @@
+cmake_minimum_required(VERSION 3.20)
+
+# UI 模块库定义
+add_library(ui INTERFACE)
+
+# 头文件目录
+target_include_directories(ui INTERFACE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+# 依赖项
+target_link_libraries(ui INTERFACE
+    utils
+    imgui::imgui
+    SDL3::SDL3
+)
+
+# C++23 标准
+target_compile_features(ui INTERFACE cxx_std_23)
+
+
+target_compile_options(ui INTERFACE
+    # GCC
+    $<$<AND:$<CXX_COMPILER_ID:GNU>,$<CONFIG:Debug>>:-Wall -Wextra -Wpedantic -O0 -g>
+    $<$<AND:$<CXX_COMPILER_ID:GNU>,$<CONFIG:Release>>:-Wall -O3 -DNDEBUG>
+
+    # Clang
+    $<$<AND:$<CXX_COMPILER_ID:Clang>,$<CONFIG:Debug>>:-Wall -Wextra -Wpedantic -O0 -g>
+    $<$<AND:$<CXX_COMPILER_ID:Clang>,$<CONFIG:Release>>:-Wall -O3 -DNDEBUG>
+
+    # MSVC
+    $<$<AND:$<CXX_COMPILER_ID:MSVC>,$<CONFIG:Debug>>:/W4 /Od /Zi /EHsc>
+    $<$<AND:$<CXX_COMPILER_ID:MSVC>,$<CONFIG:Release>>:/O2 /DNDEBUG /EHsc>
+
+    # Clang-cl
+    $<$<AND:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_FRONTEND_VARIANT:MSVC>,$<CONFIG:Debug>>:/EHsc /Zi /W4>
+    $<$<AND:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_FRONTEND_VARIANT:MSVC>,$<CONFIG:Release>>:/EHsc /O2 /DNDEBUG>
+
+)
+# 导出头文件列表（用于 IDE 项目视图）
+set(UI_HEADERS
+    # Components
+    components/UIComponents.h
+    components/UIDefine.h
+    components/UITags.h
+    ui/UIEvents.h
+    
+    # Systems
+    systems/InteractionSystem.h
+    systems/UIAnimationSystem.h
+    systems/UILayoutSystem.h
+    systems/UIRenderSystem.h
+    systems/WindowsSystem.h
+    
+    # UI Core
+    ui/Application.h
+    ui/UIFactory.h
+    ui/UIHelper.h
+    ui/UISystem.h
+)
+
+# 添加到目标源文件（仅用于 IDE 显示）
+target_sources(ui INTERFACE ${UI_HEADERS})
+
+# 安装规则（可选）
+install(DIRECTORY components systems ui
+    DESTINATION include/PestManKill/ui
+    FILES_MATCHING PATTERN "*.h"
+)

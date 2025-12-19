@@ -17,9 +17,9 @@
 
 #pragma once
 #include <entt/entt.hpp>
-#include "src/client/utils/utils.h"             // 包含 Registry
-#include "src/client/components/UIComponents.h" // 包含 Size
-#include "src/client/components/UITags.h"       // 包含 LayoutDirtyTag
+#include <utils.h>                          // 包含 Registry
+#include "src/ui/components/UIComponents.h" // 包含 Size
+#include "src/ui/components/UITags.h"       // 包含 LayoutDirtyTag
 
 namespace ui::systems
 {
@@ -70,13 +70,10 @@ public:
                 registry.emplace_or_replace<components::LayoutDirtyTag>(rootEntity);
 
                 // 可选：触发一个 ECS 事件通知其他系统（例如 RenderSystem 可能需要更新投影矩阵）
-                // utils::Dispatcher::getInstance().trigger<events::WindowResizeEvent>(newW, newH);
+                utils::Dispatcher::getInstance().trigger<events::WindowResizeEvent>(newW, newH);
             }
         }
     }
-
-    // WindowSystem 不需要常规的 update(deltaTime) 循环，因为它只响应外部事件。
-    // 如果需要处理如最大化/最小化等 ECS 状态，可以增加一个 update() 函数。
 };
 
 } // namespace ui::systems

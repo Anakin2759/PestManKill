@@ -15,39 +15,57 @@
 #pragma once
 #include "src/net/transport/IUdpTransport.h"
 #include <vector>
-
+#include <mutex>
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
-#include "KcpServer.h"
 
-// 假设你的 IUdpTransport 定义如下
+/**
+ * @brief Mock UDP 传输层，用于测试
+ */
 class MockUdpTransport : public IUdpTransport
 {
 public:
-    MOCK_METHOD(void, send, (const asio::ip::udp::endpoint& to, std::span<const uint8_t> data), (override));
-};
-
-// 为了测试回调，我们创建一个测试用的 Server 类
-class TestServer : public Server
-{
-public:
-    using Server::Server;
-
-    // 记录回调状态
-    struct SessionEvent
+    struct Packet
     {
-        uint32_t conv;
-        bool created = false;
-        bool closed = false;
+        asio::ip::udp::endpoint to;
+        std::vector<uint8_t> data;
     };
-    std::unordered_map<uint32_t, SessionEvent> events;
 
-protected:
-    void onSession(uint32_t conv, std::shared_ptr<KcpSession> sess) override
+    void send(const asio::ip::udp::endpoint& to, std::span<const uint8_t> data) override
     {
-        events[conv].conv = conv;
-        events[conv].created = true;
+        std::lock_guard lock(m_mutex);
+        m_packets.push_back({to, std::vector<uint8_t>(data.begin(), data.end())});
+        m_sendCount++;
     }
 
-    void onSessionClosed(uint32_t conv) override { events[conv].closed = true; }
+    // 测试辅助方法
+    [[nodiscard]] size_t getSendCount() const
+    {
+        std::lock_guard lock(m_mutex);
+        return m_sendCount;
+    }
+
+    [[nodiscard]] std::vector<Packet> getPackets() const
+    {
+        std::lock_guard lock(m_mutex);
+        return m_packets;
+    }
+
+    void clearPackets()
+    {
+        std::lock_guard lock(m_mutex);
+        m_packets.clear();
+        m_sendCount = 0;
+    }
+
+    [[nodiscard]] bool hasPacketTo(const asio::ip::udp::endpoint& ep) const
+    {
+        std::lock_guard lock(m_mutex);
+        return std::ranges::any_of(m_packets, [&](const Packet& p) { return p.to == ep; });
+    }
+
+private:
+    mutable std::mutex m_mutex;
+    std::vector<Packet> m_packets;
+    size_t m_sendCount = 0;
 };

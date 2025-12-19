@@ -8,51 +8,41 @@ CompileFlags:
   Add:
     # C++23 标准
     - "-std=c++23"
-    # 明确启用异常支持
-    - "-fexceptions"
-    - "-fcxx-exceptions"
-    # 启用所有错误报告
-    - "-ferror-limit=0"
-    # 禁用宏回溯限制，便于调试
-    - "-fmacro-backtrace-limit=0"
-    # 禁用模板回溯限制
-    - "-ftemplate-backtrace-limit=0"
+    
+    # 启用协程支持
+    - "-fcoroutines"
+    
     # 添加常用警告
     - "-Wall"
     - "-Wextra"
-    # 定义调试宏
-    - "-DCLANGD_ANALYSIS=1"
+    
     # C++ 特定警告控制
     - "-Wno-unused-parameter"
     - "-Wno-missing-field-initializers"
+
+    # MSVC 兼容模式
+    - "--target=x86_64-pc-windows-msvc"
+    - "-fms-compatibility"
+    - "-fms-extensions"
+    - "-fdelayed-template-parsing"
     
   Remove:
     # 移除 CMake 生成的不兼容模块参数
     - "-fmodules-ts"
     - "-fmodule-mapper=*"
     - "-fdeps-format=*"
-
-    # 移除其他可能有问题的参数
     - "-fcoroutines-ts"
     - "-ftemplate-backtrace-limit=*"
     - "-fmacro-backtrace-limit=*"
-    - "-fmodule-mapper=*"
-    - "-fdeps-format=*"
-    
-
+    - "/EHsc"
+    - "-wd*"
 
 # 诊断配置
 Diagnostics:
   # 抑制常见的无害警告
   Suppress:
     - "unused-parameter"
-    - "missing-field-initializers"
-    - "sign-compare"
-    - "unused-variable"
-    # 添加 clang-tidy 的检查名以确保对函数形参（parameter）未使用的警告被抑制。
-    # 常见检查名包括 "misc-unused-parameters"（clang-tidy）以及编译器产生的 "unused-parameter"。
     - "misc-unused-parameters"
-
 
 # 代码补全配置
 Completion:
@@ -61,3 +51,4 @@ Completion:
 # 索引配置
 Index:
   Background: Build
+

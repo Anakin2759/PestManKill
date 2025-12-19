@@ -8,6 +8,14 @@
  * @brief 交互处理系统
  *
  * 将原始输入事件映射到UI实体的交互组件上，并更新 Hover/Active/Dirty 等 ECS 状态。
+ * 负责处理点击、悬停等交互逻辑，触发相应的UI事件和通知后台。
+    从SDL或ImGui获取鼠标位置和按键状态。
+    遍历所有可交互实体，执行点碰撞测试 (Hit Test)。
+    更新实体的 HoveredTag 和 ActiveTag 组件。
+    处理点击事件，触发 ButtonClickedEvent 等UI事件。
+    管理交互状态，确保正确的状态转换和事件触发。
+    优化交互检测顺序，支持Z-Order排序。
+    易于扩展以支持更多交互类型和复杂逻辑。
  *
  * ************************************************************************
  */
@@ -15,23 +23,24 @@
 #include <entt/entt.hpp>
 #include <algorithm>
 #include <functional>
-#include "src/client/utils/utils.h"             // 包含 Registry, Dispatcher
-#include "src/client/components/UIComponents.h" // 包含 Position, Size, Clickable, ButtonState, Hierarchy
-#include "src/client/components/UITags.h"       // 包含 HoveredTag, ActiveTag, DisabledTag, LayoutDirtyTag
-#include "src/client/events/UIEvents.h"         // 包含 ButtonClickedEvent
+#include "src/utils/Registry.h"             // 包含 Registry
+#include "src/utils/Dispatcher.h"           // 包含 Dispatcher
+#include "src/ui/components/UIComponents.h" // 包含 Position, Size, Clickable, ButtonState, Hierarchy
+#include "src/ui/components/UITags.h"       // 包含 HoveredTag, ActiveTag, DisabledTag, LayoutDirtyTag
+#include "src/ui/ui/UIEvents.h"             // 包含 ButtonClickedEvent
 
 namespace ui::systems
 {
 // 假设 utils::Input::getMousePosition() 和 utils::Input::isMouseButtonDown() 已存在
-namespace utils
+namespace input_utils
 {
 struct Input
 {
-    static ImVec2 getMousePosition();
-    static bool isMouseButtonDown(int button);
-    static bool isMouseButtonClicked(int button);
+    static ImVec2 getMousePosition() { return ImGui::GetIO().MousePos; }
+    static bool isMouseButtonDown(int button) { return ImGui::GetIO().MouseDown[button]; }
+    static bool isMouseButtonClicked(int button) { return ImGui::IsMouseClicked(button); }
 };
-} // namespace utils
+} // namespace input_utils
 
 class InteractionSystem
 {
@@ -121,9 +130,9 @@ public:
      */
     void update() noexcept
     {
-        auto& registry = utils::Registry::getInstance();
-        const ImVec2 mousePos = utils::Input::getMousePosition();
-        bool isMouseDown = utils::Input::isMouseButtonDown(0); // 假设左键
+        auto& registry = ::utils::Registry::getInstance();
+        const ImVec2 mousePos = input_utils::Input::getMousePosition();
+        bool isMouseDown = input_utils::Input::isMouseButtonDown(0); // 假设左键
 
         // 1. 清除上一帧的 HoveredTag
         // 保证只有命中检测成功的实体才拥有 HoveredTag
@@ -170,7 +179,16 @@ public:
                 if (m_activeEntity == hitEntity)
                 {
                     // 按钮点击事件：触发 ECS 事件
-                    utils::Dispatcher::getInstance().trigger<events::ButtonClickedEvent>(hitEntity);
+                    utils::Dispatcher::getInstance().trigger<events::ButtonClick>({hitEntity});
+
+                    // 兼容：如果 Clickable 上挂了回调，直接调用
+                    if (auto* clickable = registry.try_get<components::Clickable>(hitEntity))
+                    {
+                        if (clickable->enabled && clickable->onClick)
+                        {
+                            clickable->onClick(hitEntity);
+                        }
+                    }
 
                     // TODO: 对于 TextEditTag 等，可以在这里添加 FocusTag
 

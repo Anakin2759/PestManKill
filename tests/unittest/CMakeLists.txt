@@ -16,6 +16,9 @@ find_package(GTest REQUIRED)
 add_executable(net_tests
     net/test_kcp_session.cpp
     net/test_kcp_server.cpp
+    net/test_frame_codec.cpp
+    net/test_transport.cpp
+    net/test_peek_conv.cpp
 )
 
 target_include_directories(net_tests PRIVATE

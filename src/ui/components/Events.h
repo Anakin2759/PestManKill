@@ -48,7 +48,6 @@ struct EntityCreated
 
 /**
  * @brief ECS 实体销毁事件。
- * 替代 WidgetDestroyed。
  */
 struct EntityDestroyed
 {
@@ -95,6 +94,9 @@ struct ButtonClick
     entt::entity entity;
     // 如果需要标识，InteractionSystem 应负责查询该实体的 Name/ID 组件。
 };
+
+// 兼容旧命名
+using ButtonClickedEvent = ButtonClick;
 
 /**
  * @brief 文本内容改变事件 (TextEdit/Input)。

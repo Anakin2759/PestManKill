@@ -1,7 +1,7 @@
 /**
  * ************************************************************************
  *
- * @file UILayoutSystem.h
+ * @file LayoutSystem.h
  * @author AnakinLiu (azrael2759@qq.com)
  * @date 2025-12-11 (Finalized)
  * @version 0.3
@@ -24,15 +24,15 @@
 #include <numeric>
 #include <functional> // For std::function in traversal
 
-#include "src/client/utils/utils.h"
-#include "src/client/components/UIComponents.h"
-#include "src/client/components/UITags.h"
-#include "src/client/components/UIDefine.h"
+#include <utils.h>
+#include "src/ui/components/UIComponents.h"
+#include "src/ui/components/UITags.h"
+#include "src/ui/components/UIDefine.h"
 
 namespace ui::systems
 {
 
-class UILayoutSystem
+class LayoutSystem
 {
 public:
     void update() noexcept
@@ -56,6 +56,11 @@ public:
             }
         }
     }
+    void registry(entt::entity entity)
+    {
+        
+    }
+    void unregi
 
 private:
     // ... (getLayoutSortOrder 函数保持不变) ...
@@ -126,9 +131,9 @@ private:
         {
             if (!registry.all_of<components::Position, components::Size>(childEntity)) continue;
 
-            const auto* spacer = registry.try_get<components::SpacerTag>(childEntity);
+            bool hasSpacer = registry.all_of<components::SpacerTag>(childEntity);
 
-            if (spacer)
+            if (hasSpacer)
             {
                 const auto& spacerComp = registry.get<const components::Spacer>(childEntity);
                 totalStretch += spacerComp.stretchFactor;
@@ -234,7 +239,7 @@ private:
                 childPos.x = currentX;
 
                 // B. 设置 Y 轴对齐 (垂直对齐)
-                applyVerticalAlignment(childPos, childSize, containerInnerHeight, currentY);
+                applyVerticalAlignment(registry, childEntity, childPos, childSize, containerInnerHeight, currentY);
 
                 // C. 推进位置
                 if (registry.any_of<components::SpacerTag>(childEntity))
@@ -255,7 +260,7 @@ private:
                 childPos.y = currentY;
 
                 // B. 设置 X 轴对齐 (水平对齐)
-                applyHorizontalAlignment(childPos, childSize, containerInnerWidth, currentX);
+                applyHorizontalAlignment(registry, childEntity, childPos, childSize, containerInnerWidth, currentX);
 
                 // C. 推进位置
                 if (registry.any_of<components::SpacerTag>(childEntity))
@@ -284,16 +289,16 @@ private:
      * @param containerInnerHeight 父容器内部高度 (Padding后)
      * @param containerInnerYStart 父容器内部 Y 轴起始位置 (Top Padding)
      */
-    void applyVerticalAlignment(components::Position& pos,
+    void applyVerticalAlignment(entt::registry& registry,
+                                entt::entity childEntity,
+                                components::Position& pos,
                                 const components::Size& size,
                                 float containerInnerHeight,
                                 float containerInnerYStart)
     {
-        // 假设 Alignment 组件存储在子元素上
-        const auto& registry = utils::Registry::getInstance();
-        const auto* alignmentComp = registry.try_get<components::Alignment>(entt::to_entity(pos));
-
-        uint8_t alignment = alignmentComp ? static_cast<uint8_t>(*alignmentComp) : 0;
+        // Alignment 组件存储在子元素实体上
+        const auto* alignmentComp = registry.try_get<components::Alignment>(childEntity);
+        const uint8_t alignment = alignmentComp ? static_cast<uint8_t>(*alignmentComp) : 0;
 
         // 默认是从 Top Padding 开始，即 Top 贴边
         if (alignment & static_cast<uint8_t>(components::Alignment::VCENTER))
@@ -323,9 +328,23 @@ private:
     {
         // 假设 Alignment 组件存储在子元素上
         const auto& registry = utils::Registry::getInstance();
-        const auto* alignmentComp = registry.try_get<components::Alignment>(entt::to_entity(pos));
+        (void)registry;
+        (void)pos;
+        (void)size;
+        (void)containerInnerWidth;
+        (void)containerInnerXStart;
+        // 旧实现有 bug（把 Position 当 entity）。新实现见下方重载。
+    }
 
-        uint8_t alignment = alignmentComp ? static_cast<uint8_t>(*alignmentComp) : 0;
+    void applyHorizontalAlignment(entt::registry& registry,
+                                  entt::entity childEntity,
+                                  components::Position& pos,
+                                  const components::Size& size,
+                                  float containerInnerWidth,
+                                  float containerInnerXStart)
+    {
+        const auto* alignmentComp = registry.try_get<components::Alignment>(childEntity);
+        const uint8_t alignment = alignmentComp ? static_cast<uint8_t>(*alignmentComp) : 0;
 
         // 默认是从 Left Padding 开始，即 LEFT 贴边
         if (alignment & static_cast<uint8_t>(components::Alignment::HCENTER))

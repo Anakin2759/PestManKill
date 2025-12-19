@@ -1,7 +1,7 @@
 /**
  * ************************************************************************
  *
- * @file UIComponents.h
+ * @file Components.h
  * @author AnakinLiu (azrael2759@qq.com)
  * @date 2025-12-05
  * @brief UI ECS 组件定义 (完整且优化版)
@@ -83,6 +83,7 @@ struct Border
 {
     ImVec4 color{1.0F, 1.0F, 1.0F, 1.0F};
     float thickness = 1.0F;
+    float borderRadius = 0.0F; // 圆角半径
     bool enabled = false;
 };
 
@@ -146,6 +147,8 @@ struct Text
 {
     std::string content;
     ImVec4 color{1.0F, 1.0F, 1.0F, 1.0F};
+    float fontSize = 0.0F; // 0 表示使用 ImGui 默认字体大小
+    Alignment alignment = Alignment::NONE;
     bool wordWrap = false;
     float wrapWidth = 0.0F;
 };
@@ -157,6 +160,7 @@ struct TextEdit
 {
     std::string buffer; // 存储输入文本的缓冲区
     std::string placeholder;
+    ImVec4 textColor{1.0F, 1.0F, 1.0F, 1.0F};
     bool multiline = false;
     bool readOnly = false;
     bool password = false;
@@ -186,6 +190,7 @@ struct Image
 struct Clickable
 {
     bool enabled = true;
+    std::function<void(entt::entity)> onClick{};
 };
 
 /**
@@ -247,6 +252,9 @@ struct Window
     bool hasTitleBar = true;
     bool hasToolbar = false;
     bool modal = true;
+    bool noResize = false;
+    bool noMove = false;
+    bool noCollapse = false;
     ImVec2 minSize{300.0F, 200.0F};
     ImVec2 maxSize{FLT_MAX, FLT_MAX};
 };
