@@ -1,7 +1,7 @@
 /**
  * ************************************************************************
  *
- * @file UIFactory.h
+ * @file Factory.h
  * @author AnakinLiu (azrael2759@qq.com)
  * @date 2025-12-11 (Updated)
  * @version 0.2
@@ -20,10 +20,10 @@
 #include <string>
 #include <string_view>
 #include <functional>
-#include "src/ui/components/UIComponents.h"
-#include "src/ui/components/UITags.h"
-#include "src/ui/components/UIDefine.h"
-#include "src/ui/ui/UIEvents.h"
+#include "src/ui/components/Components.h"
+#include "src/ui/components/Tags.h"
+#include "src/ui/components/Define.h"
+#include "src/ui/components/Events.h"
 #include <utils.h>
 namespace ui::factory
 {
@@ -44,7 +44,6 @@ inline entt::entity createBaseWidget()
 
     // 原 RenderGuard 已移除，渲染系统应自行处理实体有效性
 
-    utils::Dispatcher::getInstance().enqueue<events::WidgetCreated>(entity);
     return entity;
 }
 
@@ -132,8 +131,7 @@ inline entt::entity CreateTextEdit(const std::string& placeholder = "", bool mul
     // buffer 默认为空
 
     // 文本输入框通常有固定最小尺寸
-    utils::Registry::getInstance().get<components::Size>(entity).minWidth = 100.0f;
-    utils::Registry::getInstance().get<components::Size>(entity).minHeight = multiline ? 80.0f : 30.0f;
+    utils::Registry::getInstance().get<components::Size>(entity).minSize = {100.0f, multiline ? 80.0f : 30.0f};
 
     return entity;
 }
@@ -154,8 +152,7 @@ inline entt::entity CreateImage(void* textureId, float defaultWidth = 50.0f, flo
 
     // 默认固定尺寸 (如果 autoSize=false)
     auto& size = utils::Registry::getInstance().get<components::Size>(entity);
-    size.width = defaultWidth;
-    size.height = defaultHeight;
+    size.size = {defaultWidth, defaultHeight};
     size.autoSize = false; // 图像通常默认固定尺寸或根据父布局缩放
 
     return entity;
@@ -204,10 +201,8 @@ inline entt::entity CreateSpacer(int stretchFactor = 1)
     // Spacer 必须有 Size 才能让布局系统计算
     utils::Registry::getInstance().emplace<components::Size>(entity);
     utils::Registry::getInstance().get<components::Size>(entity).autoSize = false;
-    utils::Registry::getInstance().get<components::Size>(entity).width = 0.0f;
-    utils::Registry::getInstance().get<components::Size>(entity).height = 0.0f;
+    utils::Registry::getInstance().get<components::Size>(entity).size = {0.0f, 0.0f};
 
-    utils::Dispatcher::getInstance().enqueue<events::WidgetCreated>(entity);
     return entity;
 }
 
@@ -218,8 +213,7 @@ inline entt::entity CreateSpacer(float width, float height)
 {
     auto entity = createBaseWidget();
     auto& size = utils::Registry::getInstance().get<components::Size>(entity);
-    size.width = width;
-    size.height = height;
+    size.size = {width, height};
     size.autoSize = false;
     return entity;
 }
@@ -244,8 +238,7 @@ inline entt::entity CreateDialog(std::string_view title)
 
     // 对话框通常有固定的 Position 和 Size
     utils::Registry::getInstance().get<components::Size>(entity).autoSize = false;
-    utils::Registry::getInstance().get<components::Size>(entity).width = 400.0f;
-    utils::Registry::getInstance().get<components::Size>(entity).height = 300.0f;
+    utils::Registry::getInstance().get<components::Size>(entity).size = {400.0f, 300.0f};
 
     // 对话框通常有一个 LayoutInfo 来排列内部元素
     utils::Registry::getInstance().emplace<components::LayoutInfo>(entity);
@@ -274,8 +267,7 @@ inline entt::entity CreateWindow(std::string_view title)
 
     // 窗口容器通常有固定的默认尺寸
     utils::Registry::getInstance().get<components::Size>(entity).autoSize = false;
-    utils::Registry::getInstance().get<components::Size>(entity).width = 600.0f;
-    utils::Registry::getInstance().get<components::Size>(entity).height = 400.0f;
+    utils::Registry::getInstance().get<components::Size>(entity).size = {600.0f, 400.0f};
 
     // 窗口需要布局和内边距
     utils::Registry::getInstance().emplace<components::LayoutInfo>(entity);
@@ -346,7 +338,7 @@ inline entt::entity CreateTextArea(std::string_view initialText = "", std::strin
 inline entt::entity createMainWindow()
 {
     auto entity = CreateWindow("Main Window");
-    utils::Registry::getInstance().emplace<components::MainWindowTag>(entity);
+
     return entity;
 }
 

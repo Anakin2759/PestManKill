@@ -40,30 +40,35 @@ target_compile_options(ui INTERFACE
 # 导出头文件列表（用于 IDE 项目视图）
 set(UI_HEADERS
     # Components
-    components/UIComponents.h
-    components/UIDefine.h
-    components/UITags.h
-    ui/UIEvents.h
+    components/Components.h
+    components/Define.h
+    components/Tags.h
+    components/Events.h
     
     # Systems
     systems/InteractionSystem.h
-    systems/UIAnimationSystem.h
-    systems/UILayoutSystem.h
-    systems/UIRenderSystem.h
+    systems/AnimationSystem.h
+    systems/LayoutSystem.h
+    systems/RenderSystem.h
     systems/WindowsSystem.h
     
     # UI Core
-    ui/Application.h
-    ui/UIFactory.h
-    ui/UIHelper.h
-    ui/UISystem.h
+    core/Application.h
+    core/Factory.h
+    core/helper.h
+    core/SystemManager.h
+    core/EventLoop.h
+    core/ImguiContext.h
+
+    # Interface
+    interface/Isystem.h
 )
 
 # 添加到目标源文件（仅用于 IDE 显示）
 target_sources(ui INTERFACE ${UI_HEADERS})
 
 # 安装规则（可选）
-install(DIRECTORY components systems ui
+install(DIRECTORY components systems core interface
     DESTINATION include/PestManKill/ui
     FILES_MATCHING PATTERN "*.h"
 )

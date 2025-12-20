@@ -1,7 +1,7 @@
 /**
  * ************************************************************************
  *
- * @file UIHelper.h
+ * @file Helper.h
  * @author AnakinLiu (azrael2759@qq.com)
  * @date 2025-12-11 (Updated)
  * @version 0.2
@@ -17,10 +17,10 @@
 
 #pragma once
 #include <entt/entt.hpp>
-#include <algorithm>                 // For std::clamp
-#include "components/UIComponents.h" // 包含所有数据组件
-#include "components/UITags.h"       // 包含所有 Tag 组件
-#include "components/UIDefine.h"     // 包含所有枚举
+#include <algorithm>               // For std::clamp
+#include "components/Components.h" // 包含所有数据组件
+#include "components/Tags.h"       // 包含所有 Tag 组件
+#include "components/Define.h"     // 包含所有枚举
 
 namespace ui::helper
 {
@@ -50,8 +50,7 @@ inline void setFixedSize(entt::registry& registry, entt::entity entity, float wi
     if (!registry.valid(entity)) return;
 
     auto& size = registry.get_or_emplace<components::Size>(entity);
-    size.width = width;
-    size.height = height;
+    size.size = {width, height};
     size.autoSize = false;
 
     markLayoutDirty(registry, entity);
@@ -66,8 +65,8 @@ inline void setPosition(entt::registry& registry, entt::entity entity, float x, 
     if (!registry.valid(entity)) return;
 
     auto& pos = registry.get_or_emplace<components::Position>(entity);
-    pos.x = x;
-    pos.y = y;
+    pos.value = {x, y};
+
     // 我们优化后的 Position 组件中移除了 useCustomPosition 字段，
     // 布局系统通过检查 Position 组件是否存在来决定是否参与计算。
     // 这里设置 Position 组件即表示其位置被确定。

@@ -6,7 +6,7 @@
  * @date 2025-12-05
  * @brief UI ECS 组件定义 (完整且优化版)
  *
- * 遵循ECS模式：纯数据结构，无行为逻辑，只包含属性
+ * 遵循ECS模式：纯数据结构，无行为逻辑，只包含属性,不含状态
  * 确保组件的纯粹性和独立性
  *
  * ************************************************************************
@@ -19,8 +19,9 @@
 #include <string>
 #include <vector>
 #include <functional>
+#include <cfloat>
 #include <entt/entt.hpp>
-#include "UIDefine.h" // 假设 UIDefine.h 中包含了所有必要的枚举和常量
+#include "Define.h"
 
 namespace ui::components
 {
@@ -32,22 +33,18 @@ namespace ui::components
  */
 struct Size
 {
-    float width = 0.0F;
-    float height = 0.0F;
-    float minWidth = 0.0F;
-    float minHeight = 0.0F;
-    float maxWidth = FLT_MAX;
-    float maxHeight = FLT_MAX;
+    ImVec2 size{0.0f, 0.0f};
+    ImVec2 minSize{0.0f, 0.0f};
+    ImVec2 maxSize{FLT_MAX, FLT_MAX};
     bool autoSize = true; // 是否自动根据内容调整大小
 };
 
 /**
- * @brief UI元素的相对位置组件
+ * @brief UI 元素的相对位置组件
  */
 struct Position
 {
-    float x = 0.0F;
-    float y = 0.0F;
+    ImVec2 value{0.0f, 0.0f};
 };
 
 /**
@@ -55,24 +52,25 @@ struct Position
  */
 struct Margin
 {
-    ImVec4 values{0, 0, 0, 0}; // Top, Right, Bottom, Left
+    ImVec4 values{0.0f, 0.0f, 0.0f, 0.0f}; // Top, Right, Bottom, Left
 };
+
 /**
  * @brief 内边距组件
  * 定义元素内容与其边框之间的空间。
  */
 struct Padding
 {
-    // 对应 ImVec4(Top, Right, Bottom, Left)
-    ImVec4 values{0, 0, 0, 0};
+    ImVec4 values{0.0f, 0.0f, 0.0f, 0.0f}; // Top, Right, Bottom, Left
 };
+
 /**
- * @brief 背景绘制组件 (包含圆角)
+ * @brief 背景绘制组件
  */
 struct Background
 {
-    ImVec4 color{0.0F, 0.0F, 0.0F, 0.0F};
-    float borderRadius = 0.0F; // 圆角半径
+    ImVec4 color{0.0f, 0.0f, 0.0f, 0.0f};
+    float borderRadius = 0.0f; // 圆角半径
     bool enabled = false;
 };
 
@@ -81,9 +79,9 @@ struct Background
  */
 struct Border
 {
-    ImVec4 color{1.0F, 1.0F, 1.0F, 1.0F};
-    float thickness = 1.0F;
-    float borderRadius = 0.0F; // 圆角半径
+    ImVec4 color{1.0f, 1.0f, 1.0f, 1.0f};
+    float thickness = 1.0f;
+    float borderRadius = 0.0f; // 圆角半径
     bool enabled = false;
 };
 
@@ -92,7 +90,7 @@ struct Border
  */
 struct Alpha
 {
-    float value = 1.0F;
+    float value = 1.0f;
 };
 
 // ===================== 层级与滚动 =====================
@@ -113,10 +111,10 @@ struct ScrollArea
 {
     ImVec2 scrollOffset{0.0f, 0.0f}; // 当前滚动位置
     ImVec2 contentSize{0.0f, 0.0f};  // 内容区域大小
+    float scrollSpeed = 10.0f;
     bool horizontalScroll = false;
     bool verticalScroll = true;
-    float scrollSpeed = 10.0f;
-    bool showScrollbars = true; // 原始属性保留
+    bool showScrollbars = true;
 };
 
 // ===================== 布局组件 =====================
@@ -127,7 +125,7 @@ struct ScrollArea
 struct LayoutInfo
 {
     LayoutDirection direction = LayoutDirection::HORIZONTAL;
-    float spacing = 5.0F; // 元素间距
+    float spacing = 5.0f; // 元素间距
 };
 
 /**
@@ -146,11 +144,11 @@ struct Spacer
 struct Text
 {
     std::string content;
-    ImVec4 color{1.0F, 1.0F, 1.0F, 1.0F};
-    float fontSize = 0.0F; // 0 表示使用 ImGui 默认字体大小
+    ImVec4 color{1.0f, 1.0f, 1.0f, 1.0f};
+    float fontSize = 0.0f; // 0 表示使用 ImGui 默认字体大小
     Alignment alignment = Alignment::NONE;
     bool wordWrap = false;
-    float wrapWidth = 0.0F;
+    float wrapWidth = 0.0f;
 };
 
 /**
@@ -160,14 +158,14 @@ struct TextEdit
 {
     std::string buffer; // 存储输入文本的缓冲区
     std::string placeholder;
-    ImVec4 textColor{1.0F, 1.0F, 1.0F, 1.0F};
+    ImVec4 textColor{1.0f, 1.0f, 1.0f, 1.0f};
+    size_t maxLength = 256;
     bool multiline = false;
     bool readOnly = false;
     bool password = false;
-    size_t maxLength = 256;
 };
 
-// ===================== 图像组件 (完整定义) =====================
+// ===================== 图像组件 =====================
 
 /**
  * @brief 图像组件
@@ -175,11 +173,11 @@ struct TextEdit
 struct Image
 {
     void* textureId = nullptr;                  // 纹理句柄 (例如 SDL_Texture* 或 OpenGL ID)
-    ImVec2 uvMin{0.0F, 0.0F};                   // UV 最小坐标
-    ImVec2 uvMax{1.0F, 1.0F};                   // UV 最大坐标
-    ImVec4 tintColor{1.0F, 1.0F, 1.0F, 1.0F};   // 颜色叠加
-    ImVec4 borderColor{0.0F, 0.0F, 0.0F, 0.0F}; // 边框颜色 (原始属性保留)
-    bool maintainAspectRatio = true;            // 是否保持宽高比 (原始属性保留)
+    ImVec2 uvMin{0.0f, 0.0f};                   // UV 最小坐标
+    ImVec2 uvMax{1.0f, 1.0f};                   // UV 最大坐标
+    ImVec4 tintColor{1.0f, 1.0f, 1.0f, 1.0f};   // 颜色叠加
+    ImVec4 borderColor{0.0f, 0.0f, 0.0f, 0.0f}; // 边框颜色
+    bool maintainAspectRatio = true;            // 是否保持宽高比
 };
 
 // ===================== 交互与状态 =====================
@@ -189,8 +187,8 @@ struct Image
  */
 struct Clickable
 {
-    bool enabled = true;
     std::function<void(entt::entity)> onClick{};
+    bool enabled = true;
 };
 
 /**
@@ -210,15 +208,15 @@ struct ButtonState
     bool triggered = false; // 本帧是否触发过动作
 };
 
-// ===================== 动画组件 (精简) =====================
+// ===================== 动画组件 =====================
 
 /**
  * @brief 动画时间状态
  */
 struct AnimationTime
 {
-    float duration = 1.0F;
-    float elapsed = 0.0F;
+    float duration = 1.0f;
+    float elapsed = 0.0f;
     EasingType easing = EasingType::Linear;
     PlayMode mode = PlayMode::ONCE;
 };
@@ -237,8 +235,8 @@ struct AnimationPosition
  */
 struct AnimationAlpha
 {
-    float from = 1.0F;
-    float to = 0.0F;
+    float from = 1.0f;
+    float to = 0.0f;
 };
 
 // ===================== 复杂组件数据 =====================
@@ -249,14 +247,14 @@ struct AnimationAlpha
 struct Window
 {
     std::string title;
+    ImVec2 minSize{300.0f, 200.0f};
+    ImVec2 maxSize{FLT_MAX, FLT_MAX};
     bool hasTitleBar = true;
     bool hasToolbar = false;
     bool modal = true;
     bool noResize = false;
     bool noMove = false;
     bool noCollapse = false;
-    ImVec2 minSize{300.0F, 200.0F};
-    ImVec2 maxSize{FLT_MAX, FLT_MAX};
 };
 
 /**
@@ -264,11 +262,11 @@ struct Window
  */
 struct Arrow
 {
-    ImVec2 startPoint{0.0F, 0.0F};
-    ImVec2 endPoint{100.0F, 100.0F};
-    ImVec4 color{1.0F, 1.0F, 1.0F, 1.0F};
-    float thickness = 2.0F;
-    float arrowSize = 10.0F;
+    ImVec2 startPoint{0.0f, 0.0f};
+    ImVec2 endPoint{100.0f, 100.0f};
+    ImVec4 color{1.0f, 1.0f, 1.0f, 1.0f};
+    float thickness = 2.0f;
+    float arrowSize = 10.0f;
 };
 
 /**
@@ -277,10 +275,10 @@ struct Arrow
 struct ListArea
 {
     std::vector<entt::entity> items;
+    std::vector<int> selectedIndices;
+    float itemHeight = 30.0f;
     int selectedIndex = -1;
     bool multiSelect = false;
-    std::vector<int> selectedIndices;
-    float itemHeight = 30.0F;
 };
 
 /**
@@ -291,18 +289,21 @@ struct TableInfo
     std::vector<std::string> headers;
     std::vector<std::vector<std::string>> rows;
     std::vector<float> columnWidths;
+    int sortColumn = -1;
     bool resizable = true;
     bool sortable = false;
-    int sortColumn = -1;
     bool sortAscending = true;
 };
 
+/**
+ * @brief 线条组件
+ */
 struct LineInfo
 {
-    ImVec2 startPoint{0.0F, 0.0F};
-    ImVec2 endPoint{100.0F, 0.0F};
-    ImVec4 color{1.0F, 1.0F, 1.0F, 1.0F};
-    float thickness = 2.0F; // 线条粗细
+    ImVec2 startPoint{0.0f, 0.0f};
+    ImVec2 endPoint{100.0f, 0.0f};
+    ImVec4 color{1.0f, 1.0f, 1.0f, 1.0f};
+    float thickness = 2.0f;
 };
 
 // ===================== 渲染与状态组件 =====================
@@ -320,8 +321,8 @@ struct Title
  */
 struct Targetable
 {
-    bool selectable = false;
     int priority = 0;
+    bool selectable = false;
 };
 
 } // namespace ui::components

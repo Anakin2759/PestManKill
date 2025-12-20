@@ -15,9 +15,9 @@
 
 #include "SceneManager.h"
 #include "GameClient.h"
-#include "src/ui/ui/UIFactory.h"
-#include "src/ui/ui/UIHelper.h"
-#include "src/ui/components/UIComponents.h"
+#include "src/ui/core/Factory.h"
+#include "src/ui/core/helper.h"
+#include "src/ui/components/Components.h"
 
 using namespace ui;
 
@@ -52,7 +52,7 @@ void LoginScene::update(float deltaTime)
 void LoginScene::createUI()
 {
     // 创建主容器（居中的垂直布局）
-    m_rootEntity = factory::CreateVBox();
+    m_rootEntity = factory::CreateVBoxLayout();
     helper::setFixedSize(m_registry, m_rootEntity, 400, 350);
     helper::setPadding(m_registry, m_rootEntity, 30);
     helper::setBackgroundColor(m_registry, m_rootEntity, ImVec4(0.12f, 0.12f, 0.15f, 0.95f));
@@ -111,7 +111,7 @@ void LoginScene::createUI()
     helper::addChild(m_registry, m_rootEntity, spacer2);
 
     // 按钮容器
-    auto buttonBox = factory::CreateHBox();
+    auto buttonBox = factory::CreateHBoxLayout();
     helper::setSpacing(m_registry, buttonBox, 10);
 
     // 登录按钮
@@ -218,7 +218,7 @@ void MainMenuScene::update(float deltaTime)
 void MainMenuScene::createUI()
 {
     // 创建主容器
-    m_rootEntity = factory::CreateVBox();
+    m_rootEntity = factory::CreateVBoxLayout();
     helper::setFixedSize(m_registry, m_rootEntity, 500, 450);
     helper::setPadding(m_registry, m_rootEntity, 25);
     helper::setBackgroundColor(m_registry, m_rootEntity, ImVec4(0.1f, 0.1f, 0.12f, 0.95f));

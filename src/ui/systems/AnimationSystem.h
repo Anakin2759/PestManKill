@@ -27,8 +27,8 @@
 
 #pragma once
 #include <entt/entt.hpp>
-#include "src/ui/components/UIComponents.h"
-#include "src/ui/ui/UIEvents.h"
+#include "src/ui/components/Components.h"
+#include "src/ui/components/Events.h"
 #include "src/utils/Dispatcher.h"
 
 namespace ui::systems
@@ -42,43 +42,15 @@ public:
      * @param deltaTime 时间增量（秒）
      */
     void update(float deltaTime) {}
-    void registerHandlers()
-    {
-        // 注册动画完成事件处理器
-        utils::Dispatcher::getInstance()
-            .sink<events::AnimationCompletedEvent>()
-            .connect<&AnimationSystem::onAnimationCompleted>(this);
-    }
-    void unregisterHandlers()
-    {
-        // 注销动画完成事件处理器
-        utils::Dispatcher::getInstance()
-            .sink<events::AnimationCompletedEvent>()
-            .disconnect<&AnimationSystem::onAnimationCompleted>(this);
-    }
+    void registerHandlers() {}
+    void unregisterHandlers() {}
 
 private:
     /**
      * @brief 处理动画完成事件
      * @param event 动画完成事件
      */
-    void onAnimationCompleted(const events::AnimationCompletedEvent& event)
-    {
-        auto& registry = utils::Registry::getInstance();
-        entt::entity entity = event.entity;
-        // 根据动画类型执行相应的后续处理
-        if (registry.valid(entity))
-        {
-            if (registry.any_of<components::PositionAnimation>(entity))
-            {
-                // 位置动画完成后的处理逻辑
-            }
-            if (registry.any_of<components::AlphaAnimation>(entity))
-            {
-                // 透明度动画完成后的处理逻辑
-            }
-        }
-    }
+    void onAnimationCompleted() { auto& registry = utils::Registry::getInstance(); }
 };
 
 } // namespace ui::systems

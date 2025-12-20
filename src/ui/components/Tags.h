@@ -1,12 +1,25 @@
 /**
  * ************************************************************************
  *
- * @file UITags.h
+ * @file Tags.h
  * @author AnakinLiu (azrael2759@qq.com)
  * @date 2025-12-11
  * @brief UI ECS 标记组件定义 (纯空结构体 Tag)
  *
- * 用于标记UI元素的类型和行为，实现高性能零开销查询。
+ * 用于标记UI元素的类型。
+    -MainWidgetTag: 主组件标记，通常是根实体或主要容器
+    -ButtonTag: 按钮标记
+    -LabelTag: 文本标签标记
+    -TextTag: 文本通用标记
+    -TextEditTag: 文本输入框标记
+    -ImageTag: 图像显示标记
+    -WindowTag: 窗口标记
+    -DialogTag: 对话框标记
+    -SpacerTag: 间隔器标记
+    -ArrowTag: 几何图形：箭头
+    -LineTag: 几何图形：直线
+    -ListAreaTag: 列表区域容器标记
+    -TableTag: 表格容器标记
  *
  * ************************************************************************
  * @copyright Copyright (c) 2025 AnakinLiu

@@ -22,15 +22,15 @@
 #include <memory>
 
 // 引入所有子系统头文件
-#include "src/ui/systems/UIRenderSystem.h"
-#include "src/ui/systems/UIAnimationSystem.h"
+#include "src/ui/systems/RenderSystem.h"
+#include "src/ui/systems/AnimationSystem.h"
 #include "src/ui/systems/InteractionSystem.h"
-#include "src/ui/systems/UILayoutSystem.h"
+#include "src/ui/systems/LayoutSystem.h"
 #include "src/ui/systems/WindowsSystem.h" // 保持与 Application.h 中的一致
 // 引入其他依赖
-#include "src/ui/ui/UIFactory.h"
-#include "src/ui/components/UIComponents.h"
-#include "src/ui/ui/UIEvents.h"
+#include "src/ui/core/Factory.h"
+#include "src/ui/components/Components.h"
+#include "src/ui/components/Events.h"
 #include <utils.h>
 
 namespace ui
@@ -43,7 +43,9 @@ class SystemManager
 {
 public:
     // 构造函数：初始化所有子系统
-    SystemManager() { setupEventHandlers(); }
+    SystemManager() {
+        
+    };
 
     ~SystemManager() = default;
 
@@ -52,6 +54,8 @@ public:
     SystemManager& operator=(const SystemManager&) = delete;
     SystemManager(SystemManager&&) = delete;
     SystemManager& operator=(SystemManager&&) = delete;
+
+    
 
     /**
      * @brief 更新UI系统：按固定流程顺序执行所有System
@@ -94,10 +98,10 @@ public:
     // Getter 保持不变，但为了简洁，只保留主要的。
     // =======================================================
 
-    [[nodiscard]] systems::UIRenderSystem& getRenderSystem() { return m_renderSystem; }
-    [[nodiscard]] systems::UIAnimationSystem& getAnimationSystem() { return m_animationSystem; }
+    [[nodiscard]] systems::RenderSystem& getRenderSystem() { return m_renderSystem; }
+    [[nodiscard]] systems::AnimationSystem& getAnimationSystem() { return m_animationSystem; }
     [[nodiscard]] systems::InteractionSystem& getInteractionSystem() { return m_interactionSystem; }
-    [[nodiscard]] systems::UILayoutSystem& getLayoutSystem() { return m_layoutSystem; }
+    [[nodiscard]] systems::LayoutSystem& getLayoutSystem() { return m_layoutSystem; }
 
     /**
      * @brief 清空所有UI元素（清空整个注册表）
@@ -105,21 +109,11 @@ public:
     void clear() { utils::Registry::getInstance().clear(); }
 
 private:
-    /**
-     * @brief 设置事件处理器
-     */
-    void setupEventHandlers()
-    {
-        // 示例：在这里注册系统级别的事件处理
-        // 比如：监听 WindowResizeEvent 并将其转发给 WindowSystem
-    }
-
-private:
     // 声明所有子系统实例
     systems::InteractionSystem m_interactionSystem; // 1. 输入/交互
-    systems::UIAnimationSystem m_animationSystem;   // 2. 动画/状态更新
-    systems::UILayoutSystem m_layoutSystem;         // 3. 布局计算
-    systems::UIRenderSystem m_renderSystem;         // 4. 渲染绘制
+    systems::AnimationSystem m_animationSystem;     // 2. 动画/状态更新
+    systems::LayoutSystem m_layoutSystem;           // 3. 布局计算
+    systems::RenderSystem m_renderSystem;           // 4. 渲染绘制
     systems::WindowSystem m_windowSystem;           // 窗口管理系统
 };
 } // namespace ui

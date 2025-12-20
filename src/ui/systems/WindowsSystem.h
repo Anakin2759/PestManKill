@@ -17,9 +17,9 @@
 
 #pragma once
 #include <entt/entt.hpp>
-#include <utils.h>                          // 包含 Registry
-#include "src/ui/components/UIComponents.h" // 包含 Size
-#include "src/ui/components/UITags.h"       // 包含 LayoutDirtyTag
+#include <utils.h>                        // 包含 Registry
+#include "src/ui/components/Components.h" // 包含 Size
+#include "src/ui/components/Tags.h"       // 包含 LayoutDirtyTag
 
 namespace ui::systems
 {
@@ -60,17 +60,17 @@ public:
             float newH = static_cast<float>(newHeight);
 
             // 避免不必要的更新
-            if (sizeComp->width != newW || sizeComp->height != newH)
+            if (sizeComp->size.x != newW || sizeComp->size.y != newH)
             {
-                sizeComp->width = newW;
-                sizeComp->height = newH;
+                sizeComp->size.x = newW;
+                sizeComp->size.y = newH;
 
                 // 2. 标记根实体为 LayoutDirtyTag
                 // 强制 UILayoutSystem 在下一帧运行，重新计算所有子元素的布局
                 registry.emplace_or_replace<components::LayoutDirtyTag>(rootEntity);
 
                 // 可选：触发一个 ECS 事件通知其他系统（例如 RenderSystem 可能需要更新投影矩阵）
-                utils::Dispatcher::getInstance().trigger<events::WindowResizeEvent>(newW, newH);
+                //    utils::Dispatcher::getInstance().trigger<events::WindowResizeEvent>(newW, newH);
             }
         }
     }

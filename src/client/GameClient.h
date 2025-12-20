@@ -33,12 +33,12 @@
 #include "src/shared/messages/response/CreateRoomResponse.h"
 
 // UI 模块
-#include "src/ui/ui/UISystem.h"
-#include "src/ui/ui/UIFactory.h"
-#include "src/ui/ui/UIHelper.h"
-#include "src/ui/ui/UIEvents.h"
+#include "src/ui/core/SystemManager.h"
+#include "src/ui/core/Factory.h"
+#include "src/ui/core/helper.h"
+#include "src/ui/components/Events.h"
 
-// 客户端工具
+// 工具
 #include <utils.h>
 
 class GameClient
@@ -56,7 +56,7 @@ public:
           m_transport(std::make_unique<AsioUdpTransport>(m_ioc->get_executor(), 0)) // 随机客户端端口
           ,
           m_client(std::make_unique<Client>(*m_transport, m_ioc->get_executor())),
-          m_uiSystem(std::make_unique<ui::UiSystem>())
+          m_uiSystem(std::make_unique<ui::SystemManager>())
     {
         setupLogger();
         setupMessageHandlers();
@@ -100,24 +100,12 @@ public:
     /**
      * @brief 更新 UI 系统
      */
-    void updateUI(float deltaTime)
-    {
-        if (m_uiSystem)
-        {
-            m_uiSystem->update(deltaTime);
-        }
-    }
+    void updateUI(float deltaTime) {}
 
     /**
      * @brief 渲染 UI 系统
      */
-    void renderUI(SDL_Renderer* renderer)
-    {
-        if (m_uiSystem)
-        {
-            m_uiSystem->render(renderer);
-        }
-    }
+    void renderUI(SDL_Renderer* renderer) {}
 
     /**
      * @brief 主循环
@@ -130,13 +118,6 @@ public:
         {
             // 处理网络事件
             m_ioc->poll();
-
-            // 更新 UI
-            if (m_uiSystem)
-            {
-                float deltaTime = calculateDeltaTime();
-                m_uiSystem->update(deltaTime);
-            }
 
             // 避免 CPU 占用过高
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
@@ -374,7 +355,7 @@ private:
     uint32_t m_currentRoomId = 0;
 
     // UI 相关
-    std::unique_ptr<ui::UiSystem> m_uiSystem;
+    std::unique_ptr<ui::SystemManager> m_uiSystem;
     std::chrono::steady_clock::time_point m_lastFrameTime = std::chrono::steady_clock::now();
 
     // 日志

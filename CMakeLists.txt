@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.31)
 project(PestMan LANGUAGES CXX)
 include(CheckIPOSupported)
+
+option(ENABLE_BUILD_TESTS "Enable building of unit tests" ON)
 #==================== IPO / LTO 设置 ====================
 check_ipo_supported(RESULT ipo_supported OUTPUT ipo_error)
 
@@ -87,4 +89,7 @@ add_subdirectory(src/ui)
 add_subdirectory(src/net)
 add_subdirectory(src/client)
 add_subdirectory(src/server)
-add_subdirectory(tests/unittest)
+# ===================== 单元测试 =====================
+if(ENABLE_BUILD_TESTS)
+    add_subdirectory(tests/unittest)
+endif()

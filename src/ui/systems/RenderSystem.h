@@ -25,8 +25,8 @@
 #include <entt/entt.hpp>
 #include <imgui.h>
 #include <functional>
-#include "components/UIComponents.h"
-#include "components/UITags.h"
+#include "components/Components.h"
+#include "components/Tags.h"
 #include <utils.h>
 #include <SDL3/SDL.h>
 
@@ -113,8 +113,8 @@ private:
         const float globalAlpha = parentGlobalAlpha * (alphaComp ? alphaComp->value : 1.0f);
 
         // 计算当前实体的绝对屏幕位置 (相对于父级内容区)
-        ImVec2 absolutePos(parentAbsolutePos.x + pos.x, parentAbsolutePos.y + pos.y);
-        ImVec2 absoluteEndPos(absolutePos.x + size.width, absolutePos.y + size.height);
+        ImVec2 absolutePos(parentAbsolutePos.x + pos.value.x, parentAbsolutePos.y + pos.value.y);
+        ImVec2 absoluteEndPos(absolutePos.x + size.size.x, absolutePos.y + size.size.y);
 
         // ----------------------------------------------------
         // 1. 容器特殊处理 (Window/Dialog)
@@ -134,7 +134,7 @@ private:
         // ----------------------------------------------------
         // 3. 渲染特定内容
         // ----------------------------------------------------
-        renderSpecificComponent(registry, entity, draw_list, absolutePos, ImVec2(size.width, size.height), globalAlpha);
+        renderSpecificComponent(registry, entity, draw_list, absolutePos, size.size, globalAlpha);
 
         // ----------------------------------------------------
         // 4. 递归渲染子元素 (适用于非 Window 的普通容器，如 VBox/HBox)
@@ -169,7 +169,7 @@ private:
 
         // --- 1. 设置 ImGui 窗口状态 ---
         ImGui::SetNextWindowPos(absolutePos);
-        ImGui::SetNextWindowSize(ImVec2(size.width, size.height));
+        ImGui::SetNextWindowSize(size.size);
 
         ImGuiWindowFlags flags = ImGuiWindowFlags_None;
         if (windowComp.noResize) flags |= ImGuiWindowFlags_NoResize;
@@ -191,7 +191,7 @@ private:
             ImVec2 contentStartPos = ImGui::GetCursorScreenPos();
 
             // 绘制 ECS 提供的自定义背景/边框 (如果设置了 NoBackground)
-            ImVec2 absEndPos(absolutePos.x + size.width, absolutePos.y + size.height);
+            ImVec2 absEndPos(absolutePos.x + size.size.x, absolutePos.y + size.size.y);
             renderBackground(registry, entity, window_draw_list, absolutePos, absEndPos, globalAlpha);
 
             // --- 3. 递归渲染子元素 (子元素相对于窗口内容区定位) ---

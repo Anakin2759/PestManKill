@@ -23,27 +23,26 @@
 #include <entt/entt.hpp>
 #include <algorithm>
 #include <functional>
-#include "src/utils/Registry.h"             // 包含 Registry
-#include "src/utils/Dispatcher.h"           // 包含 Dispatcher
-#include "src/ui/components/UIComponents.h" // 包含 Position, Size, Clickable, ButtonState, Hierarchy
-#include "src/ui/components/UITags.h"       // 包含 HoveredTag, ActiveTag, DisabledTag, LayoutDirtyTag
-#include "src/ui/ui/UIEvents.h"             // 包含 ButtonClickedEvent
+#include "src/utils/Registry.h"           // 包含 Registry
+#include "src/utils/Dispatcher.h"         // 包含 Dispatcher
+#include "src/ui/components/Components.h" // 包含 Position, Size, Clickable, ButtonState, Hierarchy
+#include "src/ui/components/Tags.h"       // 包含 HoveredTag, ActiveTag, DisabledTag, LayoutDirtyTag
+#include "src/ui/components/Events.h"     // 包含 ButtonClickedEvent
 
 namespace ui::systems
 {
-// 假设 utils::Input::getMousePosition() 和 utils::Input::isMouseButtonDown() 已存在
-namespace input_utils
-{
-struct Input
-{
-    static ImVec2 getMousePosition() { return ImGui::GetIO().MousePos; }
-    static bool isMouseButtonDown(int button) { return ImGui::GetIO().MouseDown[button]; }
-    static bool isMouseButtonClicked(int button) { return ImGui::IsMouseClicked(button); }
-};
-} // namespace input_utils
 
 class InteractionSystem
 {
+public:
+    void registerHandlers() {}
+
+    void unregisterHandlers() {}
+    /**
+     * @brief 处理输入事件和交互状态更新
+     */
+    void update() noexcept { auto& registry = ::utils::Registry::getInstance(); }
+
 private:
     entt::entity m_activeEntity = entt::null; // 当前处于 Active (鼠标按下) 状态的实体
 
@@ -54,10 +53,9 @@ private:
      * @param size 实体尺寸
      * @return bool 是否命中
      */
-    bool isPointInRect(const ImVec2& point, const ImVec2& pos, const components::Size& size) const
+    bool isPointInRect(const ImVec2& point, const ImVec2& pos, const ImVec2& size) const
     {
-        return point.x >= pos.x && point.x < (pos.x + size.width) && point.y >= pos.y &&
-               point.y < (pos.y + size.height);
+        return point.x >= pos.x && point.x < (pos.x + size.x) && point.y >= pos.y && point.y < (pos.y + size.y);
     }
 
     /**
@@ -77,8 +75,8 @@ private:
             const auto* posComp = registry.try_get<components::Position>(current);
             if (posComp)
             {
-                pos.x += posComp->x;
-                pos.y += posComp->y;
+                pos.x += posComp->value.x;
+                pos.y += posComp->value.y;
             }
             const auto* hierarchy = registry.try_get<components::Hierarchy>(current);
             current = hierarchy ? hierarchy->parent : entt::null;
@@ -122,96 +120,6 @@ private:
             result.push_back(pair.second);
         }
         return result;
-    }
-
-public:
-    /**
-     * @brief 处理输入事件和交互状态更新
-     */
-    void update() noexcept
-    {
-        auto& registry = ::utils::Registry::getInstance();
-        const ImVec2 mousePos = input_utils::Input::getMousePosition();
-        bool isMouseDown = input_utils::Input::isMouseButtonDown(0); // 假设左键
-
-        // 1. 清除上一帧的 HoveredTag
-        // 保证只有命中检测成功的实体才拥有 HoveredTag
-        registry.clear<components::HoveredTag>();
-
-        // 2. 获取按 Z-Order 排序的可交互实体列表
-        auto interactables = getZOrderedInteractables(registry);
-        entt::entity hitEntity = entt::null;
-
-        // 3. 命中检测 (Z-Order from front to back)
-        for (entt::entity entity : interactables)
-        {
-            // 实体必须可见
-            if (!registry.any_of<components::VisibleTag>(entity)) continue;
-
-            const auto& size = registry.get<const components::Size>(entity);
-            const ImVec2 absPos = getAbsolutePosition(registry, entity);
-
-            if (isPointInRect(mousePos, absPos, size))
-            {
-                hitEntity = entity;
-                registry.emplace_or_replace<components::HoveredTag>(entity);
-
-                // 阻止事件穿透：一旦命中，停止循环
-                break;
-            }
-        }
-
-        // 4. 处理 Active/Pressed 状态和 Click 事件
-        if (hitEntity != entt::null)
-        {
-            if (isMouseDown)
-            {
-                // 鼠标按下：标记 Active (如果之前不是，则设置 m_activeEntity)
-                registry.emplace_or_replace<components::ActiveTag>(hitEntity);
-                if (m_activeEntity == entt::null)
-                {
-                    m_activeEntity = hitEntity;
-                }
-            }
-            else // 鼠标抬起
-            {
-                // 检查是否发生了 Click (必须是 m_activeEntity 抬起且仍在 Hover)
-                if (m_activeEntity == hitEntity)
-                {
-                    // 按钮点击事件：触发 ECS 事件
-                    utils::Dispatcher::getInstance().trigger<events::ButtonClick>({hitEntity});
-
-                    // 兼容：如果 Clickable 上挂了回调，直接调用
-                    if (auto* clickable = registry.try_get<components::Clickable>(hitEntity))
-                    {
-                        if (clickable->enabled && clickable->onClick)
-                        {
-                            clickable->onClick(hitEntity);
-                        }
-                    }
-
-                    // TODO: 对于 TextEditTag 等，可以在这里添加 FocusTag
-
-                    // 触发后，将自身或父级标记为 LayoutDirtyTag，通知布局系统可能需要更新
-                    registry.emplace_or_replace<components::LayoutDirtyTag>(hitEntity);
-                }
-            }
-        }
-
-        // 5. 状态清理
-        if (!isMouseDown)
-        {
-            // 鼠标抬起时，清除所有 ActiveTag 并重置 m_activeEntity
-            registry.clear<components::ActiveTag>();
-            m_activeEntity = entt::null;
-        }
-        else if (m_activeEntity != entt::null && m_activeEntity != hitEntity)
-        {
-            // 鼠标拖出了最初按下的实体：移除其 ActiveTag
-            registry.remove<components::ActiveTag>(m_activeEntity);
-        }
-
-        // TODO: 完善 Drag & Drop 逻辑 (需要 DraggableTag 和 DraggingTag)
     }
 };
 

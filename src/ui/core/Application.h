@@ -26,9 +26,9 @@
 #include <stdexcept>
 #include <chrono>
 
-#include "src/client/model/UiSystem.h"
-#include "src/client/systems/WindowSystem.h" // 假设存在一个处理窗口尺寸变化的系统
-#include "src/client/utils/utils.h"          // 包含 Registry, Dispatcher, GraphicsContext
+#include "SystemManager.h"
+#include "src/ui/systems/WindowsSystem.h"
+#include "src/utils/utils.h" // 包含 Registry, Dispatcher, GraphicsContext
 
 namespace ui
 {
@@ -38,8 +38,7 @@ private:
     // 核心 ECS 系统封装
     SystemManager m_systems;
 
-    //ImGui 上下文管理
-    
+    // ImGui 上下文管理
 
     // ECS 根实体，代表整个屏幕/应用区域
     entt::entity m_rootEntity = entt::null;
