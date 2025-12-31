@@ -17,7 +17,6 @@
 #include "IUdpTransport.h"
 #include <array>
 #include <functional>
-
 class AsioUdpTransport final : public IUdpTransport
 {
 public:

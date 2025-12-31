@@ -5,13 +5,14 @@
  * @author AnakinLiu (azrael2759@qq.com)
  * @date 2025-12-11 (Optimized)
  * @version 0.2
- * @brief UI ECS 事件定义：优化后的通用事件与游戏特定事件分离。
+ * @brief UI ECS 事件定义：只有控件事件：显示/隐藏。
  *
  * ************************************************************************
  */
 
 #pragma once
 #include <entt/entt.hpp>
+#include <SDL3/SDL.h>
 #include <string>
 #include <vector>
 
@@ -31,6 +32,15 @@ namespace ui::events
 struct ApplicationReadyEvent
 {
     entt::entity rootEntity;
+};
+
+/**
+ * @brief 图形上下文设置事件
+ * 当 Application 创建 GraphicsContext 后发布此事件
+ */
+struct GraphicsContextSetEvent
+{
+    void* graphicsContext; // GraphicsContext* (避免循环依赖)
 };
 
 // =====================================================================
@@ -86,6 +96,32 @@ struct VisibilityChanged
 // =====================================================================
 
 /**
+ * @brief SDL 原始事件（已拷贝一份 SDL_Event）。
+ *
+ * 用于让上层或其他系统监听未被 ECS 消耗的输入/窗口事件。
+ */
+struct SDLEvent
+{
+    SDL_Event event;
+};
+
+/**
+ * @brief 请求退出事件（通常由 SDL_EVENT_QUIT 触发）。
+ */
+struct QuitRequested
+{
+};
+
+/**
+ * @brief 窗口尺寸变化事件（通常由 SDL_EVENT_WINDOW_RESIZED 触发）。
+ */
+struct WindowResized
+{
+    int width;
+    int height;
+};
+
+/**
  * @brief 按钮点击事件。
  * 合并 ButtonClicked 和 ButtonClickEvent，只保留核心信息。
  */
@@ -118,66 +154,16 @@ struct ValueChangedSelection
     int selectedIndex;
 };
 
-// =====================================================================
-// D. 游戏特定事件 (Card Game Logic)
-// ---------------------------------------------------------------------
-// 推荐将这些事件移动到独立的 GameEvents.h 中，以保持 UI 系统的纯净性。
-// =====================================================================
 
-/**
- * @brief 手牌选中状态改变事件。
- * 移除 cardName，系统应通过 cardEntity 查询其名称组件。
- */
-struct CardSelectionChanged
-{
-    entt::entity cardEntity;
-    bool selected;
-};
 
-/**
- * @brief 卡牌移动到处理区事件。
- */
-struct CardMovedToProcessing
-{
-    entt::entity cardEntity;
-};
 
-/**
- * @brief 卡牌从处理区移除事件。
- */
-struct CardRemovedFromProcessing
-{
-    entt::entity cardEntity;
-};
 
-/**
- * @brief 处理区清空前事件。
- */
-struct ProcessingAreaBeforeClear
-{
-    std::vector<entt::entity> cardEntities; // 携带待清除的实体列表
-};
 
-/**
- * @brief 玩家明确执行使用卡牌事件。
- */
-struct UseCardEvent
-{
-    entt::entity cardEntity; // 如果是单卡使用
-};
 
-/**
- * @brief 玩家明确执行取消操作事件。
- */
-struct CancelOperationEvent
-{
-};
 
-/**
- * @brief 玩家明确执行结束回合事件。
- */
-struct EndTurnEvent
+struct SendHandlerToEventLoop
 {
+    std::move_only_function<void()> handler;
 };
 
 } // namespace ui::events

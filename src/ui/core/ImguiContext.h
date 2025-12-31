@@ -1,7 +1,7 @@
 /**
  * ************************************************************************
  *
- * @file ImguiManager.h
+ * @file ImguiContext.h
  * @author AnakinLiu (azrael2759@qq.com)
  * @date 2025-12-19
  * @version 0.1
@@ -23,10 +23,10 @@
 
 namespace ui
 {
-class ImguiManager
+class ImguiContext
 {
 public:
-    explicit ImguiManager(SDL_Window* window, SDL_Renderer* renderer)
+    explicit ImguiContext(SDL_Window* window, SDL_Renderer* renderer)
     {
         // 创建 ImGui 上下文
         IMGUI_CHECKVERSION();
@@ -36,21 +36,24 @@ public:
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
         // 初始化 ImGui 渲染器后端
-        ImGui_ImplSDL3_InitForSDLRenderer(m_context.getWindow(), m_context.getRenderer());
-        ImGui_ImplSDLRenderer3_Init(m_context.getRenderer());
+        ImGui_ImplSDL3_InitForSDLRenderer(window, renderer);
+        ImGui_ImplSDLRenderer3_Init(renderer);
 
         // 设置默认样式
         ImGui::StyleColorsDark();
     }
-    ~ImguiManager()
+
+    ~ImguiContext()
     {
         ImGui_ImplSDLRenderer3_Shutdown();
         ImGui_ImplSDL3_Shutdown();
         ImGui::DestroyContext();
     }
-    ImguiManager(const ImguiManager&) = default;
-    ImguiManager& operator=(const ImguiManager&) = default;
-    ImguiManager(ImguiManager&&) = default;
-    ImguiManager& operator=(ImguiManager&&) = default;
+
+    // 禁用拷贝和移动
+    ImguiContext(const ImguiContext&) = delete;
+    ImguiContext& operator=(const ImguiContext&) = delete;
+    ImguiContext(ImguiContext&&) = delete;
+    ImguiContext& operator=(ImguiContext&&) = delete;
 };
 } // namespace ui

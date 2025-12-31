@@ -21,6 +21,12 @@
 #include <imgui.h>
 #include <memory>
 
+// 引入图形上下文
+#include "GraphicsContext.h"
+
+// 引入系统接口
+#include "src/ui/interface/Isystem.h"
+
 // 引入所有子系统头文件
 #include "src/ui/systems/RenderSystem.h"
 #include "src/ui/systems/AnimationSystem.h"
@@ -33,19 +39,52 @@
 #include "src/ui/components/Events.h"
 #include <utils.h>
 
+namespace ui::events
+{
+struct GraphicsContextSetEvent;
+}
+
 namespace ui
 {
 
 /**
  * @brief UI系统管理器：定义ECS系统的执行流程
+ * 使用 entt::poly 实现系统的动态管理
  */
 class SystemManager
 {
+private:
+    // GraphicsContext 引用（由 Application 注入）
+    GraphicsContext* m_graphicsContext = nullptr;
+
+    // 使用 entt::poly 动态管理所有系统
+    std::vector<entt::poly<interface::ISystem>> m_systems;
+
+    // 系统索引（用于快速访问特定系统）
+    enum SystemIndex : size_t
+    {
+        INTERACTION = 0,
+        ANIMATION = 1,
+        LAYOUT = 2,
+        RENDER = 3,
+        WINDOW = 4,
+        SYSTEM_COUNT = 5
+    };
+
 public:
     // 构造函数：初始化所有子系统
-    SystemManager() {
-        
-    };
+    SystemManager()
+    {
+        // 预留空间
+        m_systems.reserve(SYSTEM_COUNT);
+
+        // 按顺序添加系统
+        m_systems.emplace_back(systems::InteractionSystem{});
+        m_systems.emplace_back(systems::AnimationSystem{});
+        m_systems.emplace_back(systems::LayoutSystem{});
+        m_systems.emplace_back(systems::RenderSystem{});
+        m_systems.emplace_back(systems::WindowSystem{});
+    }
 
     ~SystemManager() = default;
 
@@ -55,65 +94,70 @@ public:
     SystemManager(SystemManager&&) = delete;
     SystemManager& operator=(SystemManager&&) = delete;
 
-    
-
     /**
-     * @brief 更新UI系统：按固定流程顺序执行所有System
-     * @param deltaTime 时间增量（秒）
-     *
+     * @brief 设置图形上下文（由 Application 调用）
      */
-    void update(float deltaTime)
+    void setGraphicsContext(GraphicsContext* context)
     {
-        // ----------------------------------------------------
-        // 1. 输入/交互：将原始输入映射为 ECS 状态 (HoveredTag, ActiveTag)
-        // 必须最先运行
-        m_interactionSystem.update();
-
-        // ----------------------------------------------------
-        // 2. 动画：根据时间更新实体的位置、尺寸、透明度等组件
-        // 运行后可能触发 LayoutDirtyTag
-        m_animationSystem.update(deltaTime);
-
-        // ----------------------------------------------------
-        // 3. 布局：计算并设置 Position 和 Size 组件
-        // 必须在所有可能修改尺寸或位置的系统（如动画）之后运行
-        m_layoutSystem.update();
-
-        // ----------------------------------------------------
-        // 4. 事件处理：处理所有系统和用户触发的事件
-        utils::Dispatcher::getInstance().update();
+        m_graphicsContext = context;
+        // 通过事件分发器发布上下文设置事件
+        auto& dispatcher = utils::Dispatcher::getInstance();
+        dispatcher.enqueue<events::GraphicsContextSetEvent>(context);
     }
 
     /**
-     * @brief 渲染所有UI元素
-     * @param renderer SDL渲染器指针
+     * @brief 注册所有系统的事件处理器
      */
-    void render(SDL_Renderer* renderer)
+    void registerAllHandlers()
     {
-        // 渲染系统必须在布局系统之后运行，以获取最终的屏幕位置和尺寸
-        m_renderSystem.update(renderer);
+        for (auto& system : m_systems)
+        {
+            system->registerHandlers();
+        }
     }
 
-    // =======================================================
-    // Getter 保持不变，但为了简洁，只保留主要的。
-    // =======================================================
+    /**
+     * @brief 注销所有系统的事件处理器
+     */
+    void unregisterAllHandlers()
+    {
+        for (auto& system : m_systems)
+        {
+            system->unregisterHandlers();
+        }
+    }
 
-    [[nodiscard]] systems::RenderSystem& getRenderSystem() { return m_renderSystem; }
-    [[nodiscard]] systems::AnimationSystem& getAnimationSystem() { return m_animationSystem; }
-    [[nodiscard]] systems::InteractionSystem& getInteractionSystem() { return m_interactionSystem; }
-    [[nodiscard]] systems::LayoutSystem& getLayoutSystem() { return m_layoutSystem; }
 
     /**
-     * @brief 清空所有UI元素（清空整个注册表）
+     * @brief 动态添加系统
+     * @tparam T 系统类型
+     * @param system 系统实例
+     */
+    template <typename T>
+    void addSystem(T&& system)
+    {
+        m_systems.emplace_back(std::forward<T>(system));
+    }
+
+    /**
+     * @brief 移除指定索引的系统
+     * @param index 系统索引
+     */
+    void removeSystem(size_t index)
+    {
+        if (index < m_systems.size())
+        {
+            m_systems.erase(m_systems.begin() + index);
+        }
+    }
+    /**
+     * @brief 获取系统数量
+     */
+    [[nodiscard]] size_t getSystemCount() const { return m_systems.size(); }
+
+    /**
+     * @brief 清空所有UI元素 携带uitag的组件
      */
     void clear() { utils::Registry::getInstance().clear(); }
-
-private:
-    // 声明所有子系统实例
-    systems::InteractionSystem m_interactionSystem; // 1. 输入/交互
-    systems::AnimationSystem m_animationSystem;     // 2. 动画/状态更新
-    systems::LayoutSystem m_layoutSystem;           // 3. 布局计算
-    systems::RenderSystem m_renderSystem;           // 4. 渲染绘制
-    systems::WindowSystem m_windowSystem;           // 窗口管理系统
 };
 } // namespace ui

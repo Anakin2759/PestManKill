@@ -5,7 +5,7 @@
  * @author AnakinLiu (azrael2759@qq.com)
  * @date 2025-12-11 (Updated)
  * @version 0.2
- * @brief 交互处理系统
+ * @brief 交互处理系统，事件驱动
  *
  * 将原始输入事件映射到UI实体的交互组件上，并更新 Hover/Active/Dirty 等 ECS 状态。
  * 负责处理点击、悬停等交互逻辑，触发相应的UI事件和通知后台。
@@ -22,28 +22,145 @@
 #pragma once
 #include <entt/entt.hpp>
 #include <algorithm>
+#include <concepts>
 #include <functional>
-#include "src/utils/Registry.h"           // 包含 Registry
-#include "src/utils/Dispatcher.h"         // 包含 Dispatcher
-#include "src/ui/components/Components.h" // 包含 Position, Size, Clickable, ButtonState, Hierarchy
-#include "src/ui/components/Tags.h"       // 包含 HoveredTag, ActiveTag, DisabledTag, LayoutDirtyTag
-#include "src/ui/components/Events.h"     // 包含 ButtonClickedEvent
+#include <utility>
+#include <SDL3/SDL.h>
+#include <imgui_impl_sdl3.h>
+#include "components/Events.h"
+#include "src/utils/Registry.h"    // 包含 Registry
+#include "src/utils/Dispatcher.h"  // 包含 Dispatcher
+#include "components/Components.h" // 包含 Position, Size, Clickable, ButtonState, Hierarchy
+#include "components/Tags.h"       // 包含 HoveredTag, ActiveTag, DisabledTag, LayoutDirtyTag
 
 namespace ui::systems
 {
 
-class InteractionSystem
+class InteractionSystem : public ui::interface::EnableRegister<InteractionSystem>
 {
 public:
-    void registerHandlers() {}
+    void registerHandlersImpl() {}
 
-    void unregisterHandlers() {}
-    /**
-     * @brief 处理输入事件和交互状态更新
-     */
-    void update() noexcept { auto& registry = ::utils::Registry::getInstance(); }
+    void unregisterHandlersImpl() {}
 
 private:
+    /**
+     * @brief 处理每一帧输入事件和交互状态更新
+     */
+    void getInput() noexcept
+    {
+        auto& registry = ::utils::Registry::getInstance();
+        auto& dispatcher = ::utils::Dispatcher::getInstance();
+
+        // 获取鼠标状态
+        ImGuiIO& io = ImGui::GetIO();
+        ImVec2 mousePos = io.MousePos;
+        bool mouseDown = io.MouseDown[0];
+        bool mouseReleased = io.MouseReleased[0];
+
+        // 如果 ImGui 想要捕获鼠标（例如在 ImGui 窗口上），跳过 UI 交互检测
+        if (io.WantCaptureMouse)
+        {
+            return;
+        }
+
+        // 清除所有实体的 HoveredTag
+        auto hoveredView = registry.view<components::HoveredTag>();
+        for (auto entity : hoveredView)
+        {
+            registry.remove<components::HoveredTag>(entity);
+        }
+
+        // 获取 Z-Order 排序的可交互实体
+        auto interactables = getZOrderedInteractables(registry);
+
+        entt::entity hoveredEntity = entt::null;
+
+        // 从前到后进行碰撞测试
+        for (auto entity : interactables)
+        {
+            const auto& pos = registry.get<const components::Position>(entity);
+            const auto& size = registry.get<const components::Size>(entity);
+
+            ImVec2 absPos = getAbsolutePosition(registry, entity);
+
+            if (isPointInRect(mousePos, absPos, size.size))
+            {
+                hoveredEntity = entity;
+                break; // 找到最前面的命中实体，停止检测
+            }
+        }
+
+        // 更新 Hover 状态
+        if (hoveredEntity != entt::null)
+        {
+            registry.emplace_or_replace<components::HoveredTag>(hoveredEntity);
+        }
+
+        // 处理鼠标按下
+        if (mouseDown && hoveredEntity != entt::null)
+        {
+            if (m_activeEntity == entt::null)
+            {
+                m_activeEntity = hoveredEntity;
+                registry.emplace_or_replace<components::ActiveTag>(m_activeEntity);
+            }
+        }
+
+        // 处理鼠标释放
+        if (mouseReleased && m_activeEntity != entt::null)
+        {
+            registry.remove<components::ActiveTag>(m_activeEntity);
+
+            // 如果释放时仍然在同一实体上，触发点击事件
+            if (m_activeEntity == hoveredEntity)
+            {
+                if (auto* clickable = registry.try_get<components::Clickable>(m_activeEntity))
+                {
+                    if (clickable->onClick)
+                    {
+                        clickable->onClick(m_activeEntity);
+                    }
+                    dispatcher.trigger<events::ButtonClick>(events::ButtonClick{m_activeEntity});
+                }
+            }
+
+            m_activeEntity = entt::null;
+        }
+    }
+
+    /**
+     * @brief 处理 SDL每tick事件 不用循环
+     *
+     * - 负责 SDL_PollEvent 事件
+     * - 将事件转发给 ImGui 后端 (ImGui_ImplSDL3_ProcessEvent)
+     * - 识别 Quit / Window Resized，并通过回调交由上层处理
+     */
+    void processEvents()
+    {
+        auto& dispatcher = ::utils::Dispatcher::getInstance();
+
+        SDL_Event event{};
+        if (SDL_PollEvent(&event))
+        {
+            ImGui_ImplSDL3_ProcessEvent(&event);
+
+            if (event.type == SDL_EVENT_QUIT)
+            {
+                dispatcher.trigger<ui::events::QuitRequested>();
+            }
+
+            if (event.type == SDL_EVENT_WINDOW_RESIZED)
+            {
+                dispatcher.trigger<ui::events::WindowResized>(
+                    ui::events::WindowResized{event.window.data1, event.window.data2});
+            }
+
+            // 保持与原逻辑一致：上层自定义事件处理在 Quit/Resize 之后执行。
+            dispatcher.trigger<ui::events::SDLEvent>(ui::events::SDLEvent{event});
+        }
+    }
+
     entt::entity m_activeEntity = entt::null; // 当前处于 Active (鼠标按下) 状态的实体
 
     /**

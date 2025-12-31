@@ -17,6 +17,7 @@
     支持背景色、边框、文本、图像等多种UI元素。
     优化渲染顺序，确保正确的层级关系。
     易于扩展以支持更多UI组件和效果。
+    在所有状态更新后进行渲染，确保视觉一致性。
  *
  * ************************************************************************
  */
@@ -24,20 +25,75 @@
 #pragma once
 #include <entt/entt.hpp>
 #include <imgui.h>
+#include <imgui_impl_sdl3.h>
+#include <imgui_impl_sdlrenderer3.h>
 #include <functional>
+#include <SDL3/SDL.h>
+#include <utils.h>
 #include "components/Components.h"
 #include "components/Tags.h"
-#include <utils.h>
-#include <SDL3/SDL.h>
+#include "components/Events.h"
+#include "interface/Isystem.h"
+
+// 前向声明
+namespace ui
+{
+class GraphicsContext;
+}
 
 namespace ui::systems
 {
 
-class RenderSystem
+class RenderSystem : public interface::EnableRegister<RenderSystem>
 {
+private:
+    GraphicsContext* m_graphicsContext = nullptr;
+
 public:
-    void update(SDL_Renderer* renderer) noexcept
+    /**
+     * @brief 注册事件处理器
+     */
+    void registerHandlersImpl()
     {
+        auto& dispatcher = utils::Dispatcher::getInstance();
+        dispatcher.sink<events::GraphicsContextSetEvent>().connect<&RenderSystem::onGraphicsContextSet>(*this);
+    }
+
+    /**
+     * @brief 注销事件处理器
+     */
+    void unregisterHandlersImpl()
+    {
+        auto& dispatcher = utils::Dispatcher::getInstance();
+        dispatcher.sink<events::GraphicsContextSetEvent>().disconnect<&RenderSystem::onGraphicsContextSet>(*this);
+    }
+
+private:
+    /**
+     * @brief 处理图形上下文设置事件
+     */
+    void onGraphicsContextSet(const events::GraphicsContextSetEvent& event)
+    {
+        m_graphicsContext = static_cast<GraphicsContext*>(event.graphicsContext);
+    }
+
+public:
+    void updateImpl() noexcept
+    {
+        // 获取 SDL_Renderer
+        SDL_Renderer* renderer = m_graphicsContext ? m_graphicsContext->getRenderer() : nullptr;
+        if (renderer == nullptr) return;
+
+        // ----------------------------------------------------
+        // 0. 帧级渲染管线 (从 Application 下沉到 RenderSystem)
+        // ----------------------------------------------------
+        ImGui_ImplSDLRenderer3_NewFrame();
+        ImGui_ImplSDL3_NewFrame();
+        ImGui::NewFrame();
+
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+        SDL_RenderClear(renderer);
+
         // ----------------------------------------------------
         // I. ImGui 顶层画布设置
         // ----------------------------------------------------
@@ -81,6 +137,17 @@ public:
         }
 
         ImGui::End();
+
+        ImGui::Render();
+        ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer);
+        SDL_RenderPresent(renderer);
+
+        // 把所有组件的脏标记清除
+        auto dirtyView = registry.view<components::RenderDirtyTag>();
+        for (auto entity : dirtyView)
+        {
+            registry.remove<components::RenderDirtyTag>(entity);
+        }
     }
 
 private:
@@ -122,14 +189,14 @@ private:
         if (registry.any_of<components::WindowTag>(entity) || registry.any_of<components::DialogTag>(entity))
         {
             // 窗口容器由专门函数处理，它会调用 ImGui::Begin/End 并在内部递归。
-            renderWindow(registry, entity, absolutePos, globalAlpha);
+            renderWindow(entity, absolutePos, globalAlpha);
             return; // 窗口/对话框处理了自身的绘制和递归，跳过默认处理
         }
 
         // ----------------------------------------------------
         // 2. 核心渲染 (背景/边框)
         // ----------------------------------------------------
-        renderBackground(registry, entity, draw_list, absolutePos, absoluteEndPos, globalAlpha);
+        renderBackground(entity, draw_list, absolutePos, absoluteEndPos, globalAlpha);
 
         // ----------------------------------------------------
         // 3. 渲染特定内容
@@ -161,8 +228,9 @@ private:
      * 这是一个特殊的渲染函数，因为它负责调用 ImGui::Begin/End，
      * 从而切换 ImGui 的当前绘制上下文和剪裁区域。
      */
-    void renderWindow(entt::registry& registry, entt::entity entity, const ImVec2& absolutePos, float globalAlpha)
+    void renderWindow(entt::entity entity, const ImVec2& absolutePos, float globalAlpha)
     {
+        auto& registry = utils::Registry::getInstance();
         const auto& windowComp = registry.get<const components::Window>(entity);
         const auto& size = registry.get<const components::Size>(entity);
         const auto* hierarchy = registry.try_get<components::Hierarchy>(entity);
@@ -192,7 +260,7 @@ private:
 
             // 绘制 ECS 提供的自定义背景/边框 (如果设置了 NoBackground)
             ImVec2 absEndPos(absolutePos.x + size.size.x, absolutePos.y + size.size.y);
-            renderBackground(registry, entity, window_draw_list, absolutePos, absEndPos, globalAlpha);
+            renderBackground(entity, window_draw_list, absolutePos, absEndPos, globalAlpha);
 
             // --- 3. 递归渲染子元素 (子元素相对于窗口内容区定位) ---
             if (hierarchy && !hierarchy->children.empty())
@@ -210,13 +278,10 @@ private:
     // 以下 Helper 函数 (renderBackground, renderSpecificComponent) 保持不变，
     // 因为它们是纯粹的 ImDrawList 操作，不需要修改。
 
-    void renderBackground(entt::registry& registry,
-                          entt::entity entity,
-                          ImDrawList* draw_list,
-                          const ImVec2& startPos,
-                          const ImVec2& endPos,
-                          float globalAlpha)
+    void renderBackground(
+        entt::entity entity, ImDrawList* draw_list, const ImVec2& startPos, const ImVec2& endPos, float globalAlpha)
     {
+        auto& registry = utils::Registry::getInstance();
         // 渲染背景 (Background Component)
         const auto* bg = registry.try_get<components::Background>(entity);
         if (bg && bg->enabled)

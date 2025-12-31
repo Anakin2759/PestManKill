@@ -1,8 +1,14 @@
 cmake_minimum_required(VERSION 3.31)
 project(PestMan LANGUAGES CXX)
 include(CheckIPOSupported)
-
+if(MSVC)
+    add_compile_definitions(
+        ASIO_DISABLE_STD_EXECUTION
+        ASIO_STANDALONE
+    )
+endif()
 option(ENABLE_BUILD_TESTS "Enable building of unit tests" ON)
+
 #==================== IPO / LTO 设置 ====================
 check_ipo_supported(RESULT ipo_supported OUTPUT ipo_error)
 
@@ -17,6 +23,7 @@ endif()
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON) #生成compile_commands.json文件
+
 set(CMAKE_CXX_EXTENSIONS OFF) #禁用编译器扩展
 #==================== 编译选项 ====================
 # 通用警告选项
@@ -37,11 +44,12 @@ endif()
 # ==================== 第三方库 ====================
 # Build SDL_image as static library
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+add_subdirectory(third_party/asio)
 add_subdirectory(third_party/mimalloc)
 add_subdirectory(third_party/entt)
 add_subdirectory(third_party/json)
 add_subdirectory(third_party/spdlog)
-add_subdirectory(third_party/asio)
+
 add_subdirectory(third_party/SDL)
 
 add_subdirectory(third_party/stb)
@@ -49,12 +57,13 @@ add_subdirectory(third_party/stb)
 add_subdirectory(third_party/imgui)
 add_subdirectory(third_party/abseil-cpp)
 add_subdirectory(third_party/kcp)
+add_subdirectory(third_party/googletest)
 
 
 
 # ==================== 静态分析工具 clang-tidy ====================
 # 允许用户通过选项启用或禁用 clang-tidy
-option(ENABLE_CLANG_TIDY "Enable clang-tidy static analysis" OFF)
+option(ENABLE_CLANG_TIDY "Enable clang-tidy static analysis" ON)
 
 # 查找 clang-tidy 可执行文件
 find_program(CLANG_TIDY_EXE
@@ -87,8 +96,8 @@ add_subdirectory(src/utils)
 add_subdirectory(src/shared)
 add_subdirectory(src/ui)
 add_subdirectory(src/net)
-add_subdirectory(src/client)
-add_subdirectory(src/server)
+ add_subdirectory(src/client)
+ add_subdirectory(src/server)
 # ===================== 单元测试 =====================
 if(ENABLE_BUILD_TESTS)
     add_subdirectory(tests/unittest)

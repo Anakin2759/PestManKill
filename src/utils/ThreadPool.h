@@ -1,7 +1,7 @@
 #pragma once
 
-#include <asio/thread_pool.hpp>
-#include <thread>
+// 防止 Windows.h 宏污染 ASIO 的 execution 命名空间
+#include <asio.hpp>
 
 namespace utils
 {

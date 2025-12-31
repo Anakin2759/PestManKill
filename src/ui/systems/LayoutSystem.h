@@ -5,7 +5,7 @@
  * @author AnakinLiu (azrael2759@qq.com)
  * @date 2025-12-11 (Finalized)
  * @version 0.3
- * @brief UI布局系统
+ * @brief UI布局系统 事件驱动
  *
  * 负责计算和设置所有UI实体的位置 (Position) 和尺寸 (Size) 组件。
  * 新增：拉伸因子 (Spacer) 和 对齐 (Alignment) 的处理逻辑。
@@ -32,11 +32,15 @@
 namespace ui::systems
 {
 
-class LayoutSystem
+class LayoutSystem : public ui::interface::EnableRegister<LayoutSystem>
 {
 public:
-    void registryHandler() {}
-    void unregistryHandler() {}
+    void registerHandlersImpl() {}
+    void unregisterHandlersImpl() {}
+
+    /**
+     * @brief 每帧更新布局
+     */
     void update() noexcept
     {
         auto& registry = utils::Registry::getInstance();

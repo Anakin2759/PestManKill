@@ -1,10 +1,13 @@
-set(EXET_NAME PestManKillServer)
-set(SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/main.cpp"
-)
-add_executable(${EXET_NAME} ${SOURCES})
+# Net module tests
 
-target_compile_options(${EXET_NAME} PRIVATE
+add_executable(net_tests
+    test_kcp_session.cpp
+    test_kcp_server.cpp
+    test_frame_codec.cpp
+    test_transport.cpp
+    test_peek_conv.cpp
+)
+target_compile_options(net_tests PRIVATE
     # GCC
     $<$<AND:$<CXX_COMPILER_ID:GNU>,$<CONFIG:Debug>>:-Wall -Wextra -Wpedantic -O0 -g>
     $<$<AND:$<CXX_COMPILER_ID:GNU>,$<CONFIG:Release>>:-Wall -O3 -DNDEBUG>
@@ -22,26 +25,20 @@ target_compile_options(${EXET_NAME} PRIVATE
     $<$<AND:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_FRONTEND_VARIANT:MSVC>,$<CONFIG:Release>>:/EHsc /O2 /DNDEBUG>
 
 )
-target_include_directories(${EXET_NAME} PRIVATE 
-    ${CMAKE_CURRENT_SOURCE_DIR}
+target_include_directories(net_tests PRIVATE
     ${CMAKE_SOURCE_DIR}
 )
 
-target_link_libraries(${EXET_NAME} PRIVATE 
-    mimalloc-static 
-    utils
-    shared
-    asio::asio 
-    nlohmann_json::nlohmann_json 
-    absl::base 
-    absl::memory 
-    absl::strings
-    absl::hash
-    absl::flat_hash_map
-    absl::raw_hash_set
-    absl::random_random
-    absl::random_seed_sequences
-    absl::random_distributions
-    kcp
+target_link_libraries(net_tests PRIVATE
+    asio::asio
+    net
+    GTest::gtest
+    GTest::gtest_main
+
+        GTest::gmock
+        GTest::gmock_main  # 如果你自己没写 main 函数，用这个
     EnTT::EnTT
-    )
+)
+
+include(GoogleTest)
+gtest_discover_tests(net_tests)

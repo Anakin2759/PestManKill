@@ -1,5 +1,6 @@
 
 #pragma once
+
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/sinks/rotating_file_sink.h>
@@ -60,28 +61,36 @@ private:
 } // namespace utils
 
 // ----------------- 宏包裹日志 -----------------
-
+#ifdef LOG_INFO
+#undef LOG_INFO
+#endif
 #define LOG_INFO(fmt, ...)                                                                                             \
     utils::Logger::getLogger()->info("[{}:{} {}] " fmt,                                                                \
                                      std::source_location::current().file_name(),                                      \
                                      std::source_location::current().line(),                                           \
                                      std::source_location::current().function_name(),                                  \
                                      ##__VA_ARGS__)
-
+#ifdef LOG_WARN
+#undef LOG_WARN
+#endif
 #define LOG_WARN(fmt, ...)                                                                                             \
     utils::Logger::getLogger()->warn("[{}:{} {}] " fmt,                                                                \
                                      std::source_location::current().file_name(),                                      \
                                      std::source_location::current().line(),                                           \
                                      std::source_location::current().function_name(),                                  \
                                      ##__VA_ARGS__)
-
+#ifdef LOG_ERROR
+#undef LOG_ERROR
+#endif
 #define LOG_ERROR(fmt, ...)                                                                                            \
     utils::Logger::getLogger()->error("[{}:{} {}] " fmt,                                                               \
                                       std::source_location::current().file_name(),                                     \
                                       std::source_location::current().line(),                                          \
                                       std::source_location::current().function_name(),                                 \
                                       ##__VA_ARGS__)
-
+#ifdef LOG_DEBUG
+#undef LOG_DEBUG
+#endif
 #define LOG_DEBUG(fmt, ...)                                                                                            \
     utils::Logger::getLogger()->debug("[{}:{} {}] " fmt,                                                               \
                                       std::source_location::current().file_name(),                                     \

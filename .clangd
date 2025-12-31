@@ -19,12 +19,7 @@ CompileFlags:
     # C++ 特定警告控制
     - "-Wno-unused-parameter"
     - "-Wno-missing-field-initializers"
-
-    # MSVC 兼容模式
-    - "--target=x86_64-pc-windows-msvc"
-    - "-fms-compatibility"
-    - "-fms-extensions"
-    - "-fdelayed-template-parsing"
+    
     
   Remove:
     # 移除 CMake 生成的不兼容模块参数
@@ -34,7 +29,7 @@ CompileFlags:
     - "-fcoroutines-ts"
     - "-ftemplate-backtrace-limit=*"
     - "-fmacro-backtrace-limit=*"
-    - "/EHsc"
+
     - "-wd*"
 
 # 诊断配置

@@ -179,6 +179,10 @@ struct LayoutDirtyTag
 {
 };
 
+struct RenderDirtyTag
+{
+};
+
 /**
  * @brief 动画进行中标记
  * AnimationSystem 添加此 Tag，用于过滤和处理正在动画的实体

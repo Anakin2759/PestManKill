@@ -113,7 +113,6 @@ InheritParentConfig: false
 # Compiler args for correct parsing
 ExtraArgs:
   - -std=c++23
-  - -D_WIN32_WINNT=0x0601
   - -DASIO_STANDALONE
   - -DUNICODE
   - -D_UNICODE

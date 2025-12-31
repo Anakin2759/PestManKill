@@ -17,10 +17,10 @@
 
 #pragma once
 #include <entt/entt.hpp>
-#include <utils.h>                        // 包含 Registry
-#include "src/ui/components/Components.h" // 包含 Size
-#include "src/ui/components/Tags.h"       // 包含 LayoutDirtyTag
-
+#include <utils.h>                 // 包含 Registry
+#include "components/Components.h" // 包含 Size
+#include "components/Tags.h"       // 包含 LayoutDirtyTag
+#include "interface/Isystem.h"
 namespace ui::systems
 {
 
@@ -29,9 +29,12 @@ namespace ui::systems
  *
  * 这是一个响应外部事件而非在主循环中遍历的系统。
  */
-class WindowSystem
+class WindowSystem : public ui::interface::EnableRegister<WindowSystem>
 {
 public:
+    void registerHandlersImpl() {}
+    void unregisterHandlersImpl() {}
+
     /**
      * @brief 响应窗口尺寸变化事件，同步ECS根实体的尺寸。
      *
@@ -66,11 +69,7 @@ public:
                 sizeComp->size.y = newH;
 
                 // 2. 标记根实体为 LayoutDirtyTag
-                // 强制 UILayoutSystem 在下一帧运行，重新计算所有子元素的布局
                 registry.emplace_or_replace<components::LayoutDirtyTag>(rootEntity);
-
-                // 可选：触发一个 ECS 事件通知其他系统（例如 RenderSystem 可能需要更新投影矩阵）
-                //    utils::Dispatcher::getInstance().trigger<events::WindowResizeEvent>(newW, newH);
             }
         }
     }

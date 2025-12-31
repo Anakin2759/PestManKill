@@ -12,10 +12,10 @@
  * For study and research only, no reprinting.
  * ************************************************************************
  */
+#include <asio.hpp>
 #include <gtest/gtest.h>
 #include "src/net/Session/KcpSession.h"
 #include "MockUdpTransport.h"
-#include <asio.hpp>
 
 using namespace std::chrono_literals;
 

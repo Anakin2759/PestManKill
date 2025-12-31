@@ -1,3 +1,4 @@
+#  ui 模块 CMake 配置文件
 cmake_minimum_required(VERSION 3.20)
 
 # UI 模块库定义
@@ -13,6 +14,8 @@ target_link_libraries(ui INTERFACE
     utils
     imgui::imgui
     SDL3::SDL3
+    EnTT::EnTT
+    asio::asio
 )
 
 # C++23 标准

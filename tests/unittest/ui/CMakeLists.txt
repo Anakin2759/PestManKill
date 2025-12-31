@@ -1,10 +1,31 @@
-set(EXET_NAME PestManKillServer)
-set(SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/main.cpp"
-)
-add_executable(${EXET_NAME} ${SOURCES})
+# UI module tests
 
-target_compile_options(${EXET_NAME} PRIVATE
+add_executable(ui_tests
+    test_MainWindow.cpp
+)
+target_compile_features(ui_tests PRIVATE cxx_std_23)
+
+target_include_directories(ui_tests PRIVATE
+    ${CMAKE_SOURCE_DIR}
+)
+target_compile_definitions(ui_tests PRIVATE
+    ASIO_STANDALONE         # 告诉 Asio 不使用 Boost
+    SDL_MAIN_HANDLED       # 防止 SDL 篡改 main 入口
+
+)
+target_link_libraries(ui_tests PRIVATE
+    EnTT::EnTT
+    asio::asio
+
+    imgui::imgui
+    SDL3::SDL3
+    utils
+    ui
+    GTest::gmock
+        GTest::gmock_main  # 如果你自己没写 main 函数，用这个
+    GTest::gtest_main
+)
+target_compile_options(ui_tests PRIVATE
     # GCC
     $<$<AND:$<CXX_COMPILER_ID:GNU>,$<CONFIG:Debug>>:-Wall -Wextra -Wpedantic -O0 -g>
     $<$<AND:$<CXX_COMPILER_ID:GNU>,$<CONFIG:Release>>:-Wall -O3 -DNDEBUG>
@@ -22,26 +43,6 @@ target_compile_options(${EXET_NAME} PRIVATE
     $<$<AND:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_FRONTEND_VARIANT:MSVC>,$<CONFIG:Release>>:/EHsc /O2 /DNDEBUG>
 
 )
-target_include_directories(${EXET_NAME} PRIVATE 
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}
-)
 
-target_link_libraries(${EXET_NAME} PRIVATE 
-    mimalloc-static 
-    utils
-    shared
-    asio::asio 
-    nlohmann_json::nlohmann_json 
-    absl::base 
-    absl::memory 
-    absl::strings
-    absl::hash
-    absl::flat_hash_map
-    absl::raw_hash_set
-    absl::random_random
-    absl::random_seed_sequences
-    absl::random_distributions
-    kcp
-    EnTT::EnTT
-    )
+include(GoogleTest)
+gtest_discover_tests(ui_tests)

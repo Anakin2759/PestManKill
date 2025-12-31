@@ -17,16 +17,16 @@
 #include <entt/entt.hpp>
 #include <entt/poly/poly.hpp>
 #include "src/context/GameContext.h"
-
+#include "absl/container/flat_hash_map.h"
 struct ISkill : entt::type_list<>
 {
     template <typename Base>
     struct type : Base
     {
         void onUse() const { return this->template invoke<0>(*this); }
-        absl::flat_hash_map<entt::entity, bool> filterTargets(entt::entity pt) const
+        absl::flat_hash_map<entt::entity, bool> filterTargets(entt::entity pt1) const
         {
-            return this->template invoke<1>(*this, pt);
+            return this->template invoke<1>(*this, pt1);
         }
     };
 

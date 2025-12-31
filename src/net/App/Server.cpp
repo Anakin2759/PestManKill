@@ -1,5 +1,5 @@
 #include "Server.h"
-
+#include <cstdint>
 #include <asio.hpp>
 #include <iostream>
 #include <utility>
@@ -19,7 +19,7 @@ uint32_t Server::selectConv([[maybe_unused]] const asio::ip::udp::endpoint& from
     return peekConv(data);
 }
 
-void Server::onSession(uint32_t conv, std::shared_ptr<KcpSession> session)
+void Server::onSession(std::uint32_t conv, std::shared_ptr<KcpSession> session)
 {
     // 1. 为每个玩家创建一个 Strand，保证该玩家的协程在线程池中是线程安全的
     auto player_executor = asio::make_strand(m_pool.get_executor());

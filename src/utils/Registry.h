@@ -10,9 +10,9 @@ class Registry
 {
 public:
     // 获取单例实例
-    static entt::registry& getInstance()
+    static ::entt::registry& getInstance()
     {
-        static entt::registry instance;
+        static ::entt::registry instance;
         return instance;
     }
 

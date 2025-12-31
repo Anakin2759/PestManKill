@@ -5,14 +5,11 @@ set(CLIENT_NAME PestManKillClient)
 # 客户端源文件
 set(CLIENT_SOURCES
     main.cpp
-    SceneImpl.cpp
 )
 
 # 客户端头文件
 set(CLIENT_HEADERS
-    GameClient.h
-    SceneManager.h
-)
+    )
 
 # 创建客户端可执行文件
 add_executable(${CLIENT_NAME} ${CLIENT_SOURCES} ${CLIENT_HEADERS})
@@ -83,7 +80,7 @@ target_compile_features(${CLIENT_NAME} PRIVATE cxx_std_23)
 set(TEST_CLIENT_NAME PestManKillClientTest)
 
 if(BUILD_TESTING)
-    add_executable(${TEST_CLIENT_NAME} main.cpp SceneImpl.cpp)
+    add_executable(${TEST_CLIENT_NAME} main.cpp)
     
     target_compile_options(${TEST_CLIENT_NAME} PRIVATE
         $<$<CXX_COMPILER_ID:MSVC>:/W4 /Od /Zi /EHsc /utf-8>

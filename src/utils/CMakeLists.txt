@@ -11,10 +11,16 @@ target_include_directories(utils INTERFACE
 
 # 依赖项
 target_link_libraries(utils INTERFACE
+    asio::asio
     EnTT::EnTT
     spdlog::spdlog_header_only
-)
 
+)
+target_compile_definitions(
+    utils
+    INTERFACE
+    ASIO_NO_DEPRECATED
+)
 # C++23 标准
 target_compile_features(utils INTERFACE cxx_std_23)
 
@@ -25,6 +31,7 @@ set(UTILS_HEADERS
     Registry.h
     ThreadPool.h
     utils.h
+    Functions.h
 )
 
 # 添加到 target 的 SOURCES（仅用于 IDE 显示）
@@ -33,3 +40,4 @@ target_sources(utils INTERFACE
     BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}
     FILES ${UTILS_HEADERS}
 )
+

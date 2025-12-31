@@ -11,6 +11,15 @@
     存在一个单例指针，方便全局访问。
     不是根实体，也不管理根实体
     只负责驱动UiSystem和处理SDL/ImGui集成
+    不负责具体UI逻辑和组件管理
+    提供初始化和清理接口
+    提供运行主循环的接口
+    提供访问根实体的接口
+    提供访问图形上下文的接口
+    一切修改UI状态的操作均通过ECS系统函数在eventloop中完成，
+
+  - exec 方法启动主循环
+
  *
  * ************************************************************************
  * @copyright Copyright (c) 2025 AnakinLiu
@@ -19,167 +28,102 @@
  */
 
 #pragma once
+
 #include <SDL3/SDL.h>
 #include <imgui.h>
 #include <imgui_impl_sdl3.h>
 #include <imgui_impl_sdlrenderer3.h>
 #include <stdexcept>
 #include <chrono>
-
+#include <utils.h>
 #include "SystemManager.h"
-#include "src/ui/systems/WindowsSystem.h"
-#include "src/utils/utils.h" // 包含 Registry, Dispatcher, GraphicsContext
+#include "GraphicsContext.h"
+#include "ImguiContext.h"
+#include "EventLoop.h"
+#include "systems/WindowsSystem.h"
+#include "components/Events.h"
 
 namespace ui
 {
 class Application
 {
+public:
+    /**
+     * @brief 构造函数：初始化所有外部和内部资源
+     * @param title 窗口标题
+     * @param width 窗口宽度
+     * @param height 窗口高度
+     */
+    explicit Application(const char* title = "PestManKill UI", int width = 800, int height = 600)
+        : m_graphicsContext(title, width, height) // GraphicsContext 自动创建 SDL 资源
+    {
+        // 1. 初始化 SDL 子系统
+        if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) != 0)
+        {
+            throw std::runtime_error(std::string("SDL_Init failed: ") + SDL_GetError());
+        }
+
+        // 2. 初始化 ImGui 上下文
+        m_imguiContext = std::make_unique<ImguiContext>(m_graphicsContext.getWindow(), m_graphicsContext.getRenderer());
+
+        // // 5. 注册所有系统的事件处理器
+        // m_systems.registerAllHandlers();
+
+        auto& dispatcher = utils::Dispatcher::getInstance();
+    }
+
+    virtual ~Application()
+    {
+        // 停止事件循环
+        // m_eventLoop.quit();
+
+        // // 注销所有系统的事件处理器
+        // m_systems.unregisterAllHandlers();
+
+        // ImguiContext 会自动清理 ImGui
+        m_imguiContext.reset();
+
+        // GraphicsContext 会在析构时自动清理 SDL 窗口和渲染器
+
+        // 清理 SDL 子系统
+        SDL_Quit();
+    }
+
+    /**
+     * @brief 应用主循环
+     */
+    void exec() { m_eventLoop.exec(); }
+
 private:
-    // 核心 ECS 系统封装
-    SystemManager m_systems;
+    // 图形上下文（包含 SDL 窗口和渲染器）
+    GraphicsContext m_graphicsContext;
 
     // ImGui 上下文管理
+    std::unique_ptr<ImguiContext> m_imguiContext;
+
+    // 事件循环
+    // EventLoop m_eventLoop;
+
+    entt::scheduler m_scheduler;
+
+    // 核心 ECS 系统封装
+    // SystemManager m_systems;
 
     // ECS 根实体，代表整个屏幕/应用区域
     entt::entity m_rootEntity = entt::null;
 
+    // 主循环控制
     bool running = true;
-    SDL_Event event{};
+
+    // 时间管理
+    using Clock = std::chrono::high_resolution_clock;
+    using TimePoint = std::chrono::time_point<Clock>;
+    TimePoint m_lastTime = Clock::now();
 
     // 阻止拷贝和移动（通常 Application 是单例或独占资源）
     Application(const Application&) = delete;
     Application& operator=(const Application&) = delete;
     Application(Application&&) = delete;
     Application& operator=(Application&&) = delete;
-
-public:
-    /**
-     * @brief 构造函数：初始化所有外部和内部资源
-     * 假设 GraphicsContext 已经实例化且可通过 utils::getInstance() 获取
-     */
-    explicit Application()
-
-        m_lastTime(Clock::now())
-    {
-        if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) < 0)
-        {
-            throw std::runtime_error("SDL_Init failed.");
-        }
-
-        // 1. ImGui 初始化 (依赖于 m_context 提供的 window 和 renderer)
-        initImGui();
-
-        // 2. 初始化 ECS 根实体
-        setupRootEntity();
-
-        // 3. 设置用户UI (留给子类实现或独立函数调用)
-        setupUI();
-    }
-
-    virtual ~Application()
-    {
-        shutdownImGui();
-        SDL_Quit();
-        // GraphicsContext 析构函数应自动清理 Window/Renderer
-    }
-
-    /**
-     * @brief 应用主循环
-     */
-    void run()
-    {
-        while (running)
-        {
-            // --- 1. 时间步长计算 ---
-            TimePoint now = Clock::now();
-            float deltaTime = std::chrono::duration<float>(now - m_lastTime).count();
-            m_lastTime = now;
-
-            // --- 2. 事件处理 ---
-            while (SDL_PollEvent(&event))
-            {
-                ImGui_ImplSDL3_ProcessEvent(&event); // 转发给 ImGui
-
-                if (event.type == SDL_EVENT_QUIT)
-                {
-                    running = false;
-                }
-
-                if (event.type == SDL_EVENT_WINDOW_RESIZED)
-                {
-                    // 通知 GraphicsContext 处理内部缩放
-                    m_context.handleResize(event.window.data1, event.window.data2);
-
-                    // 通知 ECS WindowSystem 更新根实体尺寸
-                    m_windowSystem.onResize(m_rootEntity, m_context.getWidth(), m_context.getHeight());
-                }
-
-                handleEvent(event); // 用户自定义事件处理
-            }
-
-            // --- 3. ECS 更新流程 (System::update) ---
-            m_uiSystem.update(deltaTime);
-
-            // --- 4. 渲染流程 (System::render) ---
-
-            // 4a. 启动 ImGui 新帧
-            ImGui_ImplSDLRenderer3_NewFrame();
-            ImGui_ImplSDL3_NewFrame();
-            ImGui::NewFrame();
-
-            // 4b. 渲染应用UI (由 ECS RenderSystem 处理)
-            SDL_SetRenderDrawColor(m_context.getRenderer(), 0, 0, 0, 255);
-            SDL_RenderClear(m_context.getRenderer());
-
-            m_uiSystem.render(m_context.getRenderer());
-
-            // 4c. 渲染 ImGui UI
-            ImGui::Render();
-            ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), m_context.getRenderer());
-
-            // 4d. 交换缓冲区
-            SDL_RenderPresent(m_context.getRenderer());
-        }
-    }
-
-    // Getters
-    [[nodiscard]] UiSystem& getUiSystem() { return m_uiSystem; }
-    [[nodiscard]] entt::entity getRootEntity() const { return m_rootEntity; }
-
-protected:
-    /**
-     * @brief 抽象函数：留给子类或外部调用者实现具体的UI结构。
-     */
-    virtual void setupUI() = 0;
-
-    /**
-     * @brief 抽象函数：留给子类处理未被ECS系统消耗的原始SDL事件。
-     */
-    virtual void handleEvent(const SDL_Event& event) {}
-
-private:
-    void initImGui()
-    {
-        IMGUI_CHECKVERSION();
-        ImGui::CreateContext();
-        ImGuiIO& io = ImGui::GetIO();
-        (void)io;
-        io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-
-        // 初始化 ImGui 渲染器后端
-        ImGui_ImplSDL3_InitForSDLRenderer(m_context.getWindow(), m_context.getRenderer());
-        ImGui_ImplSDLRenderer3_Init(m_context.getRenderer());
-
-        // 设置默认样式
-        ImGui::StyleColorsDark();
-    }
-
-    void shutdownImGui()
-    {
-        ImGui_ImplSDLRenderer3_Shutdown();
-        ImGui_ImplSDL3_Shutdown();
-        ImGui::DestroyContext();
-    }
 };
-
 } // namespace ui

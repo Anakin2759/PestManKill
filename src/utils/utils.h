@@ -1,5 +1,7 @@
 #pragma once
-#include "Logger.h"
-#include "Registry.h"
 #include "ThreadPool.h"
+
+#include "Registry.h"
+
 #include "Dispatcher.h"
+#include "Logger.h"
