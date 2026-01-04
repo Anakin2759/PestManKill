@@ -6,6 +6,12 @@
  * @date 2025-12-25
  * @version 0.1
  * @brief  ui每帧执行的任务类
+    在system类之上做一层任务封装
+  - 定义渲染任务和输入处理任务
+  - 任务可由entt::scheduler调度执行
+  - 支持任务的初始化、更新、完成和失败回调
+
+  系统类负责具体实现逻辑，任务类负责调度和业务流程
  *
  * ************************************************************************
  * @copyright Copyright (c) 2025 AnakinLiu
@@ -14,43 +20,56 @@
  */
 
 #pragma once
+#include <SDL3/SDL.h>
+#include <imgui.h>
+#include <imgui_impl_sdl3.h>
+#include <imgui_impl_sdlrenderer3.h>
 #include <entt/entt.hpp>
 #include <utils.h>
-/**
- * @brief 渲染任务
- */
-struct RenderTask : public entt::process<RenderTask, std::uint32_t>
+
+namespace ui
 {
-    using delta_type = std::uint32_t;
-
-    RenderTask(delta_type delay) : remaining{delay} {}
-
-    void update(delta_type delta, void*) { LOG_INFO("[render task]RenderTask update, delta: " << delta << std::endl); }
-
-    void init() { LOG_INFO("[render task]RenderTask init" << std::endl); }
-    void succeeded() { LOG_INFO("[render task]RenderTask succeeded" << std::endl); }
-    void failed() { LOG_INFO("[render task]RenderTask failed" << std::endl); }
-    void aborted() { LOG_INFO("[render task]RenderTask aborted" << std::endl); }
-
-private:
-    uint32_t remaining = 16; // 默认16ms帧间隔
-};
 
 /**
- * @brief 输入处理任务 在渲染任务之前执行
+ * @brief 输入处理任务 - 处理 SDL 事件和 ImGui 输入
  */
-struct InputTask : public entt::process<Task, std::uint32_t>
+struct InputTask : public entt::process
 {
-    void update(std::uint32_t delta, void*)
+    using allocator_type = typename entt::process::allocator_type;
+    using delta_type = typename entt::process::delta_type;
+
+    InputTask(const allocator_type& alloc, delta_type /*delay*/) : entt::process{alloc} {}
+
+    void update(const delta_type /*delta*/, void* data) override
     {
-        // 处理输入逻辑
-        LOG_INFO("[input task]InputTask update, delta: " << delta << std::endl);
-    }
-    void init() { LOG_INFO("[input task]InputTask init" << std::endl); }
-    void succeeded() { LOG_INFO("[input task]InputTask succeeded" << std::endl); }
-    void failed() { LOG_INFO("[input task]InputTask failed" << std::endl); }
-    void aborted() { LOG_INFO("[input task]InputTask aborted" << std::endl); }
+        auto& dispatcher = ::utils::Dispatcher::getInstance();
+        dispatcher.trigger<ui::events::SDLEvent>(ui::events::SDLEvent{});
 
-private:
-    uint32_t remaining = 16; // 默认16ms帧间隔
+        // 任务不终止，持续运行
+    }
+
+    void init() { LOG_INFO("[input task] InputTask initialized"); }
+    void succeeded() { LOG_INFO("[input task] InputTask succeeded"); }
+    void failed() { LOG_INFO("[input task] InputTask failed"); }
+    void aborted() { LOG_INFO("[input task] InputTask aborted"); }
 };
+
+/**
+ * @brief 渲染任务 - 执行 ImGui 和 SDL 渲染
+ */
+struct RenderTask : public entt::process
+{
+    using allocator_type = typename entt::process::allocator_type;
+    using delta_type = typename entt::process::delta_type;
+
+    RenderTask(const allocator_type& alloc, delta_type /*delay*/) : entt::process{alloc} {}
+
+    void update(const delta_type delta, void* data) override {}
+
+    void init() { LOG_INFO("[render task] RenderTask initialized"); }
+    void succeeded() { LOG_INFO("[render task] RenderTask succeeded"); }
+    void failed() { LOG_INFO("[render task] RenderTask failed"); }
+    void aborted() { LOG_INFO("[render task] RenderTask aborted"); }
+};
+
+} // namespace ui

@@ -39,7 +39,11 @@ namespace ui::systems
 class InteractionSystem : public ui::interface::EnableRegister<InteractionSystem>
 {
 public:
-    void registerHandlersImpl() {}
+    void registerHandlersImpl()
+    {
+        auto& dispatcher = utils::Dispatcher::getInstance();
+        dispatcher.sink<ui::events::SDLEvent>().connect<&InteractionSystem::onSDLEvent>(*this);
+    }
 
     void unregisterHandlersImpl() {}
 
@@ -136,12 +140,12 @@ private:
      * - 将事件转发给 ImGui 后端 (ImGui_ImplSDL3_ProcessEvent)
      * - 识别 Quit / Window Resized，并通过回调交由上层处理
      */
-    void processEvents()
+    void onSDLEvent(ui::events::SDLEvent& sdlEvent)
     {
         auto& dispatcher = ::utils::Dispatcher::getInstance();
 
-        SDL_Event event{};
-        if (SDL_PollEvent(&event))
+        auto& event = sdlEvent.event;
+        while (SDL_PollEvent(&event))
         {
             ImGui_ImplSDL3_ProcessEvent(&event);
 
@@ -149,7 +153,10 @@ private:
             {
                 dispatcher.trigger<ui::events::QuitRequested>();
             }
-
+            else if (event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED)
+            {
+                dispatcher.trigger<ui::events::QuitRequested>();
+            }
             if (event.type == SDL_EVENT_WINDOW_RESIZED)
             {
                 dispatcher.trigger<ui::events::WindowResized>(

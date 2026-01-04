@@ -63,13 +63,13 @@ private:
     // 系统索引（用于快速访问特定系统）
     enum SystemIndex : size_t
     {
-        INTERACTION = 0,
-        ANIMATION = 1,
-        LAYOUT = 2,
-        RENDER = 3,
-        WINDOW = 4,
-        SYSTEM_COUNT = 5
+        INTERACTION = 0, // 鼠标交互系统
+        ANIMATION = 1,   // 动画系统
+        LAYOUT = 2,      // 布局系统
+        RENDER = 3,      // 渲染系统
+        WINDOW = 4,      // 窗口同步系统
     };
+    static constexpr size_t SYSTEM_COUNT = 5;
 
 public:
     // 构造函数：初始化所有子系统
@@ -95,7 +95,8 @@ public:
     SystemManager& operator=(SystemManager&&) = delete;
 
     /**
-     * @brief 设置图形上下文（由 Application 调用）
+     * @brief setGraphicsContext 设置图形上下文
+     * @param context GraphicsContext* 图形上下文指针
      */
     void setGraphicsContext(GraphicsContext* context)
     {
@@ -126,7 +127,6 @@ public:
             system->unregisterHandlers();
         }
     }
-
 
     /**
      * @brief 动态添加系统

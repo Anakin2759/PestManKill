@@ -95,9 +95,18 @@ public:
                    { std::invoke(std::move(fn), std::move(capturedArgs)...); });
     }
 
+    // 注册默认处理器（无参数版本）
+    template <typename Func>
+        requires std::invocable<std::decay_t<Func>>
+    void registerDefaultHandler(Func&& func)
+    {
+        m_defaultHandler = [fn = std::forward<Func>(func)]() mutable { std::invoke(std::move(fn)); };
+    }
+
+    // 注册默认处理器（带参数版本）
     template <typename Func, typename... Args>
         requires(sizeof...(Args) > 0) && std::invocable<std::decay_t<Func>, std::decay_t<Args>...>
-    void registerDefaultHandler()
+    void registerDefaultHandler(Func&& func, Args&&... args)
     {
         m_defaultHandler = [fn = std::forward<Func>(func), ... capturedArgs = std::forward<Args>(args)]() mutable
         { std::invoke(std::move(fn), std::move(capturedArgs)...); };

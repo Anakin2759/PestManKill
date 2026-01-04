@@ -27,7 +27,20 @@
 #include <stb_image.h>
 #include "src/utils/Functions.h"
 
+#include "src/ui/core/Application.h"
+
 int main(int argc, char* argv[])
 {
     utils::functions::setConsoleToUTF8();
+    try
+    {
+        // 创建并运行 UI 应用程序
+        ui::Application app("PestManKill Client", 1024, 768);
+        app.exec();
+    }
+    catch (const std::exception& e)
+    {
+        std::cerr << "应用程序异常终止: " << e.what() << std::endl;
+        return EXIT_FAILURE;
+    }
 }

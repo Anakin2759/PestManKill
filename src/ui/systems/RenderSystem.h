@@ -78,7 +78,7 @@ private:
     }
 
 public:
-    void updateImpl() noexcept
+    void update() noexcept
     {
         // 获取 SDL_Renderer
         SDL_Renderer* renderer = m_graphicsContext ? m_graphicsContext->getRenderer() : nullptr;

@@ -154,16 +154,21 @@ struct ValueChangedSelection
     int selectedIndex;
 };
 
-
-
-
-
-
-
-
 struct SendHandlerToEventLoop
 {
     std::move_only_function<void()> handler;
+};
+
+struct UpdateEvent
+{
+};
+
+struct CloseWindow
+{
+};
+
+struct UpdateRendering
+{
 };
 
 } // namespace ui::events

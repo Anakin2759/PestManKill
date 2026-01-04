@@ -42,7 +42,7 @@
 #include "EventLoop.h"
 #include "systems/WindowsSystem.h"
 #include "components/Events.h"
-
+#include "Task.h"
 namespace ui
 {
 class Application
@@ -55,37 +55,40 @@ public:
      * @param height 窗口高度
      */
     explicit Application(const char* title = "PestManKill UI", int width = 800, int height = 600)
-        : m_graphicsContext(title, width, height) // GraphicsContext 自动创建 SDL 资源
     {
-        // 1. 初始化 SDL 子系统
-        if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) != 0)
+        // 1. 初始化 SDL 子系统（必须在 GraphicsContext 之前）
+        if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS))
         {
             throw std::runtime_error(std::string("SDL_Init failed: ") + SDL_GetError());
         }
+        // 2. 初始化图形上下文
+        m_graphicsContext = std::make_unique<GraphicsContext>(title, width, height);
+        // 3. 初始化 ImGui 上下文
+        m_imguiContext =
+            std::make_unique<ImguiContext>(m_graphicsContext->getWindow(), m_graphicsContext->getRenderer());
+        m_systems.registerAllHandlers();
 
-        // 2. 初始化 ImGui 上下文
-        m_imguiContext = std::make_unique<ImguiContext>(m_graphicsContext.getWindow(), m_graphicsContext.getRenderer());
+        // 并行调度输入和渲染任务
+        m_scheduler.attach<ui::InputTask>(16u);
+        m_scheduler.attach<ui::RenderTask>(16u);
 
-        // // 5. 注册所有系统的事件处理器
-        // m_systems.registerAllHandlers();
+        m_eventLoop.registerDefaultHandler(
+            [this]()
+            {
+                // 传递渲染上下文给任务
+                m_scheduler.update(16u);
+            });
 
         auto& dispatcher = utils::Dispatcher::getInstance();
+        dispatcher.sink<ui::events::QuitRequested>().connect<&Application::onQuitRequested>(*this);
     }
+
+    void onQuitRequested(ui::events::QuitRequested&) { m_eventLoop.quit(); }
 
     virtual ~Application()
     {
-        // 停止事件循环
-        // m_eventLoop.quit();
-
-        // // 注销所有系统的事件处理器
-        // m_systems.unregisterAllHandlers();
-
-        // ImguiContext 会自动清理 ImGui
         m_imguiContext.reset();
 
-        // GraphicsContext 会在析构时自动清理 SDL 窗口和渲染器
-
-        // 清理 SDL 子系统
         SDL_Quit();
     }
 
@@ -96,24 +99,24 @@ public:
 
 private:
     // 图形上下文（包含 SDL 窗口和渲染器）
-    GraphicsContext m_graphicsContext;
+    std::unique_ptr<GraphicsContext> m_graphicsContext;
 
     // ImGui 上下文管理
     std::unique_ptr<ImguiContext> m_imguiContext;
 
     // 事件循环
-    // EventLoop m_eventLoop;
+    EventLoop m_eventLoop;
 
     entt::scheduler m_scheduler;
 
     // 核心 ECS 系统封装
-    // SystemManager m_systems;
+    SystemManager m_systems;
 
     // ECS 根实体，代表整个屏幕/应用区域
     entt::entity m_rootEntity = entt::null;
 
     // 主循环控制
-    bool running = true;
+    bool m_running = true;
 
     // 时间管理
     using Clock = std::chrono::high_resolution_clock;

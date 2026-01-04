@@ -73,6 +73,10 @@ public:
             }
         }
     }
+    void onClose(entt::entity rootEntity)
+    {
+        // 目前不需要处理窗口关闭事件
+    }
 };
 
 } // namespace ui::systems
