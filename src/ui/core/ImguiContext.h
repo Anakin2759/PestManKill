@@ -39,6 +39,29 @@ public:
         ImGui_ImplSDL3_InitForSDLRenderer(window, renderer);
         ImGui_ImplSDLRenderer3_Init(renderer);
 
+        // 加载中文字体 (使用 Windows 系统字体)
+        const char* fontPaths[] = {
+            "C:/Windows/Fonts/msyh.ttc",   // 微软雅黑
+            "C:/Windows/Fonts/simhei.ttf", // 黑体
+            "C:/Windows/Fonts/simsun.ttc", // 宋体
+        };
+
+        bool fontLoaded = false;
+        for (const char* fontPath : fontPaths)
+        {
+            if (io.Fonts->AddFontFromFileTTF(fontPath, 18.0f, nullptr, io.Fonts->GetGlyphRangesChineseFull()))
+            {
+                fontLoaded = true;
+                break;
+            }
+        }
+
+        if (!fontLoaded)
+        {
+            // 如果没有找到中文字体，使用默认字体
+            io.Fonts->AddFontDefault();
+        }
+
         // 设置默认样式
         ImGui::StyleColorsDark();
     }

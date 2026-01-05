@@ -171,4 +171,8 @@ struct UpdateRendering
 {
 };
 
+struct UpdateLayout
+{
+};
+
 } // namespace ui::events

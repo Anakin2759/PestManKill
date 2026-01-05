@@ -28,6 +28,8 @@
 #include "src/ui/components/Components.h"
 #include "src/ui/components/Tags.h"
 #include "src/ui/components/Define.h"
+#include "src/ui/components/Events.h"
+#include "src/ui/interface/Isystem.h"
 
 namespace ui::systems
 {
@@ -35,8 +37,16 @@ namespace ui::systems
 class LayoutSystem : public ui::interface::EnableRegister<LayoutSystem>
 {
 public:
-    void registerHandlersImpl() {}
-    void unregisterHandlersImpl() {}
+    void registerHandlersImpl()
+    {
+        auto& dispatcher = utils::Dispatcher::getInstance();
+        dispatcher.sink<ui::events::UpdateLayout>().connect<&LayoutSystem::update>(*this);
+    }
+    void unregisterHandlersImpl()
+    {
+        auto& dispatcher = utils::Dispatcher::getInstance();
+        dispatcher.sink<ui::events::UpdateLayout>().disconnect<&LayoutSystem::update>(*this);
+    }
 
     /**
      * @brief 每帧更新布局

@@ -38,21 +38,35 @@ struct InputTask : public entt::process
     using allocator_type = typename entt::process::allocator_type;
     using delta_type = typename entt::process::delta_type;
 
-    InputTask(const allocator_type& alloc, delta_type /*delay*/) : entt::process{alloc} {}
-
-    void update(const delta_type /*delta*/, void* data) override
+    InputTask(const allocator_type& alloc, delta_type delay)
+        : entt::process{alloc}, remainingTime(delay), delayTime(delay)
     {
-        auto& dispatcher = ::utils::Dispatcher::getInstance();
-        dispatcher.trigger<ui::events::SDLEvent>(ui::events::SDLEvent{});
-
-        // 任务不终止，持续运行
     }
 
-    void init() { LOG_INFO("[input task] InputTask initialized"); }
+    void update(const delta_type delta, [[maybe_unused]] void* data) override
+    {
+        if (remainingTime > delta)
+        {
+            remainingTime -= delta;
+            //    aborted();
+            return; // 时间未到，直接返回
+        }
+        remainingTime = delayTime;
+        auto& dispatcher = ::utils::Dispatcher::getInstance();
+        dispatcher.trigger<ui::events::SDLEvent>(ui::events::SDLEvent{});
+        remainingTime = delayTime;
+    }
+
     void succeeded() { LOG_INFO("[input task] InputTask succeeded"); }
     void failed() { LOG_INFO("[input task] InputTask failed"); }
     void aborted() { LOG_INFO("[input task] InputTask aborted"); }
+
+private:
+    delta_type remainingTime;
+    delta_type delayTime;
 };
+
+
 
 /**
  * @brief 渲染任务 - 执行 ImGui 和 SDL 渲染
@@ -62,14 +76,35 @@ struct RenderTask : public entt::process
     using allocator_type = typename entt::process::allocator_type;
     using delta_type = typename entt::process::delta_type;
 
-    RenderTask(const allocator_type& alloc, delta_type /*delay*/) : entt::process{alloc} {}
+    RenderTask(const allocator_type& alloc, delta_type delay)
+        : entt::process{alloc}, remainingTime(delay), delayTime(delay)
+    {
+    }
 
-    void update(const delta_type delta, void* data) override {}
+    void update(const delta_type delta, [[maybe_unused]] void* data) override
+    {
+        if (remainingTime > delta)
+        {
+            remainingTime -= delta;
+            // aborted();
+            return;
+        }
+        remainingTime = delayTime;
+        auto& dispatcher = ::utils::Dispatcher::getInstance();
+        // 先触发布局更新，再渲染
+        dispatcher.trigger<ui::events::UpdateLayout>(ui::events::UpdateLayout{});
+        dispatcher.trigger<ui::events::UpdateRendering>(ui::events::UpdateRendering{});
 
-    void init() { LOG_INFO("[render task] RenderTask initialized"); }
+        // succeed();
+    }
+
     void succeeded() { LOG_INFO("[render task] RenderTask succeeded"); }
     void failed() { LOG_INFO("[render task] RenderTask failed"); }
     void aborted() { LOG_INFO("[render task] RenderTask aborted"); }
+
+private:
+    delta_type remainingTime;
+    delta_type delayTime; // 约60FPS
 };
 
 } // namespace ui

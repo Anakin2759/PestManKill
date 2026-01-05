@@ -62,11 +62,7 @@ private:
         bool mouseDown = io.MouseDown[0];
         bool mouseReleased = io.MouseReleased[0];
 
-        // 如果 ImGui 想要捕获鼠标（例如在 ImGui 窗口上），跳过 UI 交互检测
-        if (io.WantCaptureMouse)
-        {
-            return;
-        }
+        // 注意：不检查 io.WantCaptureMouse，因为我们的 ECS UI 渲染在 ImGui 窗口内部
 
         // 清除所有实体的 HoveredTag
         auto hoveredView = registry.view<components::HoveredTag>();
@@ -134,7 +130,7 @@ private:
     }
 
     /**
-     * @brief 处理 SDL每tick事件 不用循环
+     * @brief 处理 SDL每tick事件
      *
      * - 负责 SDL_PollEvent 事件
      * - 将事件转发给 ImGui 后端 (ImGui_ImplSDL3_ProcessEvent)
@@ -148,24 +144,22 @@ private:
         while (SDL_PollEvent(&event))
         {
             ImGui_ImplSDL3_ProcessEvent(&event);
-
-            if (event.type == SDL_EVENT_QUIT)
+            switch (event.type)
             {
-                dispatcher.trigger<ui::events::QuitRequested>();
+                case SDL_EVENT_QUIT:
+                case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+                    dispatcher.trigger<ui::events::QuitRequested>();
+                    break;
+                case SDL_EVENT_WINDOW_RESIZED:
+                    // 可以触发 WindowResized 事件
+                    break;
+                default:
+                    break;
             }
-            else if (event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED)
-            {
-                dispatcher.trigger<ui::events::QuitRequested>();
-            }
-            if (event.type == SDL_EVENT_WINDOW_RESIZED)
-            {
-                dispatcher.trigger<ui::events::WindowResized>(
-                    ui::events::WindowResized{event.window.data1, event.window.data2});
-            }
-
-            // 保持与原逻辑一致：上层自定义事件处理在 Quit/Resize 之后执行。
-            dispatcher.trigger<ui::events::SDLEvent>(ui::events::SDLEvent{event});
         }
+
+        // 处理交互检测（在事件处理完成后）
+        getInput();
     }
 
     entt::entity m_activeEntity = entt::null; // 当前处于 Active (鼠标按下) 状态的实体

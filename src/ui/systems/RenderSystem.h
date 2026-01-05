@@ -57,6 +57,7 @@ public:
     {
         auto& dispatcher = utils::Dispatcher::getInstance();
         dispatcher.sink<events::GraphicsContextSetEvent>().connect<&RenderSystem::onGraphicsContextSet>(*this);
+        dispatcher.sink<ui::events::UpdateRendering>().connect<&RenderSystem::update>(*this);
     }
 
     /**
@@ -66,6 +67,7 @@ public:
     {
         auto& dispatcher = utils::Dispatcher::getInstance();
         dispatcher.sink<events::GraphicsContextSetEvent>().disconnect<&RenderSystem::onGraphicsContextSet>(*this);
+        dispatcher.sink<ui::events::UpdateRendering>().disconnect<&RenderSystem::update>(*this);
     }
 
 private:
@@ -240,6 +242,7 @@ private:
         ImGui::SetNextWindowSize(size.size);
 
         ImGuiWindowFlags flags = ImGuiWindowFlags_None;
+        if (!windowComp.hasTitleBar) flags |= ImGuiWindowFlags_NoTitleBar;
         if (windowComp.noResize) flags |= ImGuiWindowFlags_NoResize;
         if (windowComp.noMove) flags |= ImGuiWindowFlags_NoMove;
         if (windowComp.noCollapse) flags |= ImGuiWindowFlags_NoCollapse;

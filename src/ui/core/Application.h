@@ -68,15 +68,22 @@ public:
             std::make_unique<ImguiContext>(m_graphicsContext->getWindow(), m_graphicsContext->getRenderer());
         m_systems.registerAllHandlers();
 
-        // 并行调度输入和渲染任务
+        // 4. 设置图形上下文到系统管理器（必须在 registerAllHandlers 之后）
+        m_systems.setGraphicsContext(m_graphicsContext.get());
+
+        // 立即处理排队的事件，确保 GraphicsContext 被分发
+        utils::Dispatcher::getInstance().update();
+
+        // 顺序执行输入->渲染任务
         m_scheduler.attach<ui::InputTask>(16u);
-        m_scheduler.attach<ui::RenderTask>(16u);
+        m_scheduler.attach<ui::RenderTask>(0u);
 
         m_eventLoop.registerDefaultHandler(
             [this]()
             {
                 // 传递渲染上下文给任务
-                m_scheduler.update(16u);
+                m_scheduler.update(1u);
+                SDL_Delay(1); // 避免100% CPU占用
             });
 
         auto& dispatcher = utils::Dispatcher::getInstance();

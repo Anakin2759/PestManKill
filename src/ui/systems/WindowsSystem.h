@@ -75,7 +75,8 @@ public:
     }
     void onClose(entt::entity rootEntity)
     {
-        // 目前不需要处理窗口关闭事件
+        auto& dispatcher = ::utils::Dispatcher::getInstance();
+        dispatcher.trigger<ui::events::QuitRequested>();
     }
 };
 

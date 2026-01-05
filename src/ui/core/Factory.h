@@ -30,10 +30,15 @@ namespace ui::factory
 
 /**
  * @brief 基础可渲染实体初始化 (所有可见UI元素都需要)
+ * @param alias 组件别名，用于调试和识别
  */
-inline entt::entity createBaseWidget()
+inline entt::entity createBaseWidget(const std::string& alias = "")
 {
     auto entity = utils::Registry::getInstance().create();
+
+    // 基础信息组件
+    auto& baseInfo = utils::Registry::getInstance().emplace<components::BaseInfo>(entity);
+    baseInfo.alias = alias;
 
     // 核心组件
     utils::Registry::getInstance().emplace<components::Position>(entity);
@@ -72,10 +77,12 @@ inline void CreateFadeInAnimation(entt::entity entity, float duration)
 
 /**
  * @brief 创建按钮
+ * @param content 按钮文本
+ * @param alias 组件别名（默认使用 content）
  */
-inline entt::entity CreateButton(const std::string& content)
+inline entt::entity CreateButton(const std::string& content, const std::string& alias = "")
 {
-    auto entity = createBaseWidget();
+    auto entity = createBaseWidget(alias);
 
     // 类型 Tag
     utils::Registry::getInstance().emplace<components::ButtonTag>(entity);
@@ -96,10 +103,12 @@ inline entt::entity CreateButton(const std::string& content)
 
 /**
  * @brief 创建文本标签
+ * @param content 标签文本
+ * @param alias 组件别名（默认使用 content）
  */
-inline entt::entity CreateLabel(const std::string& content)
+inline entt::entity CreateLabel(const std::string& content, const std::string& alias = "")
 {
-    auto entity = createBaseWidget();
+    auto entity = createBaseWidget(alias);
 
     // 类型 Tag
     utils::Registry::getInstance().emplace<components::LabelTag>(entity);
@@ -116,10 +125,14 @@ inline entt::entity CreateLabel(const std::string& content)
 
 /**
  * @brief 创建文本编辑框
+ * @param placeholder 占位文本
+ * @param multiline 是否多行
+ * @param alias 组件别名
  */
-inline entt::entity CreateTextEdit(const std::string& placeholder = "", bool multiline = false)
+inline entt::entity
+    CreateTextEdit(const std::string& placeholder = "", bool multiline = false, const std::string& alias = "")
 {
-    auto entity = createBaseWidget();
+    auto entity = createBaseWidget(alias);
 
     // 类型 Tag
     utils::Registry::getInstance().emplace<components::TextEditTag>(entity);
@@ -138,10 +151,15 @@ inline entt::entity CreateTextEdit(const std::string& placeholder = "", bool mul
 
 /**
  * @brief 创建图像
+ * @param textureId 纹理句柄
+ * @param defaultWidth 默认宽度
+ * @param defaultHeight 默认高度
+ * @param alias 组件别名
  */
-inline entt::entity CreateImage(void* textureId, float defaultWidth = 50.0f, float defaultHeight = 50.0f)
+inline entt::entity
+    CreateImage(void* textureId, float defaultWidth = 50.0f, float defaultHeight = 50.0f, const std::string& alias = "")
 {
-    auto entity = createBaseWidget();
+    auto entity = createBaseWidget(alias);
 
     // 类型 Tag
     utils::Registry::getInstance().emplace<components::ImageTag>(entity);
@@ -160,10 +178,13 @@ inline entt::entity CreateImage(void* textureId, float defaultWidth = 50.0f, flo
 
 /**
  * @brief 创建箭头 (几何图形)
+ * @param start 起点
+ * @param end 终点
+ * @param alias 组件别名
  */
-inline entt::entity CreateArrow(const ImVec2& start, const ImVec2& end)
+inline entt::entity CreateArrow(const ImVec2& start, const ImVec2& end, const std::string& alias = "")
 {
-    auto entity = createBaseWidget();
+    auto entity = createBaseWidget(alias);
 
     // 类型 Tag
     utils::Registry::getInstance().emplace<components::ArrowTag>(entity);
@@ -183,11 +204,17 @@ inline entt::entity CreateArrow(const ImVec2& start, const ImVec2& end)
 
 /**
  * @brief 创建间隔器
+ * @param stretchFactor 拉伸因子
+ * @param alias 组件别名
  */
-inline entt::entity CreateSpacer(int stretchFactor = 1)
+inline entt::entity CreateSpacer(int stretchFactor = 1, const std::string& alias = "")
 {
     // Spacer 不需要基础组件如 VisibleTag, Alpha, Position
     auto entity = utils::Registry::getInstance().create();
+
+    // 基础信息组件
+    auto& baseInfo = utils::Registry::getInstance().emplace<components::BaseInfo>(entity);
+    baseInfo.alias = alias;
 
     utils::Registry::getInstance().emplace<components::SpacerTag>(entity);
     utils::Registry::getInstance().emplace<components::Hierarchy>(entity); // 允许它被添加到 Hierarchy
@@ -208,10 +235,13 @@ inline entt::entity CreateSpacer(int stretchFactor = 1)
 
 /**
  * @brief 创建固定尺寸的“空白占位”元素（用于固定间距；不使用 SpacerTag，避免被当作拉伸占位）
+ * @param width 宽度
+ * @param height 高度
+ * @param alias 组件别名
  */
-inline entt::entity CreateSpacer(float width, float height)
+inline entt::entity CreateSpacer(float width, float height, const std::string& alias = "")
 {
-    auto entity = createBaseWidget();
+    auto entity = createBaseWidget(alias);
     auto& size = utils::Registry::getInstance().get<components::Size>(entity);
     size.size = {width, height};
     size.autoSize = false;
@@ -224,9 +254,14 @@ inline entt::entity CreateSpacer(float width, float height)
 #ifdef CreateDialog
 #undef CreateDialog
 #endif
-inline entt::entity CreateDialog(std::string_view title)
+/**
+ * @brief 创建对话框
+ * @param title 对话框标题
+ * @param alias 组件别名（默认使用 title）
+ */
+inline entt::entity CreateDialog(std::string_view title, const std::string& alias = "")
 {
-    auto entity = createBaseWidget();
+    auto entity = createBaseWidget(alias);
 
     // 类型 Tag
     utils::Registry::getInstance().emplace<components::DialogTag>(entity);
@@ -253,9 +288,14 @@ inline entt::entity CreateDialog(std::string_view title)
 #ifdef CreateWindow
 #undef CreateWindow
 #endif
-inline entt::entity CreateWindow(std::string_view title)
+/**
+ * @brief 创建窗口
+ * @param title 窗口标题
+ * @param alias 组件别名（默认使用 title）
+ */
+inline entt::entity CreateWindow(std::string_view title, const std::string& alias = "")
 {
-    auto entity = createBaseWidget();
+    auto entity = createBaseWidget(alias);
 
     // 类型 Tag
     utils::Registry::getInstance().emplace<components::WindowTag>(entity);
@@ -278,10 +318,11 @@ inline entt::entity CreateWindow(std::string_view title)
 
 /**
  * @brief 创建垂直布局容器 (VBox)
+ * @param alias 组件别名
  */
-inline entt::entity CreateVBoxLayout()
+inline entt::entity CreateVBoxLayout(const std::string& alias = "")
 {
-    auto entity = createBaseWidget();
+    auto entity = createBaseWidget(alias);
 
     // 布局信息
     auto& layout = utils::Registry::getInstance().emplace<components::LayoutInfo>(entity);
@@ -298,10 +339,11 @@ inline entt::entity CreateVBoxLayout()
 
 /**
  * @brief 创建水平布局容器 (HBox)
+ * @param alias 组件别名
  */
-inline entt::entity CreateHBoxLayout()
+inline entt::entity CreateHBoxLayout(const std::string& alias = "")
 {
-    auto entity = createBaseWidget();
+    auto entity = createBaseWidget(alias);
 
     // 布局信息
     auto& layout = utils::Registry::getInstance().emplace<components::LayoutInfo>(entity);
@@ -316,17 +358,31 @@ inline entt::entity CreateHBoxLayout()
     return entity;
 }
 
-inline entt::entity CreateTextInput(std::string_view initialText = "", std::string_view placeholder = "")
+/**
+ * @brief 创建单行文本输入框
+ * @param initialText 初始文本
+ * @param placeholder 占位文本
+ * @param alias 组件别名
+ */
+inline entt::entity
+    CreateTextInput(std::string_view initialText = "", std::string_view placeholder = "", const std::string& alias = "")
 {
-    auto entity = CreateTextEdit(std::string(placeholder), false);
+    auto entity = CreateTextEdit(std::string(placeholder), false, alias);
     auto& edit = utils::Registry::getInstance().get<components::TextEdit>(entity);
     edit.buffer = std::string(initialText);
     return entity;
 }
 
-inline entt::entity CreateTextArea(std::string_view initialText = "", std::string_view placeholder = "")
+/**
+ * @brief 创建多行文本区域
+ * @param initialText 初始文本
+ * @param placeholder 占位文本
+ * @param alias 组件别名
+ */
+inline entt::entity
+    CreateTextArea(std::string_view initialText = "", std::string_view placeholder = "", const std::string& alias = "")
 {
-    auto entity = CreateTextEdit(std::string(placeholder), true);
+    auto entity = CreateTextEdit(std::string(placeholder), true, alias);
     auto& edit = utils::Registry::getInstance().get<components::TextEdit>(entity);
     edit.buffer = std::string(initialText);
     return entity;

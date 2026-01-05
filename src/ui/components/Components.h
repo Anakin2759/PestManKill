@@ -26,6 +26,11 @@
 namespace ui::components
 {
 
+// ===================== 基本信息组件 =====================
+struct BaseInfo
+{
+    std::string alias; // 组件别名，便于调试和识别
+};
 // ===================== 基础尺寸与位置 =====================
 
 /**
@@ -187,7 +192,7 @@ struct Image
  */
 struct Clickable
 {
-    std::function<void(entt::entity)> onClick{};
+    std::move_only_function<void(entt::entity)> onClick{};
     bool enabled = true;
 };
 
