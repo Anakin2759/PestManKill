@@ -31,7 +31,7 @@
 #include "src/ui/core/Factory.h"
 #include "src/ui/core/Helper.h"
 
-int main(int argc, char* argv[])
+int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 {
     utils::functions::setConsoleToUTF8();
     try
