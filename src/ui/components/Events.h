@@ -125,15 +125,15 @@ struct WindowResized
  * @brief 按钮点击事件。
  * 合并 ButtonClicked 和 ButtonClickEvent，只保留核心信息。
  */
-struct ButtonClick
+struct ClickEvent
 {
     entt::entity entity;
     // 如果需要标识，InteractionSystem 应负责查询该实体的 Name/ID 组件。
 };
-
-// 兼容旧命名
-using ButtonClickedEvent = ButtonClick;
-
+struct HoverEvent
+{
+    entt::entity entity;
+};
 /**
  * @brief 文本内容改变事件 (TextEdit/Input)。
  * 替代 TextChanged。

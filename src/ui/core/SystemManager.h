@@ -33,6 +33,7 @@
 #include "src/ui/systems/InteractionSystem.h"
 #include "src/ui/systems/LayoutSystem.h"
 #include "src/ui/systems/WindowsSystem.h" // 保持与 Application.h 中的一致
+#include "src/ui/systems/ActionSystem.h"
 // 引入其他依赖
 #include "src/ui/core/Factory.h"
 #include "src/ui/components/Components.h"
@@ -68,8 +69,9 @@ private:
         LAYOUT = 2,      // 布局系统
         RENDER = 3,      // 渲染系统
         WINDOW = 4,      // 窗口同步系统
+        ACTION = 5
     };
-    static constexpr size_t SYSTEM_COUNT = 5;
+    static constexpr size_t SYSTEM_COUNT = 6;
 
 public:
     // 构造函数：初始化所有子系统
@@ -84,6 +86,7 @@ public:
         m_systems.emplace_back(systems::LayoutSystem{});
         m_systems.emplace_back(systems::RenderSystem{});
         m_systems.emplace_back(systems::WindowSystem{});
+        m_systems.emplace_back(systems::ActionSystem{});
     }
 
     ~SystemManager() = default;

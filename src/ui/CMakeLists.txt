@@ -44,7 +44,7 @@ target_compile_options(ui INTERFACE
 set(UI_HEADERS
     # Components
     components/Components.h
-    components/Define.h
+    components/Policies.h
     components/Tags.h
     components/Events.h
     

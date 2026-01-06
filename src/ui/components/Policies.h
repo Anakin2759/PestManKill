@@ -1,7 +1,7 @@
 /**
  * ************************************************************************
  *
- * @file Define.h
+ * @file Policies.h
  * @author AnakinLiu (azrael2759@qq.com)
  * @date 2025-12-05
  * @brief UI 相关的全局定义 (优化后)
@@ -11,7 +11,7 @@
 #pragma once
 #include <cstdint>
 
-namespace ui::components
+namespace ui::policies
 {
 /**
  * @brief 布局方向枚举
@@ -48,7 +48,7 @@ enum class Alignment : uint8_t
 /**
  * @brief 动画播放模式枚举
  */
-enum class PlayMode : uint8_t
+enum class Play : uint8_t
 {
     ONCE,    // 单次播放
     LOOP,    // 循环
@@ -58,7 +58,7 @@ enum class PlayMode : uint8_t
 /**
  * @brief 动画缓动类型枚举 (使用专业名称)
  */
-enum class EasingType : uint8_t
+enum class Easing : uint8_t
 {
     Linear, // 线性
 
@@ -77,7 +77,7 @@ enum class EasingType : uint8_t
 /**
  * @brief 交互类型枚举 (注意：建议通过 ECS Event 触发动作，此枚举用于标记UI意图)
  */
-enum class InteractionType : uint8_t
+enum class Interaction : uint8_t
 {
     None,
     Click,
@@ -91,7 +91,7 @@ enum class InteractionType : uint8_t
 /**
  * @brief 按钮视觉状态枚举
  */
-enum class ButtonVisualState : uint8_t
+enum class ButtonVisual : uint8_t
 {
     Idle,    // 默认状态
     Hover,   // 鼠标悬停
@@ -99,4 +99,22 @@ enum class ButtonVisualState : uint8_t
     Disabled // 不可用状态
 };
 
-} // namespace ui::components
+enum class Focus : uint8_t
+{
+    NoFocus,    // 不接受焦点
+    TabFocus,   // 通过 Tab 键接受焦点
+    ClickFocus, // 通过鼠标点击接受焦点
+    StrongFocus // 通过 Tab 键和鼠标点击均可接受焦点
+};
+
+/**
+ * @brief 尺寸策略枚举
+ */
+enum class Size : uint8_t
+{
+    Fixed,     // 固定尺寸
+    Auto,      // 根据内容自动调整
+    FillParent // 填满父容器 (减去内边距)
+};
+
+} // namespace ui::policies

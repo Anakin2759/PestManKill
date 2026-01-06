@@ -133,6 +133,21 @@ public:
 
             if (hierarchy.parent == entt::null)
             {
+                // 对于顶层实体，处理 FillParent 尺寸策略（使用屏幕尺寸）
+                auto* sizeComp = registry.try_get<components::Size>(entity);
+                if (sizeComp)
+                {
+                    const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+                    if (sizeComp->widthPolicy == policies::Size::FillParent)
+                    {
+                        sizeComp->size.x = displaySize.x;
+                    }
+                    if (sizeComp->heightPolicy == policies::Size::FillParent)
+                    {
+                        sizeComp->size.y = displaySize.y;
+                    }
+                }
+
                 // 递归渲染。根画布的绝对位置是 (0, 0)
                 renderEntityRecursive(registry, entity, draw_list, ImVec2(0, 0), 1.0f);
             }
@@ -233,19 +248,42 @@ private:
     void renderWindow(entt::entity entity, const ImVec2& absolutePos, float globalAlpha)
     {
         auto& registry = utils::Registry::getInstance();
-        const auto& windowComp = registry.get<const components::Window>(entity);
         const auto& size = registry.get<const components::Size>(entity);
         const auto* hierarchy = registry.try_get<components::Hierarchy>(entity);
+
+        // 获取窗口/对话框属性（兼容 Window 和 Dialog 组件）
+        std::string title;
+        bool hasTitleBar = true;
+        bool noResize = false;
+        bool noMove = false;
+        bool noCollapse = true; // Dialog 默认无折叠
+
+        if (const auto* windowComp = registry.try_get<components::Window>(entity))
+        {
+            title = windowComp->title;
+            hasTitleBar = windowComp->hasTitleBar;
+            noResize = windowComp->noResize;
+            noMove = windowComp->noMove;
+            noCollapse = windowComp->noCollapse;
+        }
+        else if (const auto* dialogComp = registry.try_get<components::Dialog>(entity))
+        {
+            title = dialogComp->title;
+            hasTitleBar = dialogComp->hasTitleBar;
+            noResize = dialogComp->noResize;
+            noMove = dialogComp->noMove;
+            noCollapse = true; // Dialog 没有 noCollapse 字段，默认禁用
+        }
 
         // --- 1. 设置 ImGui 窗口状态 ---
         ImGui::SetNextWindowPos(absolutePos);
         ImGui::SetNextWindowSize(size.size);
 
         ImGuiWindowFlags flags = ImGuiWindowFlags_None;
-        if (!windowComp.hasTitleBar) flags |= ImGuiWindowFlags_NoTitleBar;
-        if (windowComp.noResize) flags |= ImGuiWindowFlags_NoResize;
-        if (windowComp.noMove) flags |= ImGuiWindowFlags_NoMove;
-        if (windowComp.noCollapse) flags |= ImGuiWindowFlags_NoCollapse;
+        if (!hasTitleBar) flags |= ImGuiWindowFlags_NoTitleBar;
+        if (noResize) flags |= ImGuiWindowFlags_NoResize;
+        if (noMove) flags |= ImGuiWindowFlags_NoMove;
+        if (noCollapse) flags |= ImGuiWindowFlags_NoCollapse;
         // ImGui 的“模态”语义通常通过 BeginPopupModal 实现；此处使用普通 Begin，不设置不存在的 WindowFlags。
 
         // 标记：如果 ECS 窗口/对话框没有 Background 组件，则使用 ImGui 默认背景。
@@ -256,7 +294,7 @@ private:
         }
 
         // --- 2. 绘制 ImGui 窗口（使用 title 作为 ImGui ID） ---
-        if (ImGui::Begin(windowComp.title.c_str(), nullptr, flags))
+        if (ImGui::Begin(title.c_str(), nullptr, flags))
         {
             ImDrawList* window_draw_list = ImGui::GetWindowDrawList();
             ImVec2 contentStartPos = ImGui::GetCursorScreenPos();
@@ -332,20 +370,20 @@ private:
                 const ImVec2 textSize = ImGui::CalcTextSize(textComp->content.c_str());
 
                 const uint8_t align = static_cast<uint8_t>(textComp->alignment);
-                if (align & static_cast<uint8_t>(components::Alignment::HCENTER))
+                if (align & static_cast<uint8_t>(policies::Alignment::HCENTER))
                 {
                     textPos.x = pos.x + (size.x - textSize.x) * 0.5f;
                 }
-                else if (align & static_cast<uint8_t>(components::Alignment::RIGHT))
+                else if (align & static_cast<uint8_t>(policies::Alignment::RIGHT))
                 {
                     textPos.x = pos.x + (size.x - textSize.x);
                 }
 
-                if (align & static_cast<uint8_t>(components::Alignment::VCENTER))
+                if (align & static_cast<uint8_t>(policies::Alignment::VCENTER))
                 {
                     textPos.y = pos.y + (size.y - textSize.y) * 0.5f;
                 }
-                else if (align & static_cast<uint8_t>(components::Alignment::BOTTOM))
+                else if (align & static_cast<uint8_t>(policies::Alignment::BOTTOM))
                 {
                     textPos.y = pos.y + (size.y - textSize.y);
                 }

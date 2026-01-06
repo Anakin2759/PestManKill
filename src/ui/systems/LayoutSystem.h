@@ -27,7 +27,7 @@
 #include <utils.h>
 #include "src/ui/components/Components.h"
 #include "src/ui/components/Tags.h"
-#include "src/ui/components/Define.h"
+#include "src/ui/components/Policies.h"
 #include "src/ui/components/Events.h"
 #include "src/ui/interface/Isystem.h"
 
@@ -160,7 +160,7 @@ private:
                 const auto& childSize = registry.get<const components::Size>(childEntity);
 
                 // 累加固定尺寸元素占用的主要轴空间
-                if (layout.direction == components::LayoutDirection::HORIZONTAL)
+                if (layout.direction == policies::LayoutDirection::HORIZONTAL)
                 {
                     fixedSpace += childSize.size.x;
                 }
@@ -193,7 +193,7 @@ private:
             // 假设所有 Spacer 尺寸为 0，计算最小内容尺寸
             float minContentSpace = fixedSpace;
 
-            if (layout.direction == components::LayoutDirection::HORIZONTAL)
+            if (layout.direction == policies::LayoutDirection::HORIZONTAL)
             {
                 containerSize.size.x = minContentSpace + padding.y + padding.z;
             }
@@ -214,7 +214,7 @@ private:
         // 1. 计算剩余可用空间 (用于 Spacer)
         float remainingSpace = 0.0f;
 
-        if (layout.direction == components::LayoutDirection::HORIZONTAL)
+        if (layout.direction == policies::LayoutDirection::HORIZONTAL)
         {
             remainingSpace = availableWidth - fixedSpace;
         }
@@ -239,8 +239,20 @@ private:
         {
             if (!registry.all_of<components::Position, components::Size>(childEntity)) continue;
 
-            auto& childPos = registry.get<components::Position>(childEntity);
             auto& childSize = registry.get<components::Size>(childEntity);
+
+            // 处理 FillParent 尺寸策略
+            if (childSize.widthPolicy == policies::Size::FillParent)
+            {
+                childSize.size.x = containerInnerWidth;
+            }
+            if (childSize.heightPolicy == policies::Size::FillParent)
+            {
+                childSize.size.y = containerInnerHeight;
+            }
+
+            auto& childPos = registry.get<components::Position>(childEntity);
+            // childSize 已在上方声明
 
             // 计算 Spacer 尺寸
             float spacerLength = 0.0f;
@@ -250,7 +262,7 @@ private:
                 spacerLength = spacerComp.stretchFactor * spacePerStretch;
             }
 
-            if (layout.direction == components::LayoutDirection::HORIZONTAL)
+            if (layout.direction == policies::LayoutDirection::HORIZONTAL)
             {
                 // A. 设置 X 轴位置
                 childPos.value.x = currentX;
@@ -314,16 +326,16 @@ private:
                                 float containerInnerYStart)
     {
         // Alignment 组件存储在子元素实体上
-        const auto* alignmentComp = registry.try_get<components::Alignment>(childEntity);
+        const auto* alignmentComp = registry.try_get<policies::Alignment>(childEntity);
         const uint8_t alignment = alignmentComp ? static_cast<uint8_t>(*alignmentComp) : 0;
 
         // 默认是从 Top Padding 开始，即 Top 贴边
-        if (alignment & static_cast<uint8_t>(components::Alignment::VCENTER))
+        if (alignment & static_cast<uint8_t>(policies::Alignment::VCENTER))
         {
             // 垂直居中 = Y 轴起始位置 + (容器高度 - 自身高度) / 2
             pos.value.y = containerInnerYStart + (containerInnerHeight - size.size.y) / 2.0f;
         }
-        else if (alignment & static_cast<uint8_t>(components::Alignment::BOTTOM))
+        else if (alignment & static_cast<uint8_t>(policies::Alignment::BOTTOM))
         {
             // 底部对齐 = Y 轴起始位置 + 容器高度 - 自身高度
             pos.value.y = containerInnerYStart + containerInnerHeight - size.size.y;
@@ -360,16 +372,16 @@ private:
                                   float containerInnerWidth,
                                   float containerInnerXStart)
     {
-        const auto* alignmentComp = registry.try_get<components::Alignment>(childEntity);
+        const auto* alignmentComp = registry.try_get<policies::Alignment>(childEntity);
         const uint8_t alignment = alignmentComp ? static_cast<uint8_t>(*alignmentComp) : 0;
 
         // 默认是从 Left Padding 开始，即 LEFT 贴边
-        if (alignment & static_cast<uint8_t>(components::Alignment::HCENTER))
+        if (alignment & static_cast<uint8_t>(policies::Alignment::HCENTER))
         {
             // 水平居中 = X 轴起始位置 + (容器宽度 - 自身宽度) / 2
             pos.value.x = containerInnerXStart + (containerInnerWidth - size.size.x) / 2.0f;
         }
-        else if (alignment & static_cast<uint8_t>(components::Alignment::RIGHT))
+        else if (alignment & static_cast<uint8_t>(policies::Alignment::RIGHT))
         {
             // 右对齐 = X 轴起始位置 + 容器宽度 - 自身宽度
             pos.value.x = containerInnerXStart + containerInnerWidth - size.size.x;

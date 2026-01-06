@@ -88,7 +88,7 @@ private:
             if (animTime.elapsed >= animTime.duration)
             {
                 // 根据播放模式处理
-                if (animTime.mode == components::PlayMode::ONCE)
+                if (animTime.mode == policies::Play::ONCE)
                 {
                     // 移除动画组件
                     registry.remove<components::AnimationTime>(entity);
@@ -100,7 +100,7 @@ private:
                     // 触发动画完成事件
                     dispatcher.trigger<events::AnimationComplete>(events::AnimationComplete{entity});
                 }
-                else if (animTime.mode == components::PlayMode::LOOP)
+                else if (animTime.mode == policies::Play::LOOP)
                 {
                     // 重置动画
                     animTime.elapsed = 0.0f;
@@ -111,17 +111,17 @@ private:
     /**
      * @brief 应用缓动函数
      */
-    float applyEasing(float t, components::EasingType easing) const
+    float applyEasing(float t, policies::Easing easing) const
     {
         switch (easing)
         {
-            case components::EasingType::Linear:
+            case policies::Easing::Linear:
                 return t;
-            case components::EasingType::EaseInQuad:
+            case policies::Easing::EaseInQuad:
                 return t * t;
-            case components::EasingType::EaseOutQuad:
+            case policies::Easing::EaseOutQuad:
                 return t * (2.0f - t);
-            case components::EasingType::EaseInOutQuad:
+            case policies::Easing::EaseInOutQuad:
                 return t < 0.5f ? 2.0f * t * t : -1.0f + (4.0f - 2.0f * t) * t;
             default:
                 return t;

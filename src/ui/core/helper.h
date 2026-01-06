@@ -20,7 +20,7 @@
 #include <algorithm>               // For std::clamp
 #include "components/Components.h" // 包含所有数据组件
 #include "components/Tags.h"       // 包含所有 Tag 组件
-#include "components/Define.h"     // 包含所有枚举
+#include "components/Policies.h"   // 包含所有枚举
 #include <utils.h>                 // 包含 Registry
 
 namespace ui::helper
@@ -451,7 +451,7 @@ inline void traverseChildren(::entt::entity parent, Func visitor)
 /**
  * @brief 检查是否对齐方式包含指定标志
  */
-inline bool hasAlignment(components::Alignment value, components::Alignment flag)
+inline bool hasAlignment(policies::Alignment value, policies::Alignment flag)
 {
     return (static_cast<uint8_t>(value) & static_cast<uint8_t>(flag)) != 0;
 }

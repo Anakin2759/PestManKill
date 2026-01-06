@@ -21,7 +21,7 @@
 #include <functional>
 #include <cfloat>
 #include <entt/entt.hpp>
-#include "Define.h"
+#include "Policies.h"
 
 namespace ui::components
 {
@@ -41,7 +41,9 @@ struct Size
     ImVec2 size{0.0f, 0.0f};
     ImVec2 minSize{0.0f, 0.0f};
     ImVec2 maxSize{FLT_MAX, FLT_MAX};
-    bool autoSize = true; // 是否自动根据内容调整大小
+    bool autoSize = true;                               // 是否自动根据内容调整大小 (兼容旧代码)
+    policies::Size widthPolicy = policies::Size::Auto;  // 宽度策略
+    policies::Size heightPolicy = policies::Size::Auto; // 高度策略
 };
 
 /**
@@ -129,7 +131,7 @@ struct ScrollArea
  */
 struct LayoutInfo
 {
-    LayoutDirection direction = LayoutDirection::HORIZONTAL;
+    policies::LayoutDirection direction = policies::LayoutDirection::HORIZONTAL;
     float spacing = 5.0f; // 元素间距
 };
 
@@ -151,7 +153,7 @@ struct Text
     std::string content;
     ImVec4 color{1.0f, 1.0f, 1.0f, 1.0f};
     float fontSize = 0.0f; // 0 表示使用 ImGui 默认字体大小
-    Alignment alignment = Alignment::NONE;
+    policies::Alignment alignment = policies::Alignment::NONE;
     bool wordWrap = false;
     float wrapWidth = 0.0f;
 };
@@ -192,7 +194,7 @@ struct Image
  */
 struct Clickable
 {
-    std::move_only_function<void(entt::entity)> onClick{};
+    std::move_only_function<void()> onClick{};
     bool enabled = true;
 };
 
@@ -209,7 +211,7 @@ struct Checkable
  */
 struct ButtonState
 {
-    ButtonVisualState visual = ButtonVisualState::Idle;
+    policies::ButtonVisual visual = policies::ButtonVisual::Idle;
     bool triggered = false; // 本帧是否触发过动作
 };
 
@@ -222,8 +224,8 @@ struct AnimationTime
 {
     float duration = 1.0f;
     float elapsed = 0.0f;
-    EasingType easing = EasingType::Linear;
-    PlayMode mode = PlayMode::ONCE;
+    policies::Easing easing = policies::Easing::Linear;
+    policies::Play mode = policies::Play::ONCE;
 };
 
 /**
@@ -260,6 +262,20 @@ struct Window
     bool noResize = false;
     bool noMove = false;
     bool noCollapse = false;
+};
+
+/**
+ * @brief 对话框组件
+ */
+struct Dialog
+{
+    std::string title;
+    ImVec2 minSize{200.0f, 150.0f};
+    ImVec2 maxSize{FLT_MAX, FLT_MAX};
+    bool hasTitleBar = true;
+    bool modal = false;
+    bool noResize = false;
+    bool noMove = false;
 };
 
 /**

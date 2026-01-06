@@ -22,8 +22,44 @@
 
 #include <entt/entt.hpp>
 #include <utils.h>
-
+namespace ui::systems
+{
 class ActionSystem : public ui::interface::EnableRegister<ActionSystem>
 {
 public:
+    void registerHandlersImpl()
+    {
+        auto& dispatcher = utils::Dispatcher::getInstance();
+        dispatcher.sink<ui::events::ClickEvent>().connect<&ActionSystem::onClickEvent>(*this);
+    }
+    void unregisterHandlersImpl()
+    {
+        auto& dispatcher = utils::Dispatcher::getInstance();
+        dispatcher.sink<ui::events::ClickEvent>().disconnect<&ActionSystem::onClickEvent>(*this);
+    }
+
+private:
+    /**
+     * @brief 处理点击事件
+     * @param event 点击事件数据
+     */
+    void onClickEvent(const ui::events::ClickEvent& event)
+    {
+        auto& registry = utils::Registry::getInstance();
+        if (!registry.valid(event.entity)) return;
+
+        auto* clickable = registry.try_get<ui::components::Clickable>(event.entity);
+        if (clickable && clickable->enabled && clickable->onClick)
+        {
+            clickable->onClick();
+        }
+    }
+
+    void onHoverEvent(const ui::events::HoverEvent& event)
+    {
+        // 目前不处理悬浮事件
+    }
+
+    
 };
+} // namespace ui::systems

@@ -50,19 +50,18 @@ public:
 private:
     /**
      * @brief 处理每一帧输入事件和交互状态更新
+     * @param mousePressed 本帧是否有鼠标按下事件（来自 SDL）
+     * @param mouseReleased 本帧是否有鼠标释放事件（来自 SDL）
      */
-    void getInput() noexcept
+    void getInput(bool mousePressed, bool mouseReleased) noexcept
     {
         auto& registry = ::utils::Registry::getInstance();
         auto& dispatcher = ::utils::Dispatcher::getInstance();
 
-        // 获取鼠标状态
-        ImGuiIO& io = ImGui::GetIO();
-        ImVec2 mousePos = io.MousePos;
-        bool mouseDown = io.MouseDown[0];
-        bool mouseReleased = io.MouseReleased[0];
-
-        // 注意：不检查 io.WantCaptureMouse，因为我们的 ECS UI 渲染在 ImGui 窗口内部
+        // 获取鼠标位置（SDL API 直接获取，不依赖 ImGui IO 帧更新）
+        float mouseX, mouseY;
+        SDL_GetMouseState(&mouseX, &mouseY);
+        ImVec2 mousePos(mouseX, mouseY);
 
         // 清除所有实体的 HoveredTag
         auto hoveredView = registry.view<components::HoveredTag>();
@@ -79,7 +78,7 @@ private:
         // 从前到后进行碰撞测试
         for (auto entity : interactables)
         {
-            const auto& pos = registry.get<const components::Position>(entity);
+            [[maybe_unused]] const auto& pos = registry.get<const components::Position>(entity);
             const auto& size = registry.get<const components::Size>(entity);
 
             ImVec2 absPos = getAbsolutePosition(registry, entity);
@@ -97,8 +96,8 @@ private:
             registry.emplace_or_replace<components::HoveredTag>(hoveredEntity);
         }
 
-        // 处理鼠标按下
-        if (mouseDown && hoveredEntity != entt::null)
+        // 处理鼠标按下（使用 SDL 事件驱动的状态）
+        if (mousePressed && hoveredEntity != entt::null)
         {
             if (m_activeEntity == entt::null)
             {
@@ -107,7 +106,7 @@ private:
             }
         }
 
-        // 处理鼠标释放
+        // 处理鼠标释放（使用 SDL 事件驱动的状态）
         if (mouseReleased && m_activeEntity != entt::null)
         {
             registry.remove<components::ActiveTag>(m_activeEntity);
@@ -115,13 +114,10 @@ private:
             // 如果释放时仍然在同一实体上，触发点击事件
             if (m_activeEntity == hoveredEntity)
             {
+                LOG_INFO("Entity {} clicked", static_cast<uint32_t>(m_activeEntity));
                 if (auto* clickable = registry.try_get<components::Clickable>(m_activeEntity))
                 {
-                    if (clickable->onClick)
-                    {
-                        clickable->onClick(m_activeEntity);
-                    }
-                    dispatcher.trigger<events::ButtonClick>(events::ButtonClick{m_activeEntity});
+                    dispatcher.trigger<events::ClickEvent>(events::ClickEvent{m_activeEntity});
                 }
             }
 
@@ -135,12 +131,16 @@ private:
      * - 负责 SDL_PollEvent 事件
      * - 将事件转发给 ImGui 后端 (ImGui_ImplSDL3_ProcessEvent)
      * - 识别 Quit / Window Resized，并通过回调交由上层处理
+     * - 直接从 SDL 事件中追踪鼠标状态（避免依赖 ImGui IO 时序问题）
      */
     void onSDLEvent(ui::events::SDLEvent& sdlEvent)
     {
         auto& dispatcher = ::utils::Dispatcher::getInstance();
 
         auto& event = sdlEvent.event;
+        bool mousePressed = false;
+        bool mouseReleased = false;
+
         while (SDL_PollEvent(&event))
         {
             ImGui_ImplSDL3_ProcessEvent(&event);
@@ -153,16 +153,31 @@ private:
                 case SDL_EVENT_WINDOW_RESIZED:
                     // 可以触发 WindowResized 事件
                     break;
+                case SDL_EVENT_MOUSE_BUTTON_DOWN:
+                    if (event.button.button == SDL_BUTTON_LEFT)
+                    {
+                        mousePressed = true;
+                        m_mouseDown = true;
+                    }
+                    break;
+                case SDL_EVENT_MOUSE_BUTTON_UP:
+                    if (event.button.button == SDL_BUTTON_LEFT)
+                    {
+                        mouseReleased = true;
+                        m_mouseDown = false;
+                    }
+                    break;
                 default:
                     break;
             }
         }
 
         // 处理交互检测（在事件处理完成后）
-        getInput();
+        getInput(mousePressed, mouseReleased);
     }
 
     entt::entity m_activeEntity = entt::null; // 当前处于 Active (鼠标按下) 状态的实体
+    bool m_mouseDown = false;                 // 鼠标按下状态（基于 SDL 事件追踪）
 
     /**
      * @brief 执行点碰撞测试 (Hit Test)
@@ -181,23 +196,61 @@ private:
      * @param registry 注册表
      * @param entity 当前实体
      * @return ImVec2 实体的绝对位置
+     *
+     * @note 对于 Window/Dialog 容器的子元素，需要加上 ImGui 窗口的内容区偏移
+     *       以与 RenderSystem 中的渲染位置保持一致。
      */
     ImVec2 getAbsolutePosition(entt::registry& registry, entt::entity entity)
     {
-        ImVec2 pos(0.0f, 0.0f);
+        // 构建从当前实体到根的路径
+        std::vector<entt::entity> path;
         entt::entity current = entity;
-
-        // 遍历层级，累加相对位置
         while (current != entt::null && registry.valid(current))
         {
-            const auto* posComp = registry.try_get<components::Position>(current);
+            path.push_back(current);
+            const auto* hierarchy = registry.try_get<components::Hierarchy>(current);
+            current = hierarchy ? hierarchy->parent : entt::null;
+        }
+
+        // 从根到当前实体正向遍历，模拟 RenderSystem 的递归逻辑
+        ImVec2 pos(0.0f, 0.0f);
+        for (auto it = path.rbegin(); it != path.rend(); ++it)
+        {
+            entt::entity e = *it;
+            const auto* posComp = registry.try_get<components::Position>(e);
             if (posComp)
             {
                 pos.x += posComp->value.x;
                 pos.y += posComp->value.y;
             }
-            const auto* hierarchy = registry.try_get<components::Hierarchy>(current);
-            current = hierarchy ? hierarchy->parent : entt::null;
+
+            // 检查是否是 Window/Dialog 容器
+            // 如果是，需要获取 ImGui 窗口的内容区偏移（与 RenderSystem 保持一致）
+            if (registry.any_of<components::WindowTag, components::DialogTag>(e))
+            {
+                const auto* windowComp = registry.try_get<components::Window>(e);
+                if (windowComp)
+                {
+                    // 获取 ImGui 窗口状态以计算内容区偏移
+                    // ImGui::FindWindowByName 返回 ImGuiWindow*，但这是内部 API
+                    // 改用 SetNextWindowPos/Begin 配合 GetCursorScreenPos 的差值
+                    // 但由于我们在事件处理中而非渲染帧中，无法直接调用 ImGui::Begin
+                    // 因此使用预估值：标题栏高度约为 ImGui::GetFrameHeight()，无标题栏则为 0
+                    // 加上 ImGui 窗口的默认 Padding
+
+                    float titleBarOffset = windowComp->hasTitleBar ? ImGui::GetFrameHeight() : 0.0f;
+                    ImVec2 windowPadding = ImGui::GetStyle().WindowPadding;
+
+                    // 从当前实体到根已经累加了窗口的 Position
+                    // 现在需要为下一层（子元素）添加内容区偏移
+                    // 但我们是从根到叶遍历，所以在处理完窗口后加上偏移
+                    if (it + 1 != path.rend()) // 如果不是最终目标实体
+                    {
+                        pos.x += windowPadding.x;
+                        pos.y += titleBarOffset + windowPadding.y;
+                    }
+                }
+            }
         }
         return pos;
     }

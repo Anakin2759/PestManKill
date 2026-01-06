@@ -22,7 +22,7 @@
 #include <functional>
 #include "src/ui/components/Components.h"
 #include "src/ui/components/Tags.h"
-#include "src/ui/components/Define.h"
+#include "src/ui/components/Policies.h"
 #include "src/ui/components/Events.h"
 #include <utils.h>
 namespace ui::factory
@@ -267,7 +267,7 @@ inline entt::entity CreateDialog(std::string_view title, const std::string& alia
     utils::Registry::getInstance().emplace<components::DialogTag>(entity);
 
     // 内容容器组件 (包含 title, min/max size)
-    auto& dialog = utils::Registry::getInstance().emplace<components::Window>(entity);
+    auto& dialog = utils::Registry::getInstance().emplace<components::Dialog>(entity);
     dialog.title = std::string(title);
     dialog.modal = true; // 对话框通常是模态的
 
@@ -326,7 +326,7 @@ inline entt::entity CreateVBoxLayout(const std::string& alias = "")
 
     // 布局信息
     auto& layout = utils::Registry::getInstance().emplace<components::LayoutInfo>(entity);
-    layout.direction = ui::components::LayoutDirection::VERTICAL;
+    layout.direction = ui::policies::LayoutDirection::VERTICAL;
 
     // 布局容器默认自适应尺寸
     utils::Registry::getInstance().get<components::Size>(entity).autoSize = true;
@@ -347,7 +347,7 @@ inline entt::entity CreateHBoxLayout(const std::string& alias = "")
 
     // 布局信息
     auto& layout = utils::Registry::getInstance().emplace<components::LayoutInfo>(entity);
-    layout.direction = ui::components::LayoutDirection::HORIZONTAL;
+    layout.direction = ui::policies::LayoutDirection::HORIZONTAL;
 
     // 布局容器默认自适应尺寸
     utils::Registry::getInstance().get<components::Size>(entity).autoSize = true;
