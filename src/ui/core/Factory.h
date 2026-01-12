@@ -94,6 +94,8 @@ inline entt::entity CreateButton(const std::string& content, const std::string& 
     // 内容组件
     auto& text = utils::Registry::getInstance().emplace<components::Text>(entity);
     text.content = content;
+    text.alignment = ui::policies::Alignment::CENTER;
+    text.fontSize = 0.0f;
 
     // 默认尺寸自适应
     utils::Registry::getInstance().get<components::Size>(entity).autoSize = true;

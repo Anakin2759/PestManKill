@@ -16,3 +16,11 @@ target_link_libraries(shared INTERFACE
 
 # C++23 标准
 target_compile_features(shared INTERFACE cxx_std_23)
+
+# 显式编译选项以确保 MSVC/clang-cl 正确识别 C++23
+target_compile_options(shared INTERFACE
+    $<$<CXX_COMPILER_ID:GNU>:-std=c++23>
+    $<$<AND:$<CXX_COMPILER_ID:Clang>,$<NOT:$<CXX_COMPILER_FRONTEND_VARIANT:MSVC>>>:-std=c++23>
+    $<$<CXX_COMPILER_ID:MSVC>:/std:c++latest>
+    $<$<AND:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_FRONTEND_VARIANT:MSVC>>:/std:c++latest>
+)

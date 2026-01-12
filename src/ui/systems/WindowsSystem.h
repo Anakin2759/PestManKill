@@ -21,6 +21,7 @@
 #include "components/Components.h" // 包含 Size
 #include "components/Tags.h"       // 包含 LayoutDirtyTag
 #include "interface/Isystem.h"
+#include "components/Events.h"
 namespace ui::systems
 {
 
@@ -76,7 +77,7 @@ public:
     void onClose(entt::entity rootEntity)
     {
         auto& dispatcher = ::utils::Dispatcher::getInstance();
-        dispatcher.trigger<ui::events::QuitRequested>();
+        dispatcher.enqueue<ui::events::QuitRequested>();
     }
 };
 

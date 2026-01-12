@@ -25,7 +25,7 @@ Checks: >
   -fuchsia-header-anon-namespaces,
   -fuchsia-multiple-inheritance,
   -misc-non-private-member-variables-in-classes,
-
+  -cppcoreguidelines-avoid-magic-numbers
 
 CheckOptions:
   # === Naming Conventions ===

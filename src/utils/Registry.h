@@ -1,8 +1,5 @@
 #pragma once
-#include <memory>
-#include <string>
-#include <functional>
-#include <unordered_map>
+
 #include <entt/entt.hpp>
 namespace utils
 {

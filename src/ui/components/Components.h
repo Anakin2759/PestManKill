@@ -116,9 +116,9 @@ struct Hierarchy
  */
 struct ScrollArea
 {
-    ImVec2 scrollOffset{0.0f, 0.0f}; // 当前滚动位置
-    ImVec2 contentSize{0.0f, 0.0f};  // 内容区域大小
-    float scrollSpeed = 10.0f;
+    ImVec2 scrollOffset{0.0F, 0.0F}; // 当前滚动位置
+    ImVec2 contentSize{0.0F, 0.0F};  // 内容区域大小
+    float scrollSpeed{10.0F};      // 滚动速度
     bool horizontalScroll = false;
     bool verticalScroll = true;
     bool showScrollbars = true;
@@ -195,6 +195,26 @@ struct Image
 struct Clickable
 {
     std::move_only_function<void()> onClick{};
+    bool enabled = true;
+};
+
+/**
+ * @brief 可悬浮组件
+ */
+struct Hoverable
+{
+    std::move_only_function<void()> onHover{};
+    std::move_only_function<void()> onUnhover{};
+    bool enabled = true;
+};
+
+/**
+ * @brief 可按压组件 - 用于处理长按、拖动等场景
+ */
+struct Pressable
+{
+    std::move_only_function<void()> onPress{};   // 鼠标按下时触发
+    std::move_only_function<void()> onRelease{}; // 鼠标松开时触发
     bool enabled = true;
 };
 

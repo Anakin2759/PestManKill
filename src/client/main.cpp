@@ -36,7 +36,7 @@ void CreateMainWindow();
 void CreateMenuDialog();
 
 /**
- * @brief 创建主游戏窗口（空窗口，点击开始游戏后显示）
+ * @brief 创建主窗口（空窗口，点击开始游戏后显示）
  */
 void CreateMainWindow()
 {
@@ -72,7 +72,7 @@ void CreateMainWindow()
     padding.values = {10.0f, 10.0f, 10.0f, 10.0f};
 
     // 添加一个提示标签
-    auto infoLabel = ui::factory::CreateLabel("游戏主界面 - 待开发", "gameInfoLabel");
+    auto infoLabel = ui::factory::CreateLabel("主界面 - 待开发", "gameInfoLabel");
     auto& infoText = registry.get<ui::components::Text>(infoLabel);
     infoText.alignment = ui::policies::Alignment::CENTER;
     infoText.color = ImVec4(0.8f, 0.8f, 0.8f, 1.0f);
@@ -80,7 +80,11 @@ void CreateMainWindow()
     registry.get<ui::components::Size>(infoLabel).autoSize = false;
     ui::helper::addChild(gameWindow, infoLabel);
 
-    std::cout << "主游戏窗口已创建" << std::endl;
+    auto openMenuDialogBtn = ui::factory::CreateButton("打开菜单", "openMenuDialogBtn");
+
+    ui::helper::addChild(gameWindow, openMenuDialogBtn);
+
+    LOG_INFO("主窗口已创建");
 }
 
 /**
@@ -195,7 +199,7 @@ void CreateMenuDialog()
     {
         std::cout << "退出按钮被点击，关闭应用程序。" << std::endl;
         auto& dispatcher = utils::Dispatcher::getInstance();
-        dispatcher.trigger<ui::events::QuitRequested>(ui::events::QuitRequested{});
+        dispatcher.enqueue<ui::events::QuitRequested>(ui::events::QuitRequested{});
     };
     ui::helper::addChild(menuDialog, exitBtn);
 

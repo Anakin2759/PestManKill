@@ -6,38 +6,43 @@ CompileFlags:
   CompilationDatabase: build
 
   Add:
-    # C++23 标准
-    - "-std=c++23"
-    
-    # 启用协程支持
-    - "-fcoroutines"
-    
+    # MSVC 兼容模式下使用 MSVC 风格的 C++ 标准标志
+    - "/std:c++latest"
+    - "/Zc:__cplusplus"
+    # 启用所有错误报告
+    - "-ferror-limit=0"
+    # 禁用宏回溯限制，便于调试
+    - "-fmacro-backtrace-limit=0"
+    # 禁用模板回溯限制
+    - "-ftemplate-backtrace-limit=0"
     # 添加常用警告
-    - "-Wall"
     - "-Wextra"
-    
+    # 定义调试宏
+    - "-DCLANGD_ANALYSIS=1"
     # C++ 特定警告控制
     - "-Wno-unused-parameter"
     - "-Wno-missing-field-initializers"
-    
-    
-  Remove:
-    # 移除 CMake 生成的不兼容模块参数
-    - "-fmodules-ts"
-    - "-fmodule-mapper=*"
-    - "-fdeps-format=*"
-    - "-fcoroutines-ts"
-    - "-ftemplate-backtrace-limit=*"
-    - "-fmacro-backtrace-limit=*"
 
-    - "-wd*"
+    # MSVC 兼容模式
+    - "--target=x86_64-pc-windows-msvc"
 
+    - "-ID:/MSVC/VC/Tools/MSVC/14.50.35717/include"
+    - "-IC:/Program Files (x86)/Windows Kits/10/Include/10.0.26100.0/ucrt"
+    - "-IC:/Program Files (x86)/Windows Kits/10/Include/10.0.26100.0/shared"
+    - "-IC:/Program Files (x86)/Windows Kits/10/Include/10.0.26100.0/um"
+    - "-fms-compatibility"
+    - "-fms-extensions"
+    - "-fdelayed-template-parsing"
+---
 # 诊断配置
 Diagnostics:
   # 抑制常见的无害警告
   Suppress:
     - "unused-parameter"
     - "misc-unused-parameters"
+  ClangTidy:
+    Remove:
+      - "readability-function-size"
 
 # 代码补全配置
 Completion:

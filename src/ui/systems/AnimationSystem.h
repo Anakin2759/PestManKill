@@ -31,11 +31,15 @@
 #include "src/ui/components/Events.h"
 #include "src/utils/Dispatcher.h"
 #include "interface/Isystem.h"
+#include <sys/stat.h>
+#include <utils.h>
 namespace ui::systems
 {
 
 class AnimationSystem : public ui::interface::EnableRegister<AnimationSystem>
 {
+    static constexpr float DELTA_TIME = 0.016F; // 约 60 FPS，实际应该从 SystemManager 传入
+
 public:
     void registerHandlersImpl() {}
     void unregisterHandlersImpl() {}
@@ -58,7 +62,7 @@ private:
 
             // 更新已消逝时间（假设固定 deltaTime，实际应从参数传入）
             // 注意：这里需要从外部传入 deltaTime
-            float deltaTime = 0.016f; // 约 60 FPS，实际应该从 SystemManager 传入
+            float deltaTime = DELTA_TIME;
             animTime.elapsed += deltaTime;
 
             // 计算动画进度 [0, 1]
@@ -93,17 +97,21 @@ private:
                     // 移除动画组件
                     registry.remove<components::AnimationTime>(entity);
                     if (registry.all_of<components::AnimationPosition>(entity))
+                    {
                         registry.remove<components::AnimationPosition>(entity);
+                    }
                     if (registry.all_of<components::AnimationAlpha>(entity))
+                    {
                         registry.remove<components::AnimationAlpha>(entity);
+                    }
 
                     // 触发动画完成事件
-                    dispatcher.trigger<events::AnimationComplete>(events::AnimationComplete{entity});
+                    dispatcher.enqueue<events::AnimationComplete>(events::AnimationComplete{entity});
                 }
                 else if (animTime.mode == policies::Play::LOOP)
                 {
                     // 重置动画
-                    animTime.elapsed = 0.0f;
+                    animTime.elapsed = 0.0F;
                 }
             }
         }
@@ -111,20 +119,20 @@ private:
     /**
      * @brief 应用缓动函数
      */
-    float applyEasing(float t, policies::Easing easing) const
+    static float applyEasing(float time, policies::Easing easing)
     {
         switch (easing)
         {
-            case policies::Easing::Linear:
-                return t;
-            case policies::Easing::EaseInQuad:
-                return t * t;
-            case policies::Easing::EaseOutQuad:
-                return t * (2.0f - t);
-            case policies::Easing::EaseInOutQuad:
-                return t < 0.5f ? 2.0f * t * t : -1.0f + (4.0f - 2.0f * t) * t;
+            case policies::Easing::Linear: // 线性缓动
+                return time;
+            case policies::Easing::EaseInQuad: // 二次缓入
+                return time * time;
+            case policies::Easing::EaseOutQuad: // 二次缓出
+                return time * (2.0F - time);
+            case policies::Easing::EaseInOutQuad: // 二次缓入缓出
+                return time < 0.5F ? 2.0F * time * time : -1.0F + (4.0F - 2.0F * time) * time;
             default:
-                return t;
+                return time;
         }
     }
 };

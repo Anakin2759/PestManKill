@@ -75,13 +75,14 @@ public:
         utils::Dispatcher::getInstance().update();
 
         // 顺序执行输入->渲染任务
+        m_scheduler.attach<ui::EventTask>(16u);
         m_scheduler.attach<ui::InputTask>(16u);
-        m_scheduler.attach<ui::RenderTask>(0u);
+        m_scheduler.attach<ui::RenderTask>(16u);
 
         m_eventLoop.registerDefaultHandler(
             [this]()
             {
-                // 传递渲染上下文给任务
+                // 2. 执行任务调度（输入/渲染）
                 m_scheduler.update(1u);
                 SDL_Delay(1); // 避免100% CPU占用
             });

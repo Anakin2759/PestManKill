@@ -22,9 +22,10 @@ endif()
 #==================== 全局设置 ====================
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF) #禁用编译器扩展
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON) #生成compile_commands.json文件
 
-set(CMAKE_CXX_EXTENSIONS OFF) #禁用编译器扩展
+
 #==================== 编译选项 ====================
 # 通用警告选项
 if (MSVC)
@@ -63,7 +64,7 @@ add_subdirectory(third_party/googletest)
 
 # ==================== 静态分析工具 clang-tidy ====================
 # 允许用户通过选项启用或禁用 clang-tidy
-option(ENABLE_CLANG_TIDY "Enable clang-tidy static analysis" ON)
+option(ENABLE_CLANG_TIDY "Enable clang-tidy static analysis" OFF)
 
 # 查找 clang-tidy 可执行文件
 find_program(CLANG_TIDY_EXE

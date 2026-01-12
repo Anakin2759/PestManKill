@@ -1,6 +1,0 @@
-CompileFlags:
-  Add:
-    - "-fms-compatibility-version=19.50"  # 与 MSVC 兼容
-    - "-std=lastest"                        # 使用 C++23
-    - "-IC:/Program Files (x86)/Windows Kits/10/Include/10.0.22621.0/ucrt"  # Windows UCRT
-    - "-IC:/Program Files (x86)/Windows Kits/10/Include/10.0.22621.0/shared"

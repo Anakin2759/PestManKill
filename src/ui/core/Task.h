@@ -26,6 +26,7 @@
 #include <imgui_impl_sdlrenderer3.h>
 #include <entt/entt.hpp>
 #include <utils.h>
+#include "src/ui/components/Events.h"
 
 namespace ui
 {
@@ -33,7 +34,7 @@ namespace ui
 /**
  * @brief 输入处理任务 - 处理 SDL 事件和 ImGui 输入
  */
-struct InputTask : public entt::process
+struct InputTask final : public entt::process
 {
     using allocator_type = typename entt::process::allocator_type;
     using delta_type = typename entt::process::delta_type;
@@ -53,25 +54,23 @@ struct InputTask : public entt::process
         }
         remainingTime = delayTime;
         auto& dispatcher = ::utils::Dispatcher::getInstance();
-        dispatcher.trigger<ui::events::SDLEvent>(ui::events::SDLEvent{});
+        dispatcher.enqueue<ui::events::SDLEvent>(ui::events::SDLEvent{});
         remainingTime = delayTime;
     }
 
-    void succeeded() { LOG_INFO("[input task] InputTask succeeded"); }
-    void failed() { LOG_INFO("[input task] InputTask failed"); }
-    void aborted() { LOG_INFO("[input task] InputTask aborted"); }
+    void succeeded() override { LOG_INFO("[input task] InputTask succeeded"); }
+    void failed() override { LOG_INFO("[input task] InputTask failed"); }
+    void aborted() override { LOG_INFO("[input task] InputTask aborted"); }
 
 private:
     delta_type remainingTime;
     delta_type delayTime;
 };
 
-
-
 /**
  * @brief 渲染任务 - 执行 ImGui 和 SDL 渲染
  */
-struct RenderTask : public entt::process
+struct RenderTask final : public entt::process
 {
     using allocator_type = typename entt::process::allocator_type;
     using delta_type = typename entt::process::delta_type;
@@ -98,9 +97,42 @@ struct RenderTask : public entt::process
         // succeed();
     }
 
-    void succeeded() { LOG_INFO("[render task] RenderTask succeeded"); }
-    void failed() { LOG_INFO("[render task] RenderTask failed"); }
-    void aborted() { LOG_INFO("[render task] RenderTask aborted"); }
+    void succeeded() override { LOG_INFO("[render task] RenderTask succeeded"); }
+    void failed() override { LOG_INFO("[render task] RenderTask failed"); }
+    void aborted() override { LOG_INFO("[render task] RenderTask aborted"); }
+
+private:
+    delta_type remainingTime;
+    delta_type delayTime; // 约60FPS
+};
+
+struct EventTask final : public entt::process
+{
+    using allocator_type = typename entt::process::allocator_type;
+    using delta_type = typename entt::process::delta_type;
+
+    EventTask(const allocator_type& alloc, delta_type delay)
+        : entt::process{alloc}, remainingTime(delay), delayTime(delay)
+    {
+    }
+
+    void update(const delta_type delta, [[maybe_unused]] void* data) override
+    {
+        if (remainingTime > delta)
+        {
+            remainingTime -= delta;
+            // aborted();
+            return;
+        }
+        remainingTime = delayTime;
+        auto& dispatcher = ::utils::Dispatcher::getInstance();
+        dispatcher.update(); // 处理所有排队的事件
+        // succeed();
+    }
+
+    void succeeded() override { LOG_INFO("[event task] EventTask succeeded"); }
+    void failed() override { LOG_INFO("[event task] EventTask failed"); }
+    void aborted() override { LOG_INFO("[event task] EventTask aborted"); }
 
 private:
     delta_type remainingTime;

@@ -1,15 +1,18 @@
 #pragma once
 
-#include <string>
-#include <locale>
-#include <codecvt>
 
+#include <locale>
+
+#ifdef _WIN32
+#include <windows.h>
+#endif
 namespace utils::functions
 {
 inline void setConsoleToUTF8()
 {
 #if defined(_MSC_VER)
     // 设置控制台为 UTF-8 编码（Windows 特有）
+
     SetConsoleOutputCP(CP_UTF8);
     SetConsoleCP(CP_UTF8);
     std::setlocale(LC_ALL, "C");

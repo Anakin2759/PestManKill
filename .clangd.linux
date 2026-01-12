@@ -1,0 +1,54 @@
+# Linux 平台配置
+# 使用方法: ln -sf .clangd.linux .clangd
+
+# 排除第三方库
+If:
+  PathExclude: [third_party/.*]
+
+CompileFlags:
+  CompilationDatabase: build
+
+  Add:
+    # C++23 标准
+    - "-std=c++23"
+    
+    # 启用协程支持
+    - "-fcoroutines"
+    
+    # 添加常用警告
+    - "-Wall"
+    - "-Wextra"
+    
+    # C++ 特定警告控制
+    - "-Wno-unused-parameter"
+    - "-Wno-missing-field-initializers"
+    - "-Wno-c++98-compat"
+    - "-Wno-c++98-compat-pedantic"
+    - "-Wno-exit-time-destructors"
+    - "-Wno-global-constructors"
+    
+    # Linux GCC/Clang 兼容模式
+    - "--target=x86_64-linux-gnu"
+
+  Remove:
+    - "-fmodules-ts"
+    - "-fmodule-mapper=*"
+    - "-fdeps-format=*"
+    - "-fcoroutines-ts"
+    - "-ftemplate-backtrace-limit=*"
+    - "-fmacro-backtrace-limit=*"
+
+---
+# 诊断配置
+Diagnostics:
+  Suppress:
+    - "unused-parameter"
+    - "misc-unused-parameters"
+
+# 代码补全配置
+Completion:
+  AllScopes: Yes
+
+# 索引配置
+Index:
+  Background: Build

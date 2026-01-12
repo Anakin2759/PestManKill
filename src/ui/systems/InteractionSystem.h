@@ -22,8 +22,7 @@
 #pragma once
 #include <entt/entt.hpp>
 #include <algorithm>
-#include <concepts>
-#include <functional>
+
 #include <utility>
 #include <SDL3/SDL.h>
 #include <imgui_impl_sdl3.h>
@@ -32,7 +31,7 @@
 #include "src/utils/Dispatcher.h"  // 包含 Dispatcher
 #include "components/Components.h" // 包含 Position, Size, Clickable, ButtonState, Hierarchy
 #include "components/Tags.h"       // 包含 HoveredTag, ActiveTag, DisabledTag, LayoutDirtyTag
-
+#include "src/ui/interface/Isystem.h"
 namespace ui::systems
 {
 
@@ -59,16 +58,9 @@ private:
         auto& dispatcher = ::utils::Dispatcher::getInstance();
 
         // 获取鼠标位置（SDL API 直接获取，不依赖 ImGui IO 帧更新）
-        float mouseX, mouseY;
+        float mouseX = 0.0F, mouseY = 0.0F;
         SDL_GetMouseState(&mouseX, &mouseY);
         ImVec2 mousePos(mouseX, mouseY);
-
-        // 清除所有实体的 HoveredTag
-        auto hoveredView = registry.view<components::HoveredTag>();
-        for (auto entity : hoveredView)
-        {
-            registry.remove<components::HoveredTag>(entity);
-        }
 
         // 获取 Z-Order 排序的可交互实体
         auto interactables = getZOrderedInteractables(registry);
@@ -90,10 +82,24 @@ private:
             }
         }
 
-        // 更新 Hover 状态
-        if (hoveredEntity != entt::null)
+        // 更新 Hover 状态并触发事件
+        if (hoveredEntity != m_hoveredEntity)
         {
-            registry.emplace_or_replace<components::HoveredTag>(hoveredEntity);
+            // 触发 UnhoverEvent（如果之前有悬浮的实体）
+            if (m_hoveredEntity != entt::null && registry.valid(m_hoveredEntity))
+            {
+                registry.remove<components::HoveredTag>(m_hoveredEntity);
+                dispatcher.enqueue<events::UnhoverEvent>(events::UnhoverEvent{m_hoveredEntity});
+            }
+
+            // 触发 HoverEvent（如果现在有新的悬浮实体）
+            if (hoveredEntity != entt::null)
+            {
+                registry.emplace_or_replace<components::HoveredTag>(hoveredEntity);
+                dispatcher.enqueue<events::HoverEvent>(events::HoverEvent{hoveredEntity});
+            }
+
+            m_hoveredEntity = hoveredEntity;
         }
 
         // 处理鼠标按下（使用 SDL 事件驱动的状态）
@@ -103,21 +109,32 @@ private:
             {
                 m_activeEntity = hoveredEntity;
                 registry.emplace_or_replace<components::ActiveTag>(m_activeEntity);
+
+                // 触发按下事件
+                if (registry.any_of<components::Pressable>(m_activeEntity))
+                {
+                    dispatcher.enqueue<events::MousePressEvent>(events::MousePressEvent{m_activeEntity});
+                }
             }
         }
 
         // 处理鼠标释放（使用 SDL 事件驱动的状态）
         if (mouseReleased && m_activeEntity != entt::null)
         {
+            // 触发松开事件（在移除 ActiveTag 之前）
+            if (registry.any_of<components::Pressable>(m_activeEntity))
+            {
+                dispatcher.enqueue<events::MouseReleaseEvent>(events::MouseReleaseEvent{m_activeEntity});
+            }
+
             registry.remove<components::ActiveTag>(m_activeEntity);
 
             // 如果释放时仍然在同一实体上，触发点击事件
             if (m_activeEntity == hoveredEntity)
             {
-                LOG_INFO("Entity {} clicked", static_cast<uint32_t>(m_activeEntity));
-                if (auto* clickable = registry.try_get<components::Clickable>(m_activeEntity))
+                if (registry.try_get<components::Clickable>(m_activeEntity) != nullptr)
                 {
-                    dispatcher.trigger<events::ClickEvent>(events::ClickEvent{m_activeEntity});
+                    dispatcher.enqueue<events::ClickEvent>(events::ClickEvent{m_activeEntity});
                 }
             }
 
@@ -148,7 +165,7 @@ private:
             {
                 case SDL_EVENT_QUIT:
                 case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
-                    dispatcher.trigger<ui::events::QuitRequested>();
+                    dispatcher.enqueue<ui::events::QuitRequested>();
                     break;
                 case SDL_EVENT_WINDOW_RESIZED:
                     // 可以触发 WindowResized 事件
@@ -176,8 +193,9 @@ private:
         getInput(mousePressed, mouseReleased);
     }
 
-    entt::entity m_activeEntity = entt::null; // 当前处于 Active (鼠标按下) 状态的实体
-    bool m_mouseDown = false;                 // 鼠标按下状态（基于 SDL 事件追踪）
+    entt::entity m_activeEntity = entt::null;  // 当前处于 Active (鼠标按下) 状态的实体
+    entt::entity m_hoveredEntity = entt::null; // 当前悬浮的实体
+    bool m_mouseDown = false;                  // 鼠标按下状态（基于 SDL 事件追踪）
 
     /**
      * @brief 执行点碰撞测试 (Hit Test)
@@ -260,7 +278,7 @@ private:
      * @note 实际项目中，UI 实体应该根据 Z-Index Component 或渲染顺序预排序。
      * 此处为简化，仅按 Hierarchy 深度排序（深度越大越靠前）
      */
-    std::vector<entt::entity> getZOrderedInteractables(entt::registry& registry)
+    static std::vector<entt::entity> getZOrderedInteractables(entt::registry& registry)
     {
         std::vector<std::pair<int, entt::entity>> interactables;
         auto view = registry.view<const components::Position, const components::Size, const components::Clickable>();
