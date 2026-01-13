@@ -23,6 +23,7 @@ target_link_libraries(ui INTERFACE
     asio::asio
     yogacore
     ui_fonts
+    SDL3_ttf::SDL3_ttf
 )
 
 

@@ -54,7 +54,7 @@ add_subdirectory(third_party/json)
 add_subdirectory(third_party/spdlog)
 
 add_subdirectory(third_party/SDL)
-
+add_subdirectory(third_party/SDL_ttf)
 add_subdirectory(third_party/stb)
 
 add_subdirectory(third_party/imgui)
