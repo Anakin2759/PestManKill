@@ -46,6 +46,8 @@ endif()
 # Build SDL_image as static library
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 add_subdirectory(third_party/asio)
+
+add_subdirectory(third_party/cmrc)
 add_subdirectory(third_party/mimalloc)
 add_subdirectory(third_party/entt)
 add_subdirectory(third_party/json)

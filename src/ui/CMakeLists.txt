@@ -8,6 +8,11 @@ add_library(ui INTERFACE)
 target_include_directories(ui INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
+cmrc_add_resource_library(ui_fonts
+    ALIAS fonts              # 在 C++ 中调用的别名
+    NAMESPACE ui_fonts          # C++ 命名空间
+    SourceHanSans-VF.ttf.ttc
+)
 
 # 依赖项
 target_link_libraries(ui INTERFACE
@@ -17,7 +22,10 @@ target_link_libraries(ui INTERFACE
     EnTT::EnTT
     asio::asio
     yogacore
+    ui_fonts
 )
+
+
 
 # C++23 标准
 target_compile_features(ui INTERFACE cxx_std_23)
