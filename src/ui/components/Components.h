@@ -55,6 +55,17 @@ struct Position
 };
 
 /**
+ * @brief UI画布/屏幕尺寸（由渲染系统在 ImGui 帧内更新）
+ *
+ * 该组件推荐存放在 registry.ctx() 中，供 LayoutSystem 等逻辑系统读取，
+ * 以避免直接依赖 ImGui::GetIO().DisplaySize。
+ */
+struct CanvasSize
+{
+    ImVec2 value{0.0f, 0.0f};
+};
+
+/**
  * @brief 边距组件 (外边距)
  */
 struct Margin
@@ -118,7 +129,7 @@ struct ScrollArea
 {
     ImVec2 scrollOffset{0.0F, 0.0F}; // 当前滚动位置
     ImVec2 contentSize{0.0F, 0.0F};  // 内容区域大小
-    float scrollSpeed{10.0F};      // 滚动速度
+    float scrollSpeed{10.0F};        // 滚动速度
     bool horizontalScroll = false;
     bool verticalScroll = true;
     bool showScrollbars = true;

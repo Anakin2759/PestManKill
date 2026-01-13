@@ -16,6 +16,7 @@ target_link_libraries(ui INTERFACE
     SDL3::SDL3
     EnTT::EnTT
     asio::asio
+    yogacore
 )
 
 # C++23 标准

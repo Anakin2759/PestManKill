@@ -42,6 +42,13 @@ struct MainWidgetTag
 };
 
 /**
+ * @brief 标记该实体属于 UI 模块
+ */
+struct UiTag
+{
+};
+
+/**
  * @brief 按钮标记
  */
 struct ButtonTag

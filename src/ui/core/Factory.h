@@ -46,6 +46,10 @@ inline entt::entity createBaseWidget(const std::string& alias = "")
     utils::Registry::getInstance().emplace<components::Alpha>(entity);      // 统一替换 Visibility 结构
     utils::Registry::getInstance().emplace<components::VisibleTag>(entity); // 可见性标记
     utils::Registry::getInstance().emplace<components::Hierarchy>(entity);  // 允许它有父子关系
+    utils::Registry::getInstance().emplace<components::UiTag>(entity);      // 标记为 UI 实体
+
+    // 新建节点默认标记为需要布局计算
+    utils::Registry::getInstance().emplace_or_replace<components::LayoutDirtyTag>(entity);
 
     // 原 RenderGuard 已移除，渲染系统应自行处理实体有效性
 
@@ -220,6 +224,10 @@ inline entt::entity CreateSpacer(int stretchFactor = 1, const std::string& alias
 
     utils::Registry::getInstance().emplace<components::SpacerTag>(entity);
     utils::Registry::getInstance().emplace<components::Hierarchy>(entity); // 允许它被添加到 Hierarchy
+    utils::Registry::getInstance().emplace<components::UiTag>(entity);     // 标记为 UI 实体
+
+    // 新建节点默认标记为需要布局计算
+    utils::Registry::getInstance().emplace_or_replace<components::LayoutDirtyTag>(entity);
 
     // 参与布局必须具备 Position/Size
     utils::Registry::getInstance().emplace<components::Position>(entity);
@@ -231,6 +239,9 @@ inline entt::entity CreateSpacer(int stretchFactor = 1, const std::string& alias
     utils::Registry::getInstance().emplace<components::Size>(entity);
     utils::Registry::getInstance().get<components::Size>(entity).autoSize = false;
     utils::Registry::getInstance().get<components::Size>(entity).size = {0.0f, 0.0f};
+
+    // 新节点默认标记为需要布局计算
+    utils::Registry::getInstance().emplace_or_replace<components::LayoutDirtyTag>(entity);
 
     return entity;
 }
@@ -281,6 +292,9 @@ inline entt::entity CreateDialog(std::string_view title, const std::string& alia
     utils::Registry::getInstance().emplace<components::LayoutInfo>(entity);
     utils::Registry::getInstance().emplace<components::Padding>(entity);
 
+    // 自动标记为需要布局
+    utils::Registry::getInstance().emplace_or_replace<components::LayoutDirtyTag>(entity);
+
     return entity;
 }
 
@@ -314,6 +328,9 @@ inline entt::entity CreateWindow(std::string_view title, const std::string& alia
     // 窗口需要布局和内边距
     utils::Registry::getInstance().emplace<components::LayoutInfo>(entity);
     utils::Registry::getInstance().emplace<components::Padding>(entity);
+
+    // 自动标记为需要布局
+    utils::Registry::getInstance().emplace_or_replace<components::LayoutDirtyTag>(entity);
 
     return entity;
 }

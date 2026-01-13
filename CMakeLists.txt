@@ -60,6 +60,9 @@ add_subdirectory(third_party/abseil-cpp)
 add_subdirectory(third_party/kcp)
 add_subdirectory(third_party/googletest)
 
+add_subdirectory(third_party/yoga)
+add_subdirectory(third_party/eigen-5.0.0)
+
 
 
 # ==================== 静态分析工具 clang-tidy ====================

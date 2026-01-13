@@ -117,4 +117,20 @@ enum class Size : uint8_t
     FillParent // 填满父容器 (减去内边距)
 };
 
+/**
+ * @brief 位置策略 - 用于控制窗口/容器的定位方式
+ */
+struct PositionPolicy
+{
+    enum Value : uint8_t
+    {
+        Fixed,  // 使用 Position 组件中的固定位置
+        Center, // 在屏幕/父容器中居中
+        Auto    // 由布局系统自动计算
+    };
+
+    Value horizontal = Center; // 水平定位策略
+    Value vertical = Center;   // 垂直定位策略
+};
+
 } // namespace ui::policies

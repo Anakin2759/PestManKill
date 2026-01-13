@@ -14,7 +14,6 @@
  */
 
 #include <iostream>
-#include <memory>
 #include <SDL3/SDL.h>
 #include <imgui.h>
 #include <imgui_impl_sdl3.h>
@@ -30,7 +29,8 @@
 #include "src/ui/core/Application.h"
 #include "src/ui/core/Factory.h"
 #include "src/ui/core/Helper.h"
-
+namespace
+{
 // 前向声明
 void CreateMainWindow();
 void CreateMenuDialog();
@@ -47,8 +47,6 @@ void CreateMainWindow()
     auto& sizeComp = registry.get<ui::components::Size>(gameWindow);
     sizeComp.widthPolicy = ui::policies::Size::FillParent;
     sizeComp.heightPolicy = ui::policies::Size::FillParent;
-    sizeComp.size = {1024.0f, 768.0f}; // 初始尺寸（会被策略覆盖）
-    registry.get<ui::components::Position>(gameWindow).value = {0.0f, 0.0f};
 
     // 设置标题栏
     auto& windowComp = registry.get<ui::components::Window>(gameWindow);
@@ -76,8 +74,6 @@ void CreateMainWindow()
     auto& infoText = registry.get<ui::components::Text>(infoLabel);
     infoText.alignment = ui::policies::Alignment::CENTER;
     infoText.color = ImVec4(0.8f, 0.8f, 0.8f, 1.0f);
-    registry.get<ui::components::Size>(infoLabel).size = {1004.0f, 30.0f};
-    registry.get<ui::components::Size>(infoLabel).autoSize = false;
     ui::helper::addChild(gameWindow, infoLabel);
 
     auto openMenuDialogBtn = ui::factory::CreateButton("打开菜单", "openMenuDialogBtn");
@@ -104,7 +100,7 @@ void CreateMenuDialog()
     // 创建菜单对话框
     auto menuDialog = ui::factory::CreateDialog("PestManKill Menu", "menuDialog");
     registry.get<ui::components::Size>(menuDialog).size = {400.0f, 300.0f};
-    registry.get<ui::components::Position>(menuDialog).value = {312.0f, 234.0f}; // 居中
+    // 位置 (0,0) 会触发自动居中
 
     // 隐藏标题栏
     auto& dialogComp = registry.get<ui::components::Dialog>(menuDialog);
@@ -130,8 +126,6 @@ void CreateMenuDialog()
     auto& titleText = registry.get<ui::components::Text>(titleLabel);
     titleText.alignment = ui::policies::Alignment::CENTER;
     titleText.color = ImVec4(1.0f, 0.9f, 0.3f, 1.0f); // 金黄色
-    registry.get<ui::components::Size>(titleLabel).size = {360.0f, 30.0f};
-    registry.get<ui::components::Size>(titleLabel).autoSize = false;
     ui::helper::addChild(menuDialog, titleLabel);
 
     // 创建分隔间距
@@ -140,9 +134,7 @@ void CreateMenuDialog()
 
     // 创建开始游戏按钮
     auto startBtn = ui::factory::CreateButton("开始游戏", "startBtn");
-    registry.get<ui::components::Size>(startBtn).size = {150.0f, 40.0f};
-    registry.get<ui::components::Size>(startBtn).autoSize = false;
-    registry.get<ui::components::Position>(startBtn).value = {125.0f, 0.0f}; // 水平居中
+    ui::helper::setFixedSize(startBtn, 150.0f, 40.0f);
     auto& startText = registry.get<ui::components::Text>(startBtn);
     startText.alignment = ui::policies::Alignment::CENTER;
     auto& startBg = registry.emplace<ui::components::Background>(startBtn);
@@ -164,9 +156,7 @@ void CreateMenuDialog()
 
     // 创建设置按钮
     auto settingsBtn = ui::factory::CreateButton("设置", "settingsBtn");
-    registry.get<ui::components::Size>(settingsBtn).size = {150.0f, 40.0f};
-    registry.get<ui::components::Size>(settingsBtn).autoSize = false;
-    registry.get<ui::components::Position>(settingsBtn).value = {125.0f, 0.0f};
+    ui::helper::setFixedSize(settingsBtn, 150.0f, 40.0f);
     auto& settingsText = registry.get<ui::components::Text>(settingsBtn);
     settingsText.alignment = ui::policies::Alignment::CENTER;
     auto& settingsBg = registry.emplace<ui::components::Background>(settingsBtn);
@@ -181,9 +171,7 @@ void CreateMenuDialog()
 
     // 创建退出按钮
     auto exitBtn = ui::factory::CreateButton("退出", "exitBtn");
-    registry.get<ui::components::Size>(exitBtn).size = {150.0f, 40.0f};
-    registry.get<ui::components::Size>(exitBtn).autoSize = false;
-    registry.get<ui::components::Position>(exitBtn).value = {125.0f, 0.0f};
+    ui::helper::setFixedSize(exitBtn, 150.0f, 40.0f);
     auto& exitText = registry.get<ui::components::Text>(exitBtn);
     exitText.alignment = ui::policies::Alignment::CENTER;
     auto& exitBg = registry.emplace<ui::components::Background>(exitBtn);
@@ -214,7 +202,7 @@ void CreateMenuDialog()
     versionText.color = ImVec4(0.6f, 0.6f, 0.6f, 1.0f);
     ui::helper::addChild(menuDialog, versionLabel);
 }
-
+} // namespace
 int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 {
     utils::functions::setConsoleToUTF8();

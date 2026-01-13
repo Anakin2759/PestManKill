@@ -393,8 +393,8 @@ inline void addChild(::entt::entity parent, ::entt::entity child)
         children.push_back(child);
     }
 
-    // 3. 标记父级为脏，触发布局计算
-    markLayoutDirty(parent);
+    // 3. 标记新节点及其祖先为脏，触发布局计算
+    markLayoutDirty(child);
 }
 
 /**

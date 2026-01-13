@@ -16,6 +16,10 @@
     管理交互状态，确保正确的状态转换和事件触发。
     优化交互检测顺序，支持Z-Order排序。
     易于扩展以支持更多交互类型和复杂逻辑。
+
+    目标：
+    实现高效、准确的UI交互处理，提升用户体验。
+    不再依赖 ImGui 的输入处理，完全自主控制交互逻辑。
  *
  * ************************************************************************
  */
@@ -62,8 +66,11 @@ private:
         SDL_GetMouseState(&mouseX, &mouseY);
         ImVec2 mousePos(mouseX, mouseY);
 
-        // 获取 Z-Order 排序的可交互实体
-        auto interactables = getZOrderedInteractables(registry);
+        // 首先检测鼠标落在哪个顶层窗口/对话框内
+        entt::entity topWindow = findTopWindowAtPoint(registry, mousePos);
+
+        // 获取 Z-Order 排序的可交互实体（只在当前窗口内搜索）
+        auto interactables = getZOrderedInteractables(registry, topWindow);
 
         entt::entity hoveredEntity = entt::null;
 
@@ -275,10 +282,11 @@ private:
 
     /**
      * @brief 获取按 Z-Order 从前到后排序的可交互实体列表
-     * @note 实际项目中，UI 实体应该根据 Z-Index Component 或渲染顺序预排序。
-     * 此处为简化，仅按 Hierarchy 深度排序（深度越大越靠前）
+     * @param registry 注册表
+     * @param topWindow 当前鼠标所在的顶层窗口（entt::null 表示不在任何窗口内）
+     * @note 只返回属于 topWindow 的可交互实体
      */
-    static std::vector<entt::entity> getZOrderedInteractables(entt::registry& registry)
+    static std::vector<entt::entity> getZOrderedInteractables(entt::registry& registry, entt::entity topWindow)
     {
         std::vector<std::pair<int, entt::entity>> interactables;
         auto view = registry.view<const components::Position, const components::Size, const components::Clickable>();
@@ -286,6 +294,13 @@ private:
         for (auto entity : view)
         {
             if (registry.any_of<components::DisabledTag>(entity)) continue; // 忽略禁用的实体
+
+            // 检查该实体是否属于 topWindow
+            entt::entity rootWindow = findRootWindow(registry, entity);
+
+            // 如果 topWindow 为 null（没有窗口），则只接受没有窗口祖先的实体
+            // 如果 topWindow 不为 null，则只接受属于该窗口的实体
+            if (rootWindow != topWindow) continue;
 
             // 简单深度排序：层级越深（子元素），Z-Order 越高
             int depth = 0;
@@ -309,6 +324,71 @@ private:
             result.push_back(pair.second);
         }
         return result;
+    }
+
+    /**
+     * @brief 查找实体所属的根窗口/对话框
+     * @return 根窗口实体，如果不在任何窗口内则返回 entt::null
+     */
+    static entt::entity findRootWindow(entt::registry& registry, entt::entity entity)
+    {
+        entt::entity current = entity;
+        entt::entity rootWindow = entt::null;
+
+        while (current != entt::null && registry.valid(current))
+        {
+            if (registry.any_of<components::WindowTag, components::DialogTag>(current))
+            {
+                rootWindow = current;
+            }
+            const auto* hierarchy = registry.try_get<components::Hierarchy>(current);
+            current = hierarchy ? hierarchy->parent : entt::null;
+        }
+
+        return rootWindow;
+    }
+
+    /**
+     * @brief 查找鼠标位置所在的最前面的窗口/对话框
+     * @return 窗口实体，如果不在任何窗口内则返回 entt::null
+     */
+    entt::entity findTopWindowAtPoint(entt::registry& registry, const ImVec2& point)
+    {
+        // 收集所有顶层窗口/对话框
+        std::vector<std::pair<int, entt::entity>> windows;
+
+        auto view = registry.view<const components::Position, const components::Size, const components::Hierarchy>();
+        for (auto entity : view)
+        {
+            // 只检查窗口和对话框
+            if (!registry.any_of<components::WindowTag, components::DialogTag>(entity)) continue;
+
+            const auto& hierarchy = registry.get<const components::Hierarchy>(entity);
+            // 只检查顶层（没有父级的）窗口
+            if (hierarchy.parent != entt::null) continue;
+
+            // 计算窗口在列表中的顺序作为 Z-Order（后创建的在前面）
+            // 使用 entity 的底层值作为近似创建顺序
+            int zOrder = static_cast<int>(static_cast<uint32_t>(entity));
+            windows.emplace_back(zOrder, entity);
+        }
+
+        // 按 Z-Order 降序排列（值越大的越后创建，应该在最前面）
+        std::sort(windows.begin(), windows.end(), [](const auto& a, const auto& b) { return a.first > b.first; });
+
+        // 从前到后检测哪个窗口包含该点
+        for (const auto& [zOrder, windowEntity] : windows)
+        {
+            const auto& pos = registry.get<const components::Position>(windowEntity);
+            const auto& size = registry.get<const components::Size>(windowEntity);
+
+            if (isPointInRect(point, pos.value, size.size))
+            {
+                return windowEntity;
+            }
+        }
+
+        return entt::null;
     }
 };
 

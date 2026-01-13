@@ -16,10 +16,11 @@
  */
 
 #pragma once
+#include <cstddef>
+#include <cstdint>
 #include <entt/entt.hpp>
 #include <SDL3/SDL.h>
 #include <imgui.h>
-#include <memory>
 
 // 引入图形上下文
 #include "GraphicsContext.h"
@@ -34,9 +35,6 @@
 #include "src/ui/systems/LayoutSystem.h"
 #include "src/ui/systems/WindowsSystem.h" // 保持与 Application.h 中的一致
 #include "src/ui/systems/ActionSystem.h"
-// 引入其他依赖
-#include "src/ui/core/Factory.h"
-#include "src/ui/components/Components.h"
 #include "src/ui/components/Events.h"
 #include <utils.h>
 
@@ -62,7 +60,7 @@ private:
     std::vector<entt::poly<interface::ISystem>> m_systems;
 
     // 系统索引（用于快速访问特定系统）
-    enum SystemIndex : size_t
+    enum SystemIndex : uint8_t
     {
         INTERACTION = 0, // 鼠标交互系统
         ANIMATION = 1,   // 动画系统
@@ -89,7 +87,7 @@ public:
         m_systems.emplace_back(systems::ActionSystem{});
     }
 
-    ~SystemManager() = default;
+    ~SystemManager() { unregisterAllHandlers(); };
 
     // 禁用拷贝和移动
     SystemManager(const SystemManager&) = delete;
@@ -146,7 +144,7 @@ public:
      * @brief 移除指定索引的系统
      * @param index 系统索引
      */
-    void removeSystem(size_t index)
+    void removeSystem(uint8_t index)
     {
         if (index < m_systems.size())
         {
@@ -161,6 +159,11 @@ public:
     /**
      * @brief 清空所有UI元素 携带uitag的组件
      */
-    void clear() { utils::Registry::getInstance().clear(); }
+    void clear()
+    {
+        auto& registry = utils::Registry::getInstance();
+        auto view = registry.view<components::UiTag>();
+        registry.destroy(view.begin(), view.end());
+    }
 };
 } // namespace ui

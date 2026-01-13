@@ -18,23 +18,27 @@
     优化渲染顺序，确保正确的层级关系。
     易于扩展以支持更多UI组件和效果。
     在所有状态更新后进行渲染，确保视觉一致性。
+
+    目标：
+    使用SDL_GUI代替ImGui控件，实现高性能、灵活的UI渲染。
+    使用eigen代替ImGui的矩阵变换功能和坐标保存。
  *
  * ************************************************************************
  */
 
 #pragma once
+#include <cstdint>
 #include <entt/entt.hpp>
 #include <imgui.h>
 #include <imgui_impl_sdl3.h>
 #include <imgui_impl_sdlrenderer3.h>
-#include <functional>
 #include <SDL3/SDL.h>
 #include <utils.h>
 #include "components/Components.h"
 #include "components/Tags.h"
 #include "components/Events.h"
 #include "interface/Isystem.h"
-
+#include "core/GraphicsContext.h"
 // 前向声明
 namespace ui
 {
@@ -83,7 +87,7 @@ public:
     void update() noexcept
     {
         // 获取 SDL_Renderer
-        SDL_Renderer* renderer = m_graphicsContext ? m_graphicsContext->getRenderer() : nullptr;
+        SDL_Renderer* renderer = m_graphicsContext != nullptr ? m_graphicsContext->getRenderer() : nullptr;
         if (renderer == nullptr) return;
 
         // ----------------------------------------------------
@@ -93,6 +97,33 @@ public:
         ImGui_ImplSDL3_NewFrame();
         ImGui::NewFrame();
 
+        {
+            auto& registry = utils::Registry::getInstance();
+            int w = 0;
+            int h = 0;
+
+            if (m_graphicsContext != nullptr && m_graphicsContext->getWindow() != nullptr)
+            {
+                SDL_GetWindowSizeInPixels(m_graphicsContext->getWindow(), &w, &h);
+            }
+
+            const float fw = static_cast<float>(w);
+            const float fh = static_cast<float>(h);
+
+            auto canvasView = registry.view<components::MainWidgetTag, components::Size>();
+            for (auto e : canvasView)
+            {
+                auto& size = canvasView.get<components::Size>(e);
+                size.autoSize = false;
+                if (size.size.x != fw || size.size.y != fh)
+                {
+                    size.size = ImVec2(fw, fh);
+                    registry.emplace_or_replace<components::LayoutDirtyTag>(e);
+                }
+            }
+        }
+
+        // 清屏
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
         SDL_RenderClear(renderer);
 
@@ -106,11 +137,14 @@ public:
         ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
 
         // 使用一个始终打开的 ImGui 窗口作为根画布 (Root Canvas)
-        ImGui::Begin("##ECS_UI_ROOT_CANVAS",
-                     nullptr,
-                     ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
-                         ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus |
-                         ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_NoBackground);
+        ImGui::Begin(
+            "##ECS_UI_ROOT_CANVAS",
+            nullptr,
+            static_cast<uint32_t>(ImGuiWindowFlags_NoTitleBar) | static_cast<uint32_t>(ImGuiWindowFlags_NoResize) |
+                static_cast<uint32_t>(ImGuiWindowFlags_NoMove) | static_cast<uint32_t>(ImGuiWindowFlags_NoCollapse) |
+                static_cast<uint32_t>(ImGuiWindowFlags_NoBringToFrontOnFocus) |
+                static_cast<uint32_t>(ImGuiWindowFlags_NoNavFocus) |
+                static_cast<uint32_t>(ImGuiWindowFlags_NoBackground));
 
         ImGui::PopStyleVar(2);
 
@@ -133,21 +167,6 @@ public:
 
             if (hierarchy.parent == entt::null)
             {
-                // 对于顶层实体，处理 FillParent 尺寸策略（使用屏幕尺寸）
-                auto* sizeComp = registry.try_get<components::Size>(entity);
-                if (sizeComp)
-                {
-                    const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
-                    if (sizeComp->widthPolicy == policies::Size::FillParent)
-                    {
-                        sizeComp->size.x = displaySize.x;
-                    }
-                    if (sizeComp->heightPolicy == policies::Size::FillParent)
-                    {
-                        sizeComp->size.y = displaySize.y;
-                    }
-                }
-
                 // 递归渲染。根画布的绝对位置是 (0, 0)
                 renderEntityRecursive(registry, entity, draw_list, ImVec2(0, 0), 1.0f);
             }
@@ -297,19 +316,20 @@ private:
         if (ImGui::Begin(title.c_str(), nullptr, flags))
         {
             ImDrawList* window_draw_list = ImGui::GetWindowDrawList();
-            ImVec2 contentStartPos = ImGui::GetCursorScreenPos();
 
             // 绘制 ECS 提供的自定义背景/边框 (如果设置了 NoBackground)
             ImVec2 absEndPos(absolutePos.x + size.size.x, absolutePos.y + size.size.y);
             renderBackground(entity, window_draw_list, absolutePos, absEndPos, globalAlpha);
 
-            // --- 3. 递归渲染子元素 (子元素相对于窗口内容区定位) ---
+            // --- 3. 递归渲染子元素 ---
+            // 子元素位置由 LayoutSystem 计算，相对于窗口的 (0,0)
+            // 因此使用 absolutePos（窗口左上角）作为基准，而非 contentStartPos
             if (hierarchy && !hierarchy->children.empty())
             {
                 for (entt::entity child : hierarchy->children)
                 {
-                    // 递归调用：使用 ImGui 窗口的 DrawList 和 内容区位置
-                    renderEntityRecursive(registry, child, window_draw_list, contentStartPos, globalAlpha);
+                    // 递归调用：使用窗口的绝对位置作为基准
+                    renderEntityRecursive(registry, child, window_draw_list, absolutePos, globalAlpha);
                 }
             }
         }
@@ -394,7 +414,9 @@ private:
                 }
                 else
                 {
-                    draw_list->AddText(textPos, color, textComp->content.c_str());
+                    // 使用 ImGui 当前字体（包含中文支持）和默认字号
+                    draw_list->AddText(
+                        ImGui::GetFont(), ImGui::GetFontSize(), textPos, color, textComp->content.c_str());
                 }
             }
         }

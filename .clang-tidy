@@ -51,13 +51,19 @@ CheckOptions:
     value: '^pro_.*'
   - key: readability-identifier-naming.PrivateMemberPrefix
     value: m_
+  # const 变量使用普通命名 (camelBack)
   - key: readability-identifier-naming.ConstantCase
+    value: camelBack
+  # constexpr 变量使用全大写
+  - key: readability-identifier-naming.ConstexprVariableCase
     value: UPPER_CASE
   - key: readability-identifier-naming.EnumConstantCase
     value: UPPER_CASE
   - key: readability-identifier-naming.GlobalConstantCase
     value: UPPER_CASE
   - key: readability-identifier-naming.StaticConstantCase
+    value: UPPER_CASE
+  - key: readability-identifier-naming.StaticConstexprCase
     value: UPPER_CASE
   - key: readability-identifier-naming.ClassIgnoredRegexp
     value: '^(type|impl|tag|proxy|base)$'
