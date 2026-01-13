@@ -54,10 +54,11 @@ target_compile_options(ui INTERFACE
 # 导出头文件列表（用于 IDE 项目视图）
 set(UI_HEADERS
     # Components
-    components/Components.h
-    components/Policies.h
-    components/Tags.h
-    components/Events.h
+    common/Components.h
+    common/Policies.h
+    common/Tags.h
+    common/Events.h
+    common/Types.h
     
     # Systems
     systems/InteractionSystem.h
@@ -73,6 +74,7 @@ set(UI_HEADERS
     core/SystemManager.h
     core/EventLoop.h
     core/ImguiContext.h
+    core/TaskChain.h
 
     # Interface
     interface/Isystem.h

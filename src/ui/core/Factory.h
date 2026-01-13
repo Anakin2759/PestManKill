@@ -19,11 +19,9 @@
 #include <entt/entt.hpp>
 #include <string>
 #include <string_view>
-#include <functional>
 #include "src/ui/common/Components.h"
 #include "src/ui/common/Tags.h"
 #include "src/ui/common/Policies.h"
-#include "src/ui/common/Events.h"
 #include <utils.h>
 #include "common/Types.h" // 包含 Vec2, Color 等类型
 namespace ui::factory
@@ -33,7 +31,7 @@ namespace ui::factory
  * @brief 基础可渲染实体初始化 (所有可见UI元素都需要)
  * @param alias 组件别名，用于调试和识别
  */
-inline entt::entity createBaseWidget(const std::string& alias = "")
+inline entt::entity CreateBaseWidget(const std::string& alias = "")
 {
     auto entity = utils::Registry::getInstance().create();
 
@@ -87,7 +85,7 @@ inline void CreateFadeInAnimation(entt::entity entity, float duration)
  */
 inline entt::entity CreateButton(const std::string& content, const std::string& alias = "")
 {
-    auto entity = createBaseWidget(alias);
+    auto entity = CreateBaseWidget(alias);
 
     // 类型 Tag
     utils::Registry::getInstance().emplace<components::ButtonTag>(entity);
@@ -115,7 +113,7 @@ inline entt::entity CreateButton(const std::string& content, const std::string& 
  */
 inline entt::entity CreateLabel(const std::string& content, const std::string& alias = "")
 {
-    auto entity = createBaseWidget(alias);
+    auto entity = CreateBaseWidget(alias);
 
     // 类型 Tag
     utils::Registry::getInstance().emplace<components::LabelTag>(entity);
@@ -139,7 +137,7 @@ inline entt::entity CreateLabel(const std::string& content, const std::string& a
 inline entt::entity
     CreateTextEdit(const std::string& placeholder = "", bool multiline = false, const std::string& alias = "")
 {
-    auto entity = createBaseWidget(alias);
+    auto entity = CreateBaseWidget(alias);
 
     // 类型 Tag
     utils::Registry::getInstance().emplace<components::TextEditTag>(entity);
@@ -166,7 +164,7 @@ inline entt::entity
 inline entt::entity
     CreateImage(void* textureId, float defaultWidth = 50.0f, float defaultHeight = 50.0f, const std::string& alias = "")
 {
-    auto entity = createBaseWidget(alias);
+    auto entity = CreateBaseWidget(alias);
 
     // 类型 Tag
     utils::Registry::getInstance().emplace<components::ImageTag>(entity);
@@ -191,7 +189,7 @@ inline entt::entity
  */
 inline entt::entity CreateArrow(const Vec2& start, const Vec2& end, const std::string& alias = "")
 {
-    auto entity = createBaseWidget(alias);
+    auto entity = CreateBaseWidget(alias);
 
     // 类型 Tag
     utils::Registry::getInstance().emplace<components::ArrowTag>(entity);
@@ -255,7 +253,7 @@ inline entt::entity CreateSpacer(int stretchFactor = 1, const std::string& alias
  */
 inline entt::entity CreateSpacer(float width, float height, const std::string& alias = "")
 {
-    auto entity = createBaseWidget(alias);
+    auto entity = CreateBaseWidget(alias);
     auto& size = utils::Registry::getInstance().get<components::Size>(entity);
     size.size = {width, height};
     size.autoSize = false;
@@ -275,7 +273,7 @@ inline entt::entity CreateSpacer(float width, float height, const std::string& a
  */
 inline entt::entity CreateDialog(std::string_view title, const std::string& alias = "")
 {
-    auto entity = createBaseWidget(alias);
+    auto entity = CreateBaseWidget(alias);
 
     // 类型 Tag
     utils::Registry::getInstance().emplace<components::DialogTag>(entity);
@@ -312,7 +310,7 @@ inline entt::entity CreateDialog(std::string_view title, const std::string& alia
  */
 inline entt::entity CreateWindow(std::string_view title, const std::string& alias = "")
 {
-    auto entity = createBaseWidget(alias);
+    auto entity = CreateBaseWidget(alias);
 
     // 类型 Tag
     utils::Registry::getInstance().emplace<components::WindowTag>(entity);
@@ -342,7 +340,7 @@ inline entt::entity CreateWindow(std::string_view title, const std::string& alia
  */
 inline entt::entity CreateVBoxLayout(const std::string& alias = "")
 {
-    auto entity = createBaseWidget(alias);
+    auto entity = CreateBaseWidget(alias);
 
     // 布局信息
     auto& layout = utils::Registry::getInstance().emplace<components::LayoutInfo>(entity);
@@ -363,7 +361,7 @@ inline entt::entity CreateVBoxLayout(const std::string& alias = "")
  */
 inline entt::entity CreateHBoxLayout(const std::string& alias = "")
 {
-    auto entity = createBaseWidget(alias);
+    auto entity = CreateBaseWidget(alias);
 
     // 布局信息
     auto& layout = utils::Registry::getInstance().emplace<components::LayoutInfo>(entity);

@@ -57,8 +57,8 @@ void CreateMainWindow()
 
     // 添加窗口背景
     auto& gameBg = registry.emplace<ui::components::Background>(gameWindow);
-    gameBg.color = {0.1f, 0.1f, 0.12f, 1.0f};
-    gameBg.borderRadius = 4.0f;
+    gameBg.color = {0.1F, 0.1F, 0.12F, 1.0F};
+    gameBg.borderRadius = 4.0F;
     gameBg.enabled = true;
 
     // 设置布局

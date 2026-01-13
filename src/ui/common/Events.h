@@ -238,4 +238,9 @@ struct UpdateLayout
 {
 };
 
+struct QuequedTask
+{
+    std::move_only_function<void()> func;
+};
+
 } // namespace ui::events

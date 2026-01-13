@@ -40,8 +40,9 @@
 #include "GraphicsContext.h"
 #include "ImguiContext.h"
 #include "EventLoop.h"
+#include "TaskChain.h"
 #include "common/Events.h"
-#include "Task.h"
+#include "TaskChain.h"
 #include "src/ui/common/Components.h"
 #include "src/ui/common/Tags.h"
 namespace ui
@@ -114,9 +115,9 @@ public:
         }
 
         // 顺序执行事件缓冲处理->输入->渲染任务
-        m_scheduler.attach<ui::EventTask>(FRAME_DELAY_MS);
-        m_scheduler.attach<ui::InputTask>(FRAME_DELAY_MS);
-        m_scheduler.attach<ui::RenderTask>(FRAME_DELAY_MS);
+        m_scheduler.attach<ui::EventTaskChain>(FRAME_DELAY_MS);
+        m_scheduler.attach<ui::InputTaskChain>(FRAME_DELAY_MS);
+        m_scheduler.attach<ui::RenderTaskChain>(FRAME_DELAY_MS);
 
         m_eventLoop.registerDefaultHandler(
             [this]()
@@ -154,7 +155,6 @@ public:
     void exec() { m_eventLoop.exec(); }
 
 private:
-    // 图形上下文（包含 SDL 窗口和渲染器）
     std::unique_ptr<GraphicsContext> m_graphicsContext;
 
     // ImGui 上下文管理

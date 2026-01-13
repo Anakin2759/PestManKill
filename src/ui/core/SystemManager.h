@@ -20,7 +20,6 @@
 #include <cstdint>
 #include <entt/entt.hpp>
 #include <SDL3/SDL.h>
-#include <imgui.h>
 
 // 引入图形上下文
 #include "GraphicsContext.h"

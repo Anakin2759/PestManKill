@@ -1,15 +1,15 @@
 /**
  * ************************************************************************
  *
- * @file Task.h
+ * @file TaskChain.h
  * @author AnakinLiu (azrael2759@qq.com)
  * @date 2025-12-25
  * @version 0.1
- * @brief  ui每帧执行的任务类
-    在system类之上做一层任务封装
-  - 定义渲染任务和输入处理任务
-  - 任务可由entt::scheduler调度执行
-  - 支持任务的初始化、更新、完成和失败回调
+ * @brief  ui每帧执行的任务链封装
+
+  - 定义渲染任务和输入处理任务链
+  - 任务链可由entt::scheduler调度执行
+  - 支持任务链的初始化、更新、完成和失败回调
 
   系统类负责具体实现逻辑，任务类负责调度和业务流程
  *
@@ -34,12 +34,12 @@ namespace ui
 /**
  * @brief 输入处理任务 - 处理 SDL 事件和 ImGui 输入
  */
-struct InputTask final : public entt::process
+struct InputTaskChain final : public entt::process
 {
     using allocator_type = typename entt::process::allocator_type;
     using delta_type = typename entt::process::delta_type;
 
-    InputTask(const allocator_type& alloc, delta_type delay)
+    InputTaskChain(const allocator_type& alloc, delta_type delay)
         : entt::process{alloc}, remainingTime(delay), delayTime(delay)
     {
     }
@@ -70,12 +70,12 @@ private:
 /**
  * @brief 渲染任务 - 执行 ImGui 和 SDL 渲染
  */
-struct RenderTask final : public entt::process
+struct RenderTaskChain final : public entt::process
 {
     using allocator_type = typename entt::process::allocator_type;
     using delta_type = typename entt::process::delta_type;
 
-    RenderTask(const allocator_type& alloc, delta_type delay)
+    RenderTaskChain(const allocator_type& alloc, delta_type delay)
         : entt::process{alloc}, remainingTime(delay), delayTime(delay)
     {
     }
@@ -106,12 +106,12 @@ private:
     delta_type delayTime; // 约60FPS
 };
 
-struct EventTask final : public entt::process
+struct EventTaskChain final : public entt::process
 {
     using allocator_type = typename entt::process::allocator_type;
     using delta_type = typename entt::process::delta_type;
 
-    EventTask(const allocator_type& alloc, delta_type delay)
+    EventTaskChain(const allocator_type& alloc, delta_type delay)
         : entt::process{alloc}, remainingTime(delay), delayTime(delay)
     {
     }
