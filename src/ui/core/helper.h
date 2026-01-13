@@ -17,12 +17,12 @@
 
 #pragma once
 #include <entt/entt.hpp>
-#include <algorithm>               // For std::clamp
-#include "components/Components.h" // 包含所有数据组件
-#include "components/Tags.h"       // 包含所有 Tag 组件
-#include "components/Policies.h"   // 包含所有枚举
-#include <utils.h>                 // 包含 Registry
-
+#include <algorithm>           // For std::clamp
+#include "common/Components.h" // 包含所有数据组件
+#include "common/Tags.h"       // 包含所有 Tag 组件
+#include "common/Policies.h"   // 包含所有枚举
+#include <utils.h>             // 包含 Registry
+#include "common/Types.h"      // 包含 Vec2, Vec4, color 等类型
 namespace ui::helper
 {
 
@@ -114,7 +114,7 @@ inline void setAlpha(::entt::entity entity, float alpha)
 /**
  * @brief 设置背景颜色
  */
-inline void setBackgroundColor(::entt::entity entity, const ImVec4& color)
+inline void setBackgroundColor(::entt::entity entity, const Color& color)
 {
     auto& registry = utils::Registry::getInstance();
     if (!registry.valid(entity)) return;
@@ -177,7 +177,7 @@ inline void setPadding(::entt::entity entity, float left, float top, float right
 
     auto& padding = registry.get_or_emplace<components::Padding>(entity);
     // Padding 结构为 ImVec4(Top, Right, Bottom, Left)
-    padding.values = ImVec4(top, right, bottom, left);
+    padding.values = Vec4(top, right, bottom, left);
 
     markLayoutDirty(entity);
 }
@@ -247,7 +247,7 @@ inline void setLabelText(::entt::entity entity, const std::string& content)
 /**
  * @brief 设置文本颜色 (应用于 Text 和 TextEdit)
  */
-inline void setTextColor(::entt::entity entity, const ImVec4& color)
+inline void setTextColor(::entt::entity entity, const Color& color)
 {
     auto& registry = utils::Registry::getInstance();
     if (!registry.valid(entity)) return;
@@ -315,7 +315,7 @@ inline void centerInParent(::entt::entity entity)
 /**
  * @brief 开始位置动画
  */
-inline void startPositionAnimation(::entt::entity entity, const ImVec2& startPos, const ImVec2& endPos, float duration)
+inline void startPositionAnimation(::entt::entity entity, const Vec2& startPos, const Vec2& endPos, float duration)
 {
     auto& registry = utils::Registry::getInstance();
     if (!registry.valid(entity)) return;

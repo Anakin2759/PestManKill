@@ -35,7 +35,7 @@
 #include "src/ui/systems/LayoutSystem.h"
 #include "src/ui/systems/WindowsSystem.h" // 保持与 Application.h 中的一致
 #include "src/ui/systems/ActionSystem.h"
-#include "src/ui/components/Events.h"
+#include "src/ui/common/Events.h"
 #include <utils.h>
 
 namespace ui::events

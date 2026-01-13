@@ -28,16 +28,15 @@
 #include <unordered_map>
 #include <functional>
 #include <cmath>
-#include <imgui.h>
 
 // Yoga 布局引擎
 #include <yoga/Yoga.h>
 
 #include <utils.h>
-#include "src/ui/components/Components.h"
-#include "src/ui/components/Tags.h"
-#include "src/ui/components/Policies.h"
-#include "src/ui/components/Events.h"
+#include "src/ui/common/Components.h"
+#include "src/ui/common/Tags.h"
+#include "src/ui/common/Policies.h"
+#include "src/ui/common/Events.h"
 #include "src/ui/interface/Isystem.h"
 
 namespace ui::systems
@@ -131,8 +130,8 @@ public:
         auto& registry = utils::Registry::getInstance();
 
         // LayoutSystem 仅依赖 ECS 组件：画布尺寸来自主画布实体（MainWidgetTag）的 Size。
-        const ImVec2 canvas = getCanvasSizeFromEcs(registry);
-        const bool canvasValid = (canvas.x > 0.0F && canvas.y > 0.0F);
+        const Vec2 canvas = getCanvasSizeFromEcs(registry);
+        const bool canvasValid = (canvas.x() > 0.0F && canvas.y() > 0.0F);
 
         // 检查是否有脏节点
         auto dirtyView = registry.view<const components::LayoutDirtyTag>();
@@ -172,20 +171,20 @@ public:
                 // 处理 FillParent（屏幕尺寸）
                 if (sizeComp->widthPolicy == policies::Size::FillParent)
                 {
-                    rootWidth = canvasValid ? canvas.x : sizeComp->size.x;
+                    rootWidth = canvasValid ? canvas.x() : sizeComp->size.x();
                 }
                 else
                 {
-                    rootWidth = sizeComp->size.x;
+                    rootWidth = sizeComp->size.x();
                 }
 
                 if (sizeComp->heightPolicy == policies::Size::FillParent)
                 {
-                    rootHeight = canvasValid ? canvas.y : sizeComp->size.y;
+                    rootHeight = canvasValid ? canvas.y() : sizeComp->size.y();
                 }
                 else
                 {
-                    rootHeight = sizeComp->size.y;
+                    rootHeight = sizeComp->size.y();
                 }
             }
 
@@ -198,7 +197,7 @@ public:
             // 6. 应用窗口居中策略（针对顶层容器，使用画布尺寸）
             if (canvasValid)
             {
-                applyWindowCentering(registry, root, canvas.x, canvas.y);
+                applyWindowCentering(registry, root, canvas.x(), canvas.y());
             }
             else
             {
@@ -221,7 +220,7 @@ public:
         }
     }
 
-    ImVec2 getCanvasSizeFromEcs(entt::registry& registry) const
+    Vec2 getCanvasSizeFromEcs(entt::registry& registry) const
     {
         auto view = registry.view<const components::MainWidgetTag, const components::Size>();
         for (auto entity : view)
@@ -229,7 +228,7 @@ public:
             const auto& size = registry.get<const components::Size>(entity);
             return size.size;
         }
-        return ImVec2(0.0F, 0.0F);
+        return {0.0F, 0.0F};
     }
 
     bool wantsWindowCentering(entt::registry& registry, entt::entity root) const
@@ -239,7 +238,8 @@ public:
         if (pos == nullptr || size == nullptr) return false;
 
         // 默认：位置是 (0,0) 且尺寸有效，则视为需要自动居中
-        bool wantCenter = (pos->value.x == 0.0F && pos->value.y == 0.0F && size->size.x > 0.0F && size->size.y > 0.0F);
+        bool wantCenter =
+            (pos->value.x() == 0.0F && pos->value.y() == 0.0F && size->size.x() > 0.0F && size->size.y() > 0.0F);
 
         if (const auto* posPolicy = registry.try_get<policies::PositionPolicy>(root))
         {
@@ -334,10 +334,10 @@ private:
         // 2. 内边距 (Padding)
         if (const auto* padding = registry.try_get<components::Padding>(entity))
         {
-            YGNodeStyleSetPadding(node, YGEdgeTop, padding->values.x);
-            YGNodeStyleSetPadding(node, YGEdgeRight, padding->values.y);
-            YGNodeStyleSetPadding(node, YGEdgeBottom, padding->values.w);
-            YGNodeStyleSetPadding(node, YGEdgeLeft, padding->values.z);
+            YGNodeStyleSetPadding(node, YGEdgeTop, padding->values.x());
+            YGNodeStyleSetPadding(node, YGEdgeRight, padding->values.y());
+            YGNodeStyleSetPadding(node, YGEdgeBottom, padding->values.w());
+            YGNodeStyleSetPadding(node, YGEdgeLeft, padding->values.z());
         }
 
         // 3. 尺寸 (Size)
@@ -346,7 +346,7 @@ private:
             // 宽度策略
             if (sizeComp->widthPolicy == policies::Size::Fixed)
             {
-                YGNodeStyleSetWidth(node, sizeComp->size.x);
+                YGNodeStyleSetWidth(node, sizeComp->size.x());
             }
             else if (sizeComp->widthPolicy == policies::Size::FillParent)
             {
@@ -360,7 +360,7 @@ private:
             // 高度策略
             if (sizeComp->heightPolicy == policies::Size::Fixed)
             {
-                YGNodeStyleSetHeight(node, sizeComp->size.y);
+                YGNodeStyleSetHeight(node, sizeComp->size.y());
             }
             else if (sizeComp->heightPolicy == policies::Size::FillParent)
             {
@@ -372,23 +372,23 @@ private:
             }
 
             // 非 autoSize 的固定尺寸
-            if (!sizeComp->autoSize && sizeComp->size.x > 0 && sizeComp->size.y > 0)
+            if (!sizeComp->autoSize && sizeComp->size.x() > 0 && sizeComp->size.y() > 0)
             {
                 if (sizeComp->widthPolicy == policies::Size::Auto)
                 {
-                    YGNodeStyleSetWidth(node, sizeComp->size.x);
+                    YGNodeStyleSetWidth(node, sizeComp->size.x());
                 }
                 if (sizeComp->heightPolicy == policies::Size::Auto)
                 {
-                    YGNodeStyleSetHeight(node, sizeComp->size.y);
+                    YGNodeStyleSetHeight(node, sizeComp->size.y());
                 }
             }
 
             // 最小/最大尺寸约束
-            if (sizeComp->minSize.x > 0) YGNodeStyleSetMinWidth(node, sizeComp->minSize.x);
-            if (sizeComp->minSize.y > 0) YGNodeStyleSetMinHeight(node, sizeComp->minSize.y);
-            if (sizeComp->maxSize.x < FLT_MAX) YGNodeStyleSetMaxWidth(node, sizeComp->maxSize.x);
-            if (sizeComp->maxSize.y < FLT_MAX) YGNodeStyleSetMaxHeight(node, sizeComp->maxSize.y);
+            if (sizeComp->minSize.x() > 0) YGNodeStyleSetMinWidth(node, sizeComp->minSize.x());
+            if (sizeComp->minSize.y() > 0) YGNodeStyleSetMinHeight(node, sizeComp->minSize.y());
+            if (sizeComp->maxSize.x() < FLT_MAX) YGNodeStyleSetMaxWidth(node, sizeComp->maxSize.x());
+            if (sizeComp->maxSize.y() < FLT_MAX) YGNodeStyleSetMaxHeight(node, sizeComp->maxSize.y());
         }
 
         // 4. Spacer 处理 (flexGrow)
@@ -430,7 +430,6 @@ private:
         }
 
         // 7. 文本/按钮等叶子节点：使用 Size 组件中已有的尺寸
-        // 注意：不能在这里调用 ImGui::CalcTextSize，因为可能在 ImGui 帧外执行
         if (!registry.any_of<components::LayoutInfo>(entity))
         {
             // 叶子节点：如果没有设置固定尺寸，给一个合理的默认值
@@ -480,15 +479,15 @@ private:
         // 回写到 Position 组件（相对于父容器）
         if (auto* pos = registry.try_get<components::Position>(entity))
         {
-            pos->value.x = left;
-            pos->value.y = top;
+            pos->value.x() = left;
+            pos->value.y() = top;
         }
 
         // 回写到 Size 组件（仅当值有效时）
         if (auto* size = registry.try_get<components::Size>(entity))
         {
-            if (!std::isnan(width) && width > 0) size->size.x = width;
-            if (!std::isnan(height) && height > 0) size->size.y = height;
+            if (!std::isnan(width) && width > 0) size->size.x() = width;
+            if (!std::isnan(height) && height > 0) size->size.y() = height;
         }
 
         // 递归处理子节点
@@ -528,7 +527,7 @@ private:
 
         // 检查是否有 PositionPolicy 组件来决定居中策略
         // 默认：如果位置是 (0,0) 且尺寸有效，则居中
-        bool shouldCenter = (pos->value.x == 0.0f && pos->value.y == 0.0f);
+        bool shouldCenter = (pos->value.x() == 0.0f && pos->value.y() == 0.0f);
 
         // 如果有明确的位置策略组件，检查是否要求居中
         if (const auto* posPolicy = registry.try_get<policies::PositionPolicy>(root))
@@ -544,10 +543,10 @@ private:
             }
         }
 
-        if (shouldCenter && size->size.x > 0 && size->size.y > 0)
+        if (shouldCenter && size->size.x() > 0 && size->size.y() > 0)
         {
-            pos->value.x = (screenWidth - size->size.x) / 2.0f;
-            pos->value.y = (screenHeight - size->size.y) / 2.0f;
+            pos->value.x() = (screenWidth - size->size.x()) / 2.0f;
+            pos->value.y() = (screenHeight - size->size.y()) / 2.0f;
         }
     }
 

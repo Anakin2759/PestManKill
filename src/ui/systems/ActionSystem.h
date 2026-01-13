@@ -23,10 +23,10 @@
 #include <entt/entt.hpp>
 #include <utils.h>
 #include "imgui_internal.h"
-#include "src/ui/components/Events.h"
+#include "src/ui/common/Events.h"
 #include "src/utils/Dispatcher.h"
 #include "interface/Isystem.h"
-#include "src/ui/components/Components.h"
+#include "src/ui/common/Components.h"
 namespace ui::systems
 {
 class ActionSystem : public ui::interface::EnableRegister<ActionSystem>

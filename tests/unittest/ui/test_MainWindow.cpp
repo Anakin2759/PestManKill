@@ -18,8 +18,8 @@
 #include "src/utils/utils.h"
 #include "src/ui/core/Helper.h"
 #include "src/ui/core/Factory.h"
-#include "src/ui/components/Components.h"
-#include "src/ui/components/Tags.h"
+#include "src/ui/common/Components.h"
+#include "src/ui/common/Tags.h"
 
 namespace ui::tests
 {

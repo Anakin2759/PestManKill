@@ -17,11 +17,11 @@
 
 #pragma once
 #include <entt/entt.hpp>
-#include <utils.h>                 // 包含 Registry
-#include "components/Components.h" // 包含 Size
-#include "components/Tags.h"       // 包含 LayoutDirtyTag
+#include <utils.h>             // 包含 Registry
+#include "common/Components.h" // 包含 Size
+#include "common/Tags.h"       // 包含 LayoutDirtyTag
 #include "interface/Isystem.h"
-#include "components/Events.h"
+#include "common/Events.h"
 namespace ui::systems
 {
 
@@ -64,10 +64,10 @@ public:
             float newH = static_cast<float>(newHeight);
 
             // 避免不必要的更新
-            if (sizeComp->size.x != newW || sizeComp->size.y != newH)
+            if (sizeComp->size.x() != newW || sizeComp->size.y() != newH)
             {
-                sizeComp->size.x = newW;
-                sizeComp->size.y = newH;
+                sizeComp->size.x() = newW;
+                sizeComp->size.y() = newH;
 
                 // 2. 标记根实体为 LayoutDirtyTag
                 registry.emplace_or_replace<components::LayoutDirtyTag>(rootEntity);

@@ -40,10 +40,10 @@
 #include "GraphicsContext.h"
 #include "ImguiContext.h"
 #include "EventLoop.h"
-#include "components/Events.h"
+#include "common/Events.h"
 #include "Task.h"
-#include "src/ui/components/Components.h"
-#include "src/ui/components/Tags.h"
+#include "src/ui/common/Components.h"
+#include "src/ui/common/Tags.h"
 namespace ui
 {
 class Application
@@ -101,11 +101,11 @@ public:
                 registry.emplace<ui::components::Hierarchy>(m_rootEntity);
 
                 auto& pos = registry.emplace<ui::components::Position>(m_rootEntity);
-                pos.value = ImVec2(0.0f, 0.0f);
+                pos.value = {0.0f, 0.0f};
 
                 auto& size = registry.emplace<ui::components::Size>(m_rootEntity);
                 size.autoSize = false;
-                size.size = ImVec2(static_cast<float>(width), static_cast<float>(height));
+                size.size = {static_cast<float>(width), static_cast<float>(height)};
                 size.widthPolicy = ui::policies::Size::Fixed;
                 size.heightPolicy = ui::policies::Size::Fixed;
 

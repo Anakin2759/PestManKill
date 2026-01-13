@@ -20,11 +20,12 @@
 #include <string>
 #include <string_view>
 #include <functional>
-#include "src/ui/components/Components.h"
-#include "src/ui/components/Tags.h"
-#include "src/ui/components/Policies.h"
-#include "src/ui/components/Events.h"
+#include "src/ui/common/Components.h"
+#include "src/ui/common/Tags.h"
+#include "src/ui/common/Policies.h"
+#include "src/ui/common/Events.h"
 #include <utils.h>
+#include "common/Types.h" // 包含 Vec2, Color 等类型
 namespace ui::factory
 {
 
@@ -188,7 +189,7 @@ inline entt::entity
  * @param end 终点
  * @param alias 组件别名
  */
-inline entt::entity CreateArrow(const ImVec2& start, const ImVec2& end, const std::string& alias = "")
+inline entt::entity CreateArrow(const Vec2& start, const Vec2& end, const std::string& alias = "")
 {
     auto entity = createBaseWidget(alias);
 

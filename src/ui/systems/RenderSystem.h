@@ -34,9 +34,9 @@
 #include <imgui_impl_sdlrenderer3.h>
 #include <SDL3/SDL.h>
 #include <utils.h>
-#include "components/Components.h"
-#include "components/Tags.h"
-#include "components/Events.h"
+#include "common/Components.h"
+#include "common/Tags.h"
+#include "common/Events.h"
 #include "interface/Isystem.h"
 #include "core/GraphicsContext.h"
 // 前向声明
@@ -115,9 +115,9 @@ public:
             {
                 auto& size = canvasView.get<components::Size>(e);
                 size.autoSize = false;
-                if (size.size.x != fw || size.size.y != fh)
+                if (size.size.x() != fw || size.size.y() != fh)
                 {
-                    size.size = ImVec2(fw, fh);
+                    size.size = {fw, fh};
                     registry.emplace_or_replace<components::LayoutDirtyTag>(e);
                 }
             }
@@ -216,8 +216,8 @@ private:
         const float globalAlpha = parentGlobalAlpha * (alphaComp ? alphaComp->value : 1.0f);
 
         // 计算当前实体的绝对屏幕位置 (相对于父级内容区)
-        ImVec2 absolutePos(parentAbsolutePos.x + pos.value.x, parentAbsolutePos.y + pos.value.y);
-        ImVec2 absoluteEndPos(absolutePos.x + size.size.x, absolutePos.y + size.size.y);
+        ImVec2 absolutePos(parentAbsolutePos.x + pos.value.x(), parentAbsolutePos.y + pos.value.y());
+        ImVec2 absoluteEndPos(absolutePos.x + size.size.x(), absolutePos.y + size.size.y());
 
         // ----------------------------------------------------
         // 1. 容器特殊处理 (Window/Dialog)
@@ -237,7 +237,7 @@ private:
         // ----------------------------------------------------
         // 3. 渲染特定内容
         // ----------------------------------------------------
-        renderSpecificComponent(registry, entity, draw_list, absolutePos, size.size, globalAlpha);
+        renderSpecificComponent(registry, entity, draw_list, absolutePos, {size.size.x(), size.size.y()}, globalAlpha);
 
         // ----------------------------------------------------
         // 4. 递归渲染子元素 (适用于非 Window 的普通容器，如 VBox/HBox)
@@ -296,16 +296,14 @@ private:
 
         // --- 1. 设置 ImGui 窗口状态 ---
         ImGui::SetNextWindowPos(absolutePos);
-        ImGui::SetNextWindowSize(size.size);
+        ImGui::SetNextWindowSize({size.size.x(), size.size.y()});
 
         ImGuiWindowFlags flags = ImGuiWindowFlags_None;
         if (!hasTitleBar) flags |= ImGuiWindowFlags_NoTitleBar;
         if (noResize) flags |= ImGuiWindowFlags_NoResize;
         if (noMove) flags |= ImGuiWindowFlags_NoMove;
         if (noCollapse) flags |= ImGuiWindowFlags_NoCollapse;
-        // ImGui 的“模态”语义通常通过 BeginPopupModal 实现；此处使用普通 Begin，不设置不存在的 WindowFlags。
 
-        // 标记：如果 ECS 窗口/对话框没有 Background 组件，则使用 ImGui 默认背景。
         // 如果有 Background 组件，则设置 ImGuiWindowFlags_NoBackground，并在 ECS 中绘制。
         if (registry.any_of<components::Background>(entity))
         {
@@ -318,7 +316,7 @@ private:
             ImDrawList* window_draw_list = ImGui::GetWindowDrawList();
 
             // 绘制 ECS 提供的自定义背景/边框 (如果设置了 NoBackground)
-            ImVec2 absEndPos(absolutePos.x + size.size.x, absolutePos.y + size.size.y);
+            ImVec2 absEndPos(absolutePos.x + size.size.x(), absolutePos.y + size.size.y());
             renderBackground(entity, window_draw_list, absolutePos, absEndPos, globalAlpha);
 
             // --- 3. 递归渲染子元素 ---
@@ -347,7 +345,7 @@ private:
         const auto* bg = registry.try_get<components::Background>(entity);
         if (bg && bg->enabled)
         {
-            ImVec4 finalColor = bg->color;
+            ImVec4 finalColor = {bg->color.red, bg->color.green, bg->color.blue, bg->color.alpha};
             finalColor.w *= globalAlpha;
             ImU32 color = ImGui::GetColorU32(finalColor);
 
@@ -358,7 +356,7 @@ private:
         const auto* border = registry.try_get<components::Border>(entity);
         if (border && border->thickness > 0.0f)
         {
-            ImVec4 finalColor = border->color;
+            ImVec4 finalColor = {border->color.red, border->color.green, border->color.blue, border->color.alpha};
             finalColor.w *= globalAlpha;
             ImU32 color = ImGui::GetColorU32(finalColor);
 
@@ -382,7 +380,8 @@ private:
             const auto* textComp = registry.try_get<components::Text>(entity);
             if (textComp && !textComp->content.empty())
             {
-                ImVec4 finalColor = textComp->color;
+                ImVec4 finalColor = {
+                    textComp->color.red, textComp->color.green, textComp->color.blue, textComp->color.alpha};
                 finalColor.w *= globalAlpha;
                 ImU32 color = ImGui::GetColorU32(finalColor);
 
@@ -431,12 +430,12 @@ private:
                 draw_list->AddImage(imageComp.textureId,
                                     pos,
                                     endPos,
-                                    imageComp.uvMin,
-                                    imageComp.uvMax,
-                                    ImGui::GetColorU32(ImVec4(imageComp.tintColor.x,
-                                                              imageComp.tintColor.y,
-                                                              imageComp.tintColor.z,
-                                                              imageComp.tintColor.w * globalAlpha)));
+                                    {imageComp.uvMin.x(), imageComp.uvMin.y()},
+                                    {imageComp.uvMax.x(), imageComp.uvMax.y()},
+                                    ImGui::GetColorU32(ImVec4(imageComp.tintColor.red,
+                                                              imageComp.tintColor.green,
+                                                              imageComp.tintColor.blue,
+                                                              imageComp.tintColor.alpha * globalAlpha)));
             }
         }
 
@@ -454,7 +453,10 @@ private:
 
             // 2. 绘制文本 (buffer 或 placeholder)
             const std::string& content = textEditComp.buffer.empty() ? textEditComp.placeholder : textEditComp.buffer;
-            ImVec4 finalColor = textEditComp.textColor;
+            ImVec4 finalColor = {textEditComp.textColor.red,
+                                 textEditComp.textColor.green,
+                                 textEditComp.textColor.blue,
+                                 textEditComp.textColor.alpha};
             finalColor.w *= globalAlpha;
             ImU32 text_color = ImGui::GetColorU32(finalColor);
             ImVec2 textPos(pos.x + 5.0f, pos.y + 5.0f);
@@ -465,10 +467,13 @@ private:
         if (registry.any_of<components::ArrowTag>(entity))
         {
             const auto& arrowComp = registry.get<const components::Arrow>(entity);
-            ImVec4 finalColor = arrowComp.color;
-            finalColor.w *= globalAlpha;
-            ImU32 color = ImGui::GetColorU32(finalColor);
-            draw_list->AddLine(arrowComp.startPoint, arrowComp.endPoint, color, arrowComp.thickness);
+            Color finalColor = arrowComp.color;
+            finalColor.blue *= globalAlpha;
+
+            draw_list->AddLine({arrowComp.startPoint.x(), arrowComp.startPoint.y()},
+                               {arrowComp.endPoint.x(), arrowComp.endPoint.y()},
+                               finalColor.toSDLColor(),
+                               arrowComp.thickness);
         }
     }
 };

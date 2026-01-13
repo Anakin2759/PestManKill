@@ -26,7 +26,7 @@
 #include <imgui_impl_sdlrenderer3.h>
 #include <entt/entt.hpp>
 #include <utils.h>
-#include "src/ui/components/Events.h"
+#include "src/ui/common/Events.h"
 
 namespace ui
 {

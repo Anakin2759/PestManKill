@@ -27,8 +27,8 @@
 
 #pragma once
 #include <entt/entt.hpp>
-#include "src/ui/components/Components.h"
-#include "src/ui/components/Events.h"
+#include "src/ui/common/Components.h"
+#include "src/ui/common/Events.h"
 #include "src/utils/Dispatcher.h"
 #include "interface/Isystem.h"
 #include <sys/stat.h>
@@ -76,8 +76,8 @@ private:
             {
                 if (auto* pos = registry.try_get<components::Position>(entity))
                 {
-                    pos->value.x = animPos->from.x + (animPos->to.x - animPos->from.x) * easedProgress;
-                    pos->value.y = animPos->from.y + (animPos->to.y - animPos->from.y) * easedProgress;
+                    pos->value.x() = animPos->from.x() + (animPos->to.x() - animPos->from.x()) * easedProgress;
+                    pos->value.y() = animPos->from.y() + (animPos->to.y() - animPos->from.y()) * easedProgress;
                 }
             }
 

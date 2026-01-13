@@ -30,12 +30,13 @@
 #include <utility>
 #include <SDL3/SDL.h>
 #include <imgui_impl_sdl3.h>
-#include "components/Events.h"
-#include "src/utils/Registry.h"    // 包含 Registry
-#include "src/utils/Dispatcher.h"  // 包含 Dispatcher
-#include "components/Components.h" // 包含 Position, Size, Clickable, ButtonState, Hierarchy
-#include "components/Tags.h"       // 包含 HoveredTag, ActiveTag, DisabledTag, LayoutDirtyTag
+#include "common/Events.h"
+#include "src/utils/Registry.h"   // 包含 Registry
+#include "src/utils/Dispatcher.h" // 包含 Dispatcher
+#include "common/Components.h"    // 包含 Position, Size, Clickable, ButtonState, Hierarchy
+#include "common/Tags.h"          // 包含 HoveredTag, ActiveTag, DisabledTag, LayoutDirtyTag
 #include "src/ui/interface/Isystem.h"
+#include "common/Types.h" // 包含 Vec2
 namespace ui::systems
 {
 
@@ -64,7 +65,7 @@ private:
         // 获取鼠标位置（SDL API 直接获取，不依赖 ImGui IO 帧更新）
         float mouseX = 0.0F, mouseY = 0.0F;
         SDL_GetMouseState(&mouseX, &mouseY);
-        ImVec2 mousePos(mouseX, mouseY);
+        Vec2 mousePos(mouseX, mouseY);
 
         // 首先检测鼠标落在哪个顶层窗口/对话框内
         entt::entity topWindow = findTopWindowAtPoint(registry, mousePos);
@@ -80,7 +81,7 @@ private:
             [[maybe_unused]] const auto& pos = registry.get<const components::Position>(entity);
             const auto& size = registry.get<const components::Size>(entity);
 
-            ImVec2 absPos = getAbsolutePosition(registry, entity);
+            Vec2 absPos = getAbsolutePosition(registry, entity);
 
             if (isPointInRect(mousePos, absPos, size.size))
             {
@@ -211,9 +212,10 @@ private:
      * @param size 实体尺寸
      * @return bool 是否命中
      */
-    bool isPointInRect(const ImVec2& point, const ImVec2& pos, const ImVec2& size) const
+    bool isPointInRect(const Vec2& point, const Vec2& pos, const Vec2& size) const
     {
-        return point.x >= pos.x && point.x < (pos.x + size.x) && point.y >= pos.y && point.y < (pos.y + size.y);
+        return point.x() >= pos.x() && point.x() < (pos.x() + size.x()) && point.y() >= pos.y() &&
+               point.y() < (pos.y() + size.y());
     }
 
     /**
@@ -225,7 +227,7 @@ private:
      * @note 对于 Window/Dialog 容器的子元素，需要加上 ImGui 窗口的内容区偏移
      *       以与 RenderSystem 中的渲染位置保持一致。
      */
-    ImVec2 getAbsolutePosition(entt::registry& registry, entt::entity entity)
+    Vec2 getAbsolutePosition(entt::registry& registry, entt::entity entity)
     {
         // 构建从当前实体到根的路径
         std::vector<entt::entity> path;
@@ -238,15 +240,15 @@ private:
         }
 
         // 从根到当前实体正向遍历，模拟 RenderSystem 的递归逻辑
-        ImVec2 pos(0.0f, 0.0f);
+        Vec2 pos(0.0f, 0.0f);
         for (auto it = path.rbegin(); it != path.rend(); ++it)
         {
             entt::entity e = *it;
             const auto* posComp = registry.try_get<components::Position>(e);
             if (posComp)
             {
-                pos.x += posComp->value.x;
-                pos.y += posComp->value.y;
+                pos.x() += posComp->value.x();
+                pos.y() += posComp->value.y();
             }
 
             // 检查是否是 Window/Dialog 容器
@@ -271,8 +273,8 @@ private:
                     // 但我们是从根到叶遍历，所以在处理完窗口后加上偏移
                     if (it + 1 != path.rend()) // 如果不是最终目标实体
                     {
-                        pos.x += windowPadding.x;
-                        pos.y += titleBarOffset + windowPadding.y;
+                        pos.x() += windowPadding.x;
+                        pos.y() += titleBarOffset + windowPadding.y;
                     }
                 }
             }
@@ -352,7 +354,7 @@ private:
      * @brief 查找鼠标位置所在的最前面的窗口/对话框
      * @return 窗口实体，如果不在任何窗口内则返回 entt::null
      */
-    entt::entity findTopWindowAtPoint(entt::registry& registry, const ImVec2& point)
+    entt::entity findTopWindowAtPoint(entt::registry& registry, const Vec2& point)
     {
         // 收集所有顶层窗口/对话框
         std::vector<std::pair<int, entt::entity>> windows;

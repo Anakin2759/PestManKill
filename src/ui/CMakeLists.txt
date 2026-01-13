@@ -11,7 +11,7 @@ target_include_directories(ui INTERFACE
 cmrc_add_resource_library(ui_fonts
     ALIAS fonts              # 在 C++ 中调用的别名
     NAMESPACE ui_fonts          # C++ 命名空间
-    SourceHanSans-VF.ttf.ttc
+    assets/fonts/NotoSansSC-VariableFont_wght.ttf
 )
 
 # 依赖项
@@ -24,6 +24,7 @@ target_link_libraries(ui INTERFACE
     yogacore
     ui_fonts
     SDL3_ttf::SDL3_ttf
+    eigen
 )
 
 
