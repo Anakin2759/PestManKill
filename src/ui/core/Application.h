@@ -41,6 +41,7 @@
 #include "ImguiContext.h"
 #include "EventLoop.h"
 #include "TaskChain.h"
+#include "ThreadPool.h"
 #include "common/Events.h"
 #include "src/ui/common/Components.h"
 #include "src/ui/common/Tags.h"
@@ -114,6 +115,7 @@ public:
         }
 
         // 顺序执行事件缓冲处理->输入->渲染任务
+        m_scheduler.attach<ui::QueuedTaskChain>();
         m_scheduler.attach<ui::EventTaskChain>(FRAME_DELAY_MS);
         m_scheduler.attach<ui::InputTaskChain>(FRAME_DELAY_MS);
         m_scheduler.attach<ui::RenderTaskChain>(FRAME_DELAY_MS);
@@ -138,7 +140,8 @@ public:
     void onQuitRequested([[maybe_unused]] ui::events::QuitRequested& event)
     {
         m_scheduler.update(LOOP_DELAY_MS);
-        m_eventLoop.quit();
+        utils::ThreadPool::enqueue([this]() { m_eventLoop.quit(); });
+        // m_eventLoop.quit();
     }
 
     virtual ~Application()

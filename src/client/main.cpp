@@ -186,9 +186,8 @@ void CreateMenuDialog()
     auto& exitClickable = registry.get<ui::components::Clickable>(exitBtn);
     exitClickable.onClick = []()
     {
-        std::cout << "退出按钮被点击，关闭应用程序。" << std::endl;
         auto& dispatcher = utils::Dispatcher::getInstance();
-        dispatcher.enqueue<ui::events::QuitRequested>(ui::events::QuitRequested{});
+        dispatcher.trigger<ui::events::QuitRequested>(ui::events::QuitRequested{});
     };
     ui::helper::AddChild(menuDialog, exitBtn);
 

@@ -40,22 +40,22 @@ struct InputTaskChain final : public entt::process
     using delta_type = typename entt::process::delta_type;
 
     InputTaskChain(const allocator_type& alloc, delta_type delay)
-        : entt::process{alloc}, remainingTime(delay), delayTime(delay)
+        : entt::process{alloc}, m_remainingTime(delay), m_delayTime(delay)
     {
     }
 
     void update(const delta_type delta, [[maybe_unused]] void* data) override
     {
-        if (remainingTime > delta)
+        if (m_remainingTime > delta)
         {
-            remainingTime -= delta;
+            m_remainingTime -= delta;
             //    aborted();
             return; // 时间未到，直接返回
         }
-        remainingTime = delayTime;
+        m_remainingTime = m_delayTime;
         auto& dispatcher = ::utils::Dispatcher::getInstance();
         dispatcher.enqueue<ui::events::SDLEvent>(ui::events::SDLEvent{});
-        remainingTime = delayTime;
+        m_remainingTime = m_delayTime;
     }
 
     void succeeded() override { LOG_INFO("[input task] InputTask succeeded"); }
@@ -63,8 +63,8 @@ struct InputTaskChain final : public entt::process
     void aborted() override { LOG_INFO("[input task] InputTask aborted"); }
 
 private:
-    delta_type remainingTime;
-    delta_type delayTime;
+    delta_type m_remainingTime;
+    delta_type m_delayTime;
 };
 
 /**
@@ -76,19 +76,19 @@ struct RenderTaskChain final : public entt::process
     using delta_type = typename entt::process::delta_type;
 
     RenderTaskChain(const allocator_type& alloc, delta_type delay)
-        : entt::process{alloc}, remainingTime(delay), delayTime(delay)
+        : entt::process{alloc}, m_remainingTime(delay), m_delayTime(delay)
     {
     }
 
     void update(const delta_type delta, [[maybe_unused]] void* data) override
     {
-        if (remainingTime > delta)
+        if (m_remainingTime > delta)
         {
-            remainingTime -= delta;
+            m_remainingTime -= delta;
             // aborted();
             return;
         }
-        remainingTime = delayTime;
+        m_remainingTime = m_delayTime;
         auto& dispatcher = ::utils::Dispatcher::getInstance();
         // 先触发布局更新，再渲染
         dispatcher.trigger<ui::events::UpdateLayout>(ui::events::UpdateLayout{});
@@ -102,8 +102,8 @@ struct RenderTaskChain final : public entt::process
     void aborted() override { LOG_INFO("[render task] RenderTask aborted"); }
 
 private:
-    delta_type remainingTime;
-    delta_type delayTime; // 约60FPS
+    delta_type m_remainingTime;
+    delta_type m_delayTime; // 约60FPS
 };
 
 struct EventTaskChain final : public entt::process
@@ -112,19 +112,19 @@ struct EventTaskChain final : public entt::process
     using delta_type = typename entt::process::delta_type;
 
     EventTaskChain(const allocator_type& alloc, delta_type delay)
-        : entt::process{alloc}, remainingTime(delay), delayTime(delay)
+        : entt::process{alloc}, m_remainingTime(delay), m_delayTime(delay)
     {
     }
 
     void update(const delta_type delta, [[maybe_unused]] void* data) override
     {
-        if (remainingTime > delta)
+        if (m_remainingTime > delta)
         {
-            remainingTime -= delta;
+            m_remainingTime -= delta;
             // aborted();
             return;
         }
-        remainingTime = delayTime;
+        m_remainingTime = m_delayTime;
         auto& dispatcher = ::utils::Dispatcher::getInstance();
         dispatcher.update(); // 处理所有排队的事件
         // succeed();
@@ -135,8 +135,26 @@ struct EventTaskChain final : public entt::process
     void aborted() override { LOG_INFO("[event task] EventTask aborted"); }
 
 private:
-    delta_type remainingTime;
-    delta_type delayTime; // 约60FPS
+    delta_type m_remainingTime;
+    delta_type m_delayTime; // 约60FPS
+};
+
+struct QueuedTaskChain final : public entt::process
+{
+    using allocator_type = typename entt::process::allocator_type;
+    using delta_type = typename entt::process::delta_type;
+
+    explicit QueuedTaskChain(const allocator_type& alloc) : entt::process{alloc} {}
+
+    void update([[maybe_unused]] const delta_type delta, [[maybe_unused]] void* data) override
+    {
+        auto& dispatcher = ::utils::Dispatcher::getInstance();
+        dispatcher.update<events::QuequedTask>(); // 处理所有排队的任务
+    }
+
+    void succeeded() override { LOG_INFO("[queued task] QueuedTask succeeded"); }
+    void failed() override { LOG_INFO("[queued task] QueuedTask failed"); }
+    void aborted() override { LOG_INFO("[queued task] QueuedTask aborted"); }
 };
 
 } // namespace ui
