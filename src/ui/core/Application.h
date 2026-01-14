@@ -42,7 +42,6 @@
 #include "EventLoop.h"
 #include "TaskChain.h"
 #include "common/Events.h"
-#include "TaskChain.h"
 #include "src/ui/common/Components.h"
 #include "src/ui/common/Tags.h"
 namespace ui
@@ -102,7 +101,7 @@ public:
                 registry.emplace<ui::components::Hierarchy>(m_rootEntity);
 
                 auto& pos = registry.emplace<ui::components::Position>(m_rootEntity);
-                pos.value = {0.0f, 0.0f};
+                pos.value = {0.0F, 0.0F};
 
                 auto& size = registry.emplace<ui::components::Size>(m_rootEntity);
                 size.autoSize = false;

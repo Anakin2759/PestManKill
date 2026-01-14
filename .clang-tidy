@@ -25,8 +25,9 @@ Checks: >
   -fuchsia-header-anon-namespaces,
   -fuchsia-multiple-inheritance,
   -misc-non-private-member-variables-in-classes,
-  -cppcoreguidelines-avoid-magic-numbers
-
+  -cppcoreguidelines-avoid-magic-numbers,
+  -readability-magic-numbers,
+  -readability-convert-member-functions-to-static
 CheckOptions:
   # === Naming Conventions ===
   - key: readability-identifier-naming.NamespaceCase

@@ -30,7 +30,7 @@ namespace ui::helper
 /**
  * @brief 标记此实体及其父实体为 LayoutDirty，通知布局系统重新计算。
  */
-inline void markLayoutDirty(::entt::entity entity)
+inline void MarkLayoutDirty(::entt::entity entity)
 {
     auto& registry = utils::Registry::getInstance();
     ::entt::entity current = entity;
@@ -38,7 +38,7 @@ inline void markLayoutDirty(::entt::entity entity)
     {
         registry.emplace_or_replace<components::LayoutDirtyTag>(current);
         const auto* hierarchy = registry.try_get<components::Hierarchy>(current);
-        current = hierarchy ? hierarchy->parent : ::entt::null;
+        current = hierarchy != nullptr ? hierarchy->parent : ::entt::null;
     }
 }
 
@@ -47,7 +47,7 @@ inline void markLayoutDirty(::entt::entity entity)
 /**
  * @brief 设置固定尺寸
  */
-inline void setFixedSize(::entt::entity entity, float width, float height)
+inline void SetFixedSize(::entt::entity entity, float width, float height)
 {
     auto& registry = utils::Registry::getInstance();
     if (!registry.valid(entity)) return;
@@ -56,26 +56,26 @@ inline void setFixedSize(::entt::entity entity, float width, float height)
     size.size = {width, height};
     size.autoSize = false;
 
-    markLayoutDirty(entity);
+    MarkLayoutDirty(entity);
 }
 
 /**
  * @brief 设置位置
  * 注意：通常只用于根节点或不参与布局的自定义位置元素。
  */
-inline void setPosition(::entt::entity entity, float x, float y)
+inline void SetPosition(entt::entity entity, float positionX, float positionY)
 {
     auto& registry = utils::Registry::getInstance();
     if (!registry.valid(entity)) return;
 
     auto& pos = registry.get_or_emplace<components::Position>(entity);
-    pos.value = {x, y};
+    pos.value = {positionX, positionY};
 
     // 我们优化后的 Position 组件中移除了 useCustomPosition 字段，
     // 布局系统通过检查 Position 组件是否存在来决定是否参与计算。
     // 这里设置 Position 组件即表示其位置被确定。
 
-    markLayoutDirty(entity);
+    MarkLayoutDirty(entity);
 }
 
 // ===================== 可见性与样式 =====================
@@ -84,7 +84,7 @@ inline void setPosition(::entt::entity entity, float x, float y)
  * @brief 设置可见性
  * 使用 VisibleTag 实现 ECS 哲学：可见则有 Tag，不可见则移除 Tag。
  */
-inline void setVisible(::entt::entity entity, bool visible)
+inline void SetVisible(::entt::entity entity, bool visible)
 {
     auto& registry = utils::Registry::getInstance();
     if (!registry.valid(entity)) return;
@@ -102,7 +102,7 @@ inline void setVisible(::entt::entity entity, bool visible)
 /**
  * @brief 设置透明度
  */
-inline void setAlpha(::entt::entity entity, float alpha)
+inline void SetAlpha(::entt::entity entity, float alpha)
 {
     auto& registry = utils::Registry::getInstance();
     if (!registry.valid(entity)) return;
@@ -114,31 +114,32 @@ inline void setAlpha(::entt::entity entity, float alpha)
 /**
  * @brief 设置背景颜色
  */
-inline void setBackgroundColor(::entt::entity entity, const Color& color)
+inline void SetBackgroundColor(::entt::entity entity, const Color& color)
 {
     auto& registry = utils::Registry::getInstance();
     if (!registry.valid(entity)) return;
 
-    auto& bg = registry.get_or_emplace<components::Background>(entity);
-    bg.color = color;
-    bg.enabled = true;
+    auto& background = registry.get_or_emplace<components::Background>(entity);
+    background.color = color;
+    background.enabled = true;
 }
 
 /**
  * @brief 设置圆角（Background/Border）
  */
-inline void setBorderRadius(::entt::entity entity, float radius)
+inline void SetBorderRadius(::entt::entity entity, float radius)
 {
     auto& registry = utils::Registry::getInstance();
     if (!registry.valid(entity)) return;
 
-    auto& bg = registry.get_or_emplace<components::Background>(entity);
-    bg.borderRadius = std::max(0.0f, radius);
-    bg.enabled = true;
+    auto& background = registry.get_or_emplace<components::Background>(entity);
+    const auto radiusClamped = std::max(0.0F, radius);
+    background.borderRadius = {radiusClamped, radiusClamped, radiusClamped, radiusClamped};
+    background.enabled = true;
 
     if (auto* border = registry.try_get<components::Border>(entity))
     {
-        border->borderRadius = std::max(0.0f, radius);
+        border->borderRadius = {radiusClamped, radiusClamped, radiusClamped, radiusClamped};
     }
 }
 
@@ -147,30 +148,24 @@ inline void setBorderRadius(::entt::entity entity, float radius)
 /**
  * @brief 设置布局间距
  */
-inline void setLayoutSpacing(::entt::entity entity, float spacing)
+inline void SetLayoutSpacing(::entt::entity entity, float spacing)
 {
     auto& registry = utils::Registry::getInstance();
     if (!registry.valid(entity)) return;
 
     auto* layout = registry.try_get<components::LayoutInfo>(entity);
-    if (layout)
+    if (layout != nullptr)
     {
         layout->spacing = std::max(0.0F, spacing);
-        markLayoutDirty(entity);
+        MarkLayoutDirty(entity);
     }
-}
-
-// 兼容旧命名
-inline void setSpacing(::entt::entity entity, float spacing)
-{
-    setLayoutSpacing(entity, spacing);
 }
 
 /**
  * @brief 设置内边距 (Padding)
  * 原来的 setLayoutMargins 对应我们优化后的 Padding 组件。
  */
-inline void setPadding(::entt::entity entity, float left, float top, float right, float bottom)
+inline void SetPadding(::entt::entity entity, float left, float top, float right, float bottom)
 {
     auto& registry = utils::Registry::getInstance();
     if (!registry.valid(entity)) return;
@@ -179,15 +174,15 @@ inline void setPadding(::entt::entity entity, float left, float top, float right
     // Padding 结构为 ImVec4(Top, Right, Bottom, Left)
     padding.values = Vec4(top, right, bottom, left);
 
-    markLayoutDirty(entity);
+    MarkLayoutDirty(entity);
 }
 
 /**
  * @brief 设置内边距 (统一值)
  */
-inline void setPadding(::entt::entity entity, float padding)
+inline void SetPadding(::entt::entity entity, float padding)
 {
-    setPadding(entity, padding, padding, padding, padding);
+    SetPadding(entity, padding, padding, padding, padding);
 }
 
 // ===================== 文本与交互 =====================
@@ -195,7 +190,7 @@ inline void setPadding(::entt::entity entity, float padding)
 /**
  * @brief 设置按钮文本 (统一使用 Text 组件)
  */
-inline void setButtonText(::entt::entity entity, const std::string& content)
+inline void SetButtonText(::entt::entity entity, const std::string& content)
 {
     auto& registry = utils::Registry::getInstance();
     if (!registry.valid(entity)) return;
@@ -205,7 +200,7 @@ inline void setButtonText(::entt::entity entity, const std::string& content)
     {
         auto& text = registry.get_or_emplace<components::Text>(entity);
         text.content = content;
-        markLayoutDirty(entity);
+        MarkLayoutDirty(entity);
     }
 }
 
@@ -213,7 +208,7 @@ inline void setButtonText(::entt::entity entity, const std::string& content)
  * @brief 设置按钮启用状态
  * 使用 DisabledTag 实现 ECS 哲学。
  */
-inline void setButtonEnabled(::entt::entity entity, bool enabled)
+inline void SetButtonEnabled(::entt::entity entity, bool enabled)
 {
     auto& registry = utils::Registry::getInstance();
     if (!registry.valid(entity)) return;
@@ -231,7 +226,7 @@ inline void setButtonEnabled(::entt::entity entity, bool enabled)
 /**
  * @brief 设置标签文本
  */
-inline void setLabelText(::entt::entity entity, const std::string& content)
+inline void SetLabelText(::entt::entity entity, const std::string& content)
 {
     auto& registry = utils::Registry::getInstance();
     if (!registry.valid(entity)) return;
@@ -240,14 +235,14 @@ inline void setLabelText(::entt::entity entity, const std::string& content)
     {
         auto& text = registry.get_or_emplace<components::Text>(entity);
         text.content = content;
-        markLayoutDirty(entity);
+        MarkLayoutDirty(entity);
     }
 }
 
 /**
  * @brief 设置文本颜色 (应用于 Text 和 TextEdit)
  */
-inline void setTextColor(::entt::entity entity, const Color& color)
+inline void SetTextColor(::entt::entity entity, const Color& color)
 {
     auto& registry = utils::Registry::getInstance();
     if (!registry.valid(entity)) return;
@@ -265,25 +260,25 @@ inline void setTextColor(::entt::entity entity, const Color& color)
 /**
  * @brief 获取文本编辑框内容
  */
-inline std::string getTextEditContent(::entt::entity entity)
+inline std::string GetTextEditContent(::entt::entity entity)
 {
     auto& registry = utils::Registry::getInstance();
     if (!registry.valid(entity)) return "";
 
     auto* textEdit = registry.try_get<components::TextEdit>(entity);
-    return textEdit ? textEdit->buffer : ""; // 注意：我们优化后的 TextEdit 使用 buffer
+    return textEdit != nullptr ? textEdit->buffer : ""; // 注意：我们优化后的 TextEdit 使用 buffer
 }
 
 /**
  * @brief 设置文本编辑框内容
  */
-inline void setTextEditContent(::entt::entity entity, const std::string& content)
+inline void SetTextEditContent(::entt::entity entity, const std::string& content)
 {
     auto& registry = utils::Registry::getInstance();
     if (!registry.valid(entity)) return;
 
     auto* textEdit = registry.try_get<components::TextEdit>(entity);
-    if (textEdit)
+    if (textEdit != nullptr)
     {
         textEdit->buffer = content; // 注意：我们优化后的 TextEdit 使用 buffer
     }
@@ -292,7 +287,7 @@ inline void setTextEditContent(::entt::entity entity, const std::string& content
 /**
  * @brief 设置密码模式（TextEdit.password）
  */
-inline void setPasswordMode(::entt::entity entity, bool enabled)
+inline void SetPasswordMode(::entt::entity entity, bool enabled)
 {
     auto& registry = utils::Registry::getInstance();
     if (!registry.valid(entity)) return;
@@ -305,9 +300,9 @@ inline void setPasswordMode(::entt::entity entity, bool enabled)
 /**
  * @brief 将实体在父级内居中（当前最小实现：仅标记布局脏，由布局系统或外部定位处理）
  */
-inline void centerInParent(::entt::entity entity)
+inline void CenterInParent(::entt::entity entity)
 {
-    markLayoutDirty(entity);
+    MarkLayoutDirty(entity);
 }
 
 // ===================== 动画操作 =====================
@@ -315,7 +310,7 @@ inline void centerInParent(::entt::entity entity)
 /**
  * @brief 开始位置动画
  */
-inline void startPositionAnimation(::entt::entity entity, const Vec2& startPos, const Vec2& endPos, float duration)
+inline void StartPositionAnimation(::entt::entity entity, const Vec2& startPos, const Vec2& endPos, float duration)
 {
     auto& registry = utils::Registry::getInstance();
     if (!registry.valid(entity)) return;
@@ -334,7 +329,7 @@ inline void startPositionAnimation(::entt::entity entity, const Vec2& startPos, 
 /**
  * @brief 开始透明度动画
  */
-inline void startAlphaAnimation(::entt::entity entity, float startAlpha, float endAlpha, float duration)
+inline void StartAlphaAnimation(::entt::entity entity, float startAlpha, float endAlpha, float duration)
 {
     auto& registry = utils::Registry::getInstance();
     if (!registry.valid(entity)) return;
@@ -353,7 +348,7 @@ inline void startAlphaAnimation(::entt::entity entity, float startAlpha, float e
 /**
  * @brief 停止动画
  */
-inline void stopAnimation(::entt::entity entity)
+inline void StopAnimation(::entt::entity entity)
 {
     auto& registry = utils::Registry::getInstance();
     if (!registry.valid(entity)) return;
@@ -367,7 +362,7 @@ inline void stopAnimation(::entt::entity entity)
 /**
  * @brief 添加子实体到父容器中 (核心 Hierarchy 操作)
  */
-inline void addChild(::entt::entity parent, ::entt::entity child)
+inline void AddChild(::entt::entity parent, ::entt::entity child)
 {
     auto& registry = utils::Registry::getInstance();
     if (!registry.valid(parent) || !registry.valid(child)) return;
@@ -378,8 +373,8 @@ inline void addChild(::entt::entity parent, ::entt::entity child)
     // 如果子实体已经有父级，则先从旧父级移除
     if (childHierarchy.parent != ::entt::null && childHierarchy.parent != parent)
     {
-        // 实际应用中需要一个 removeChild 函数
-        // removeChild(childHierarchy.parent, child);
+        // 实际应用中需要一个 RemoveChild 函数
+        // RemoveChild(childHierarchy.parent, child);
     }
     childHierarchy.parent = parent;
 
@@ -388,19 +383,19 @@ inline void addChild(::entt::entity parent, ::entt::entity child)
 
     // 确保子实体不在列表中
     auto& children = parentHierarchy.children;
-    if (std::find(children.begin(), children.end(), child) == children.end())
+    if (!std::ranges::contains(children, child))
     {
         children.push_back(child);
     }
 
     // 3. 标记新节点及其祖先为脏，触发布局计算
-    markLayoutDirty(child);
+    MarkLayoutDirty(child);
 }
 
 /**
  * @brief 移除子实体 (从 Hierarchy 中断开，但实体本身可能仍然存在)
  */
-inline void removeChild(::entt::entity parent, ::entt::entity child)
+inline void RemoveChild(::entt::entity parent, ::entt::entity child)
 {
     auto& registry = utils::Registry::getInstance();
     if (!registry.valid(parent) || !registry.valid(child)) return;
@@ -408,17 +403,17 @@ inline void removeChild(::entt::entity parent, ::entt::entity child)
     auto* parentHierarchy = registry.try_get<components::Hierarchy>(parent);
     auto* childHierarchy = registry.try_get<components::Hierarchy>(child);
 
-    if (parentHierarchy && childHierarchy && childHierarchy->parent == parent)
+    if (parentHierarchy != nullptr && childHierarchy != nullptr && childHierarchy->parent == parent)
     {
         // 1. 从父级的 children 列表中移除
         auto& children = parentHierarchy->children;
-        children.erase(std::remove(children.begin(), children.end(), child), children.end());
+        std::erase(children, child);
 
         // 2. 清除子级的 parent 指针
         childHierarchy->parent = ::entt::null;
 
         // 3. 标记父级为脏
-        markLayoutDirty(parent);
+        MarkLayoutDirty(parent);
     }
 }
 
@@ -428,7 +423,7 @@ inline void removeChild(::entt::entity parent, ::entt::entity child)
  * 典型用途：清理/销毁 UI 树。后序遍历可避免在访问子节点前就销毁父节点导致的层级信息丢失。
  */
 template <typename Func>
-inline void traverseChildren(::entt::entity parent, Func visitor)
+inline void TraverseChildren(::entt::entity parent, Func visitor)
 {
     auto& registry = utils::Registry::getInstance();
     if (!registry.valid(parent)) return;
@@ -441,7 +436,7 @@ inline void traverseChildren(::entt::entity parent, Func visitor)
     for (const ::entt::entity child : childrenCopy)
     {
         if (!registry.valid(child)) continue;
-        traverseChildren(child, visitor);
+        TraverseChildren(child, visitor);
         visitor(child);
     }
 }
@@ -451,7 +446,7 @@ inline void traverseChildren(::entt::entity parent, Func visitor)
 /**
  * @brief 检查是否对齐方式包含指定标志
  */
-inline bool hasAlignment(policies::Alignment value, policies::Alignment flag)
+inline bool HasAlignment(policies::Alignment value, policies::Alignment flag)
 {
     return (static_cast<uint8_t>(value) & static_cast<uint8_t>(flag)) != 0;
 }

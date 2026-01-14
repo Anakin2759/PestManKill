@@ -158,7 +158,7 @@ public:
     /**
      * @brief 清空所有UI元素 携带uitag的组件
      */
-    void clear()
+    void clear() // NOLINT(readability-convert-member-functions-to-static)
     {
         auto& registry = utils::Registry::getInstance();
         auto view = registry.view<components::UiTag>();

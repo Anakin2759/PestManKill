@@ -38,8 +38,8 @@ struct BaseInfo
  */
 struct Size
 {
-    Vec2 size{0.0f, 0.0f};
-    Vec2 minSize{0.0f, 0.0f};
+    Vec2 size{0.0F, 0.0F};
+    Vec2 minSize{0.0F, 0.0F};
     Vec2 maxSize{FLT_MAX, FLT_MAX};
     bool autoSize = true;                               // 是否自动根据内容调整大小 (兼容旧代码)
     policies::Size widthPolicy = policies::Size::Auto;  // 宽度策略
@@ -51,7 +51,7 @@ struct Size
  */
 struct Position
 {
-    Vec2 value{0.0f, 0.0f};
+    Vec2 value{0.0F, 0.0F};
 };
 
 /**
@@ -62,7 +62,7 @@ struct Position
  */
 struct CanvasSize
 {
-    Vec2 value{0.0f, 0.0f};
+    Vec2 value{0.0F, 0.0F};
 };
 
 /**
@@ -70,7 +70,7 @@ struct CanvasSize
  */
 struct Margin
 {
-    Vec4 values{0.0f, 0.0f, 0.0f, 0.0f}; // Top, Right, Bottom, Left
+    Vec4 values{0.0F, 0.0F, 0.0F, 0.0F}; // Top, Right, Bottom, Left
 };
 
 /**
@@ -79,7 +79,7 @@ struct Margin
  */
 struct Padding
 {
-    Vec4 values{0.0f, 0.0f, 0.0f, 0.0f}; // Top, Right, Bottom, Left
+    Vec4 values{0.0F, 0.0F, 0.0F, 0.0F}; // Top, Right, Bottom, Left
 };
 
 /**
@@ -87,8 +87,8 @@ struct Padding
  */
 struct Background
 {
-    Color color{0.0f, 0.0f, 0.0f, 0.0f};
-    float borderRadius = 0.0f; // 圆角半径
+    Color color{0.0F, 0.0F, 0.0F, 0.0F};
+    Vec4 borderRadius{0.0F, 0.0F, 0.0F, 0.0F}; // 圆角半径 (x:TopLeft, y:TopRight, z:BottomRight, w:BottomLeft)
     bool enabled = false;
 };
 
@@ -97,9 +97,20 @@ struct Background
  */
 struct Border
 {
-    Color color{1.0f, 1.0f, 1.0f, 1.0f};
-    float thickness = 1.0f;
-    float borderRadius = 0.0f; // 圆角半径
+    Color color{1.0F, 1.0F, 1.0F, 1.0F};
+    float thickness = 1.0F;
+    Vec4 borderRadius{0.0F, 0.0F, 0.0F, 0.0F}; // 圆角半径
+    bool enabled = false;
+};
+
+/**
+ * @brief 阴影组件
+ */
+struct Shadow
+{
+    float softness{};                    // 阴影柔和度
+    Vec2 offset{0.0F, 0.0F};             // 阴影偏移 (x, y)
+    Color color{0.0F, 0.0F, 0.0F, 1.0F}; // 阴影颜色
     bool enabled = false;
 };
 
@@ -108,7 +119,7 @@ struct Border
  */
 struct Alpha
 {
-    float value = 1.0f;
+    float value = 1.0F;
 };
 
 // ===================== 层级与滚动 =====================
@@ -127,9 +138,10 @@ struct Hierarchy
  */
 struct ScrollArea
 {
-    Vec2 scrollOffset{0.0F, 0.0F}; // 当前滚动位置
-    Vec2 contentSize{0.0F, 0.0F};  // 内容区域大小
-    float scrollSpeed{10.0F};      // 滚动速度
+    static constexpr float DEFAULT_SCROLL_SPEED = 10.0F;
+    Vec2 scrollOffset{0.0F, 0.0F};           // 当前滚动位置
+    Vec2 contentSize{0.0F, 0.0F};            // 内容区域大小
+    float scrollSpeed{DEFAULT_SCROLL_SPEED}; // 滚动速度
     bool horizontalScroll = false;
     bool verticalScroll = true;
     bool showScrollbars = true;
@@ -142,8 +154,9 @@ struct ScrollArea
  */
 struct LayoutInfo
 {
+    static constexpr float DEFAULT_SPACING = 5.0F;
     policies::LayoutDirection direction = policies::LayoutDirection::HORIZONTAL;
-    float spacing = 5.0f; // 元素间距
+    float spacing = DEFAULT_SPACING; // 元素间距
 };
 
 /**
@@ -193,10 +206,10 @@ struct TextEdit
 struct Image
 {
     void* textureId = nullptr;                 // 纹理句柄 (例如 SDL_Texture* 或 OpenGL ID)
-    Vec2 uvMin{0.0f, 0.0f};                    // UV 最小坐标
-    Vec2 uvMax{1.0f, 1.0f};                    // UV 最大坐标
-    Color tintColor{1.0f, 1.0f, 1.0f, 1.0f};   // 颜色叠加
-    Color borderColor{0.0f, 0.0f, 0.0f, 0.0f}; // 边框颜色
+    Vec2 uvMin{0.0F, 0.0F};                    // UV 最小坐标
+    Vec2 uvMax{1.0F, 1.0F};                    // UV 最大坐标
+    Color tintColor{1.0F, 1.0F, 1.0F, 1.0F};   // 颜色叠加
+    Color borderColor{0.0F, 0.0F, 0.0F, 0.0F}; // 边框颜色
     bool maintainAspectRatio = true;           // 是否保持宽高比
 };
 
@@ -207,7 +220,7 @@ struct Image
  */
 struct Clickable
 {
-    std::move_only_function<void()> onClick{};
+    std::move_only_function<void()> onClick;
     bool enabled = true;
 };
 
@@ -216,8 +229,8 @@ struct Clickable
  */
 struct Hoverable
 {
-    std::move_only_function<void()> onHover{};
-    std::move_only_function<void()> onUnhover{};
+    std::move_only_function<void()> onHover;
+    std::move_only_function<void()> onUnhover;
     bool enabled = true;
 };
 
@@ -226,8 +239,8 @@ struct Hoverable
  */
 struct Pressable
 {
-    std::move_only_function<void()> onPress{};   // 鼠标按下时触发
-    std::move_only_function<void()> onRelease{}; // 鼠标松开时触发
+    std::move_only_function<void()> onPress;   // 鼠标按下时触发
+    std::move_only_function<void()> onRelease; // 鼠标松开时触发
     bool enabled = true;
 };
 
@@ -255,8 +268,8 @@ struct ButtonState
  */
 struct AnimationTime
 {
-    float duration = 1.0f;
-    float elapsed = 0.0f;
+    float duration = 1.0F;
+    float elapsed = 0.0F;
     policies::Easing easing = policies::Easing::Linear;
     policies::Play mode = policies::Play::ONCE;
 };
@@ -275,8 +288,8 @@ struct AnimationPosition
  */
 struct AnimationAlpha
 {
-    float from = 1.0f;
-    float to = 0.0f;
+    float from = 1.0F;
+    float to = 0.0F;
 };
 
 // ===================== 复杂组件数据 =====================
@@ -286,8 +299,10 @@ struct AnimationAlpha
  */
 struct Window
 {
+    static constexpr float MIN_WID = 300.0F;
+    static constexpr float MIN_HIG = 200.0F;
     std::string title;
-    Vec2 minSize{300.0f, 200.0f};
+    Vec2 minSize{MIN_WID, MIN_HIG};
     Vec2 maxSize{FLT_MAX, FLT_MAX};
     bool hasTitleBar = true;
     bool hasToolbar = false;
@@ -302,8 +317,10 @@ struct Window
  */
 struct Dialog
 {
+    static constexpr float MIN_WID = 200.0F;
+    static constexpr float MIN_HIG = 150.0F;
     std::string title;
-    Vec2 minSize{200.0f, 150.0f};
+    Vec2 minSize{MIN_WID, MIN_HIG};
     Vec2 maxSize{FLT_MAX, FLT_MAX};
     bool hasTitleBar = true;
     bool modal = false;
@@ -316,11 +333,13 @@ struct Dialog
  */
 struct Arrow
 {
-    Vec2 startPoint{0.0f, 0.0f};
-    Vec2 endPoint{100.0f, 100.0f};
-    Color color{1.0f, 1.0f, 1.0f, 1.0f};
-    float thickness = 2.0f;
-    float arrowSize = 10.0f;
+    static constexpr float DEFAULT_THICKNESS = 2.0F;
+    static constexpr float DEFAULT_ARROW_SIZE = 10.0F;
+    Vec2 startPoint{0.0F, 0.0F};
+    Vec2 endPoint{100.0F, 100.0F};
+    Color color{1.0F, 1.0F, 1.0F, 1.0F};
+    float thickness = DEFAULT_THICKNESS;
+    float arrowSize = DEFAULT_ARROW_SIZE;
 };
 
 /**
@@ -328,9 +347,10 @@ struct Arrow
  */
 struct ListArea
 {
+    static constexpr float DEFAULT_ITEM_HEIGHT = 30.0F;
     std::vector<entt::entity> items;
     std::vector<int> selectedIndices;
-    float itemHeight = 30.0f;
+    float itemHeight = DEFAULT_ITEM_HEIGHT;
     int selectedIndex = -1;
     bool multiSelect = false;
 };
@@ -354,10 +374,11 @@ struct TableInfo
  */
 struct LineInfo
 {
-    Vec2 startPoint{0.0f, 0.0f};
-    Vec2 endPoint{100.0f, 0.0f};
-    Vec4 color{1.0f, 1.0f, 1.0f, 1.0f};
-    float thickness = 2.0f;
+    static constexpr float DEFAULT_THICKNESS = 2.0F;
+    Vec2 startPoint{0.0F, 0.0F};
+    Vec2 endPoint{100.0F, 0.0F};
+    Vec4 color{1.0F, 1.0F, 1.0F, 1.0F};
+    float thickness = DEFAULT_THICKNESS;
 };
 
 // ===================== 渲染与状态组件 =====================

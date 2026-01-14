@@ -26,7 +26,6 @@
 #include <entt/entt.hpp>
 #include <vector>
 #include <unordered_map>
-#include <functional>
 #include <cmath>
 
 // Yoga 布局引擎
@@ -50,12 +49,12 @@ namespace ui::systems
 class LayoutSystem : public ui::interface::EnableRegister<LayoutSystem>
 {
 public:
-    LayoutSystem() { m_yogaConfig = YGConfigNew(); }
+    LayoutSystem() : m_yogaConfig(YGConfigNew()) {}
 
     ~LayoutSystem()
     {
         clearYogaNodes();
-        if (m_yogaConfig)
+        if (m_yogaConfig != nullptr)
         {
             YGConfigFree(m_yogaConfig);
             m_yogaConfig = nullptr;
@@ -81,7 +80,7 @@ public:
         {
             // 释放当前资源
             clearYogaNodes();
-            if (m_yogaConfig)
+            if (m_yogaConfig != nullptr)
             {
                 YGConfigFree(m_yogaConfig);
             }
@@ -159,7 +158,7 @@ public:
         {
             // 构建 Yoga 节点树
             YGNodeRef rootNode = buildYogaTree(registry, root);
-            if (!rootNode) continue;
+            if (rootNode == nullptr) continue;
             m_rootNodes.push_back(rootNode); // 保存根节点以便后续释放
 
             // 3. 获取根容器尺寸（用于布局计算）
@@ -220,9 +219,10 @@ public:
         }
     }
 
-    Vec2 getCanvasSizeFromEcs(entt::registry& registry) const
+    Vec2 getCanvasSizeFromEcs(entt::registry& registry) const // NOLINT(readability-convert-member-functions-to-static)
     {
         auto view = registry.view<const components::MainWidgetTag, const components::Size>();
+        // NOLINTNEXTLINE
         for (auto entity : view)
         {
             const auto& size = registry.get<const components::Size>(entity);
@@ -268,7 +268,7 @@ private:
         // 释放所有根节点，Yoga 会自动递归释放其子节点
         for (YGNodeRef rootNode : m_rootNodes)
         {
-            if (rootNode)
+            if (rootNode != nullptr)
             {
                 YGNodeFreeRecursive(rootNode);
             }
@@ -350,7 +350,7 @@ private:
             }
             else if (sizeComp->widthPolicy == policies::Size::FillParent)
             {
-                YGNodeStyleSetWidthPercent(node, 100.0f);
+                YGNodeStyleSetWidthPercent(node, 100.0F);
             }
             else if (sizeComp->widthPolicy == policies::Size::Auto)
             {
@@ -364,7 +364,7 @@ private:
             }
             else if (sizeComp->heightPolicy == policies::Size::FillParent)
             {
-                YGNodeStyleSetHeightPercent(node, 100.0f);
+                YGNodeStyleSetHeightPercent(node, 100.0F);
             }
             else if (sizeComp->heightPolicy == policies::Size::Auto)
             {
@@ -397,26 +397,26 @@ private:
             if (const auto* spacer = registry.try_get<components::Spacer>(entity))
             {
                 YGNodeStyleSetFlexGrow(node, static_cast<float>(spacer->stretchFactor));
-                YGNodeStyleSetFlexShrink(node, 0.0f);
+                YGNodeStyleSetFlexShrink(node, 0.0F);
             }
         }
 
         // 5. 对齐方式
         if (const auto* alignComp = registry.try_get<policies::Alignment>(entity))
         {
-            const uint8_t alignment = static_cast<uint8_t>(*alignComp);
+            const auto alignment = static_cast<uint8_t>(*alignComp);
 
             // 主轴对齐 (justify-content 由父容器设置)
             // 交叉轴自身对齐 (align-self)
-            if (alignment & static_cast<uint8_t>(policies::Alignment::VCENTER))
+            if ((alignment & static_cast<uint8_t>(policies::Alignment::VCENTER)) != 0)
             {
                 YGNodeStyleSetAlignSelf(node, YGAlignCenter);
             }
-            else if (alignment & static_cast<uint8_t>(policies::Alignment::TOP))
+            else if ((alignment & static_cast<uint8_t>(policies::Alignment::TOP)) != 0)
             {
                 YGNodeStyleSetAlignSelf(node, YGAlignFlexStart);
             }
-            else if (alignment & static_cast<uint8_t>(policies::Alignment::BOTTOM))
+            else if ((alignment & static_cast<uint8_t>(policies::Alignment::BOTTOM)) != 0)
             {
                 YGNodeStyleSetAlignSelf(node, YGAlignFlexEnd);
             }
@@ -438,8 +438,8 @@ private:
                 if (sizeComp->autoSize)
                 {
                     // 自动尺寸的叶子节点，使用默认最小尺寸
-                    float defaultWidth = 100.0f;
-                    float defaultHeight = 20.0f;
+                    float defaultWidth = 100.0F;
+                    float defaultHeight = 20.0F;
 
                     // 如果有文本，根据文本长度估算
                     if (const auto* text = registry.try_get<components::Text>(entity))
@@ -447,8 +447,8 @@ private:
                         if (!text->content.empty())
                         {
                             // 粗略估算：每个字符约 8 像素宽，高度 20 像素
-                            defaultWidth = static_cast<float>(text->content.length()) * 8.0f + 10.0f;
-                            defaultHeight = 20.0f;
+                            defaultWidth = static_cast<float>(text->content.length()) * 8.0F + 10.0F;
+                            defaultHeight = 20.0F;
                         }
                     }
 
@@ -473,8 +473,8 @@ private:
         float height = YGNodeLayoutGetHeight(node);
 
         // 安全检查：跳过无效值
-        if (std::isnan(left)) left = 0.0f;
-        if (std::isnan(top)) top = 0.0f;
+        if (std::isnan(left)) left = 0.0F;
+        if (std::isnan(top)) top = 0.0F;
 
         // 回写到 Position 组件（相对于父容器）
         if (auto* pos = registry.try_get<components::Position>(entity))
@@ -527,7 +527,7 @@ private:
 
         // 检查是否有 PositionPolicy 组件来决定居中策略
         // 默认：如果位置是 (0,0) 且尺寸有效，则居中
-        bool shouldCenter = (pos->value.x() == 0.0f && pos->value.y() == 0.0f);
+        bool shouldCenter = (pos->value.x() == 0.0F && pos->value.y() == 0.0F);
 
         // 如果有明确的位置策略组件，检查是否要求居中
         if (const auto* posPolicy = registry.try_get<policies::PositionPolicy>(root))
@@ -545,8 +545,8 @@ private:
 
         if (shouldCenter && size->size.x() > 0 && size->size.y() > 0)
         {
-            pos->value.x() = (screenWidth - size->size.x()) / 2.0f;
-            pos->value.y() = (screenHeight - size->size.y()) / 2.0f;
+            pos->value.x() = (screenWidth - size->size.x()) / 2.0F;
+            pos->value.y() = (screenHeight - size->size.y()) / 2.0F;
         }
     }
 

@@ -341,15 +341,35 @@ private:
         entt::entity entity, ImDrawList* draw_list, const ImVec2& startPos, const ImVec2& endPos, float globalAlpha)
     {
         auto& registry = utils::Registry::getInstance();
+
         // 渲染背景 (Background Component)
         const auto* bg = registry.try_get<components::Background>(entity);
+
+        // 渲染阴影 (Shadow Component)
+        const auto* shadow = registry.try_get<components::Shadow>(entity);
+        if (shadow && shadow->enabled)
+        {
+            ImVec4 shadowColor = {shadow->color.red, shadow->color.green, shadow->color.blue, shadow->color.alpha};
+            shadowColor.w *= globalAlpha;
+            ImU32 color = ImGui::GetColorU32(shadowColor);
+
+            ImVec2 shadowStart(startPos.x + shadow->offset.x(), startPos.y + shadow->offset.y());
+            ImVec2 shadowEnd(endPos.x + shadow->offset.x(), endPos.y + shadow->offset.y());
+
+            // 简单阴影：使用背景的第一个圆角半径
+            float radius = (bg && bg->enabled) ? bg->borderRadius.x() : 0.0f;
+            draw_list->AddRectFilled(shadowStart, shadowEnd, color, radius, ImDrawFlags_RoundCornersAll);
+        }
+
         if (bg && bg->enabled)
         {
             ImVec4 finalColor = {bg->color.red, bg->color.green, bg->color.blue, bg->color.alpha};
             finalColor.w *= globalAlpha;
             ImU32 color = ImGui::GetColorU32(finalColor);
 
-            draw_list->AddRectFilled(startPos, endPos, color, bg->borderRadius, ImDrawFlags_RoundCornersAll);
+            // 目前 ImGui::AddRectFilled 只支持统一圆角，取第一个分量 (TopLeft)
+            // 如需支持独立圆角，需要使用 Path API 或 Shader
+            draw_list->AddRectFilled(startPos, endPos, color, bg->borderRadius.x(), ImDrawFlags_RoundCornersAll);
         }
 
         // 渲染边框 (Border Component)
@@ -361,7 +381,7 @@ private:
             ImU32 color = ImGui::GetColorU32(finalColor);
 
             draw_list->AddRect(
-                startPos, endPos, color, border->borderRadius, ImDrawFlags_RoundCornersAll, border->thickness);
+                startPos, endPos, color, border->borderRadius.x(), ImDrawFlags_RoundCornersAll, border->thickness);
         }
     }
 
