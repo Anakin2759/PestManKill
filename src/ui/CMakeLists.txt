@@ -67,7 +67,7 @@ set(UI_HEADERS
     systems/InteractionSystem.h
     systems/AnimationSystem.h
     systems/LayoutSystem.h
-    systems/SdlGpuRenderSystem.h
+    systems/RenderSystem.h
     systems/WindowsSystem.h
     
     # UI Core

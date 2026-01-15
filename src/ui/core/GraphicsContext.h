@@ -36,7 +36,7 @@ private:
 
 public:
     /**
-     * @brief 构造函数：创建 SDL 窗口 (不再创建 SDL_Renderer，由 SdlGpuRenderSystem 接管窗口)
+     * @brief 构造函数：创建 SDL 窗口 (不再创建 SDL_Renderer，由 RenderSystem 接管窗口)
      * @param title 窗口标题
      * @param width 窗口宽度
      * @param height 窗口高度

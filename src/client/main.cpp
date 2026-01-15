@@ -145,10 +145,14 @@ void CreateMenuDialog()
     startBorder.borderRadius = {5.0F, 5.0F, 5.0F, 5.0F};
     // 点击开始游戏，创建主窗口
     auto& startClickable = registry.get<ui::components::Clickable>(startBtn);
-    startClickable.onClick = []()
+    startClickable.onClick = [menuDialog]()
     {
         CreateMainWindow();
-        // auto hide
+        auto& registry = utils::Registry::getInstance();
+        if (registry.valid(menuDialog) && registry.any_of<ui::components::VisibleTag>(menuDialog))
+        {
+            registry.remove<ui::components::VisibleTag>(menuDialog);
+        }
     };
     ui::helper::AddChild(menuDialog, startBtn);
 

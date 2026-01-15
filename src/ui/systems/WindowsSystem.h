@@ -79,6 +79,8 @@ public:
         auto& dispatcher = ::utils::Dispatcher::getInstance();
         dispatcher.enqueue<ui::events::QuitRequested>();
     }
+
+    
 };
 
 } // namespace ui::systems

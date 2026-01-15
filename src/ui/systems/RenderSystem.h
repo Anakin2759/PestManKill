@@ -1,7 +1,7 @@
 /**
  * ************************************************************************
  *
- * @file SdlGpuRenderSystem.h
+ * @file RenderSystem.h
  * @author AnakinLiu (azrael2759@qq.com)
  * @date 2026-01-13
  * @version 0.1
@@ -11,11 +11,11 @@
   - 响应 UI 渲染事件，执行实际渲染操作
 
   加载assets/sharder/spir-v文件
-  以后用来替换RenderSystem，使用SDL3 GPU进行渲染,为后续移除imGui SDL Renderer做准备
 
   支持的图形后端列表
-    - Vulkan
+
     - DX12
+    - Vulkan(待更新)
 
     使用SDL ttf渲染字体到GPU纹理上
     默认字体用 assets/fonts/NotoSansSC-VariableFont_wght.ttf
@@ -156,7 +156,7 @@ struct alignas(16) UiPushConstants
  *
  * 使用 SDL3 GPU API 实现高性能 UI 渲染，替代 ImGui DrawList
  */
-class SdlGpuRenderSystem final : public interface::EnableRegister<SdlGpuRenderSystem>
+class RenderSystem final : public interface::EnableRegister<RenderSystem>
 {
 private:
     GraphicsContext* m_graphicsContext = nullptr;
@@ -204,9 +204,9 @@ private:
     float m_screenHeight = 0.0F;
 
 public:
-    SdlGpuRenderSystem() = default;
+    RenderSystem() = default;
 
-    ~SdlGpuRenderSystem() { cleanup(); }
+    ~RenderSystem() { cleanup(); }
 
     /**
      * @brief 注册事件处理器
@@ -214,8 +214,8 @@ public:
     void registerHandlersImpl()
     {
         auto& dispatcher = utils::Dispatcher::getInstance();
-        dispatcher.sink<events::GraphicsContextSetEvent>().connect<&SdlGpuRenderSystem::onGraphicsContextSet>(*this);
-        dispatcher.sink<ui::events::UpdateRendering>().connect<&SdlGpuRenderSystem::update>(*this);
+        dispatcher.sink<events::GraphicsContextSetEvent>().connect<&RenderSystem::onGraphicsContextSet>(*this);
+        dispatcher.sink<ui::events::UpdateRendering>().connect<&RenderSystem::update>(*this);
     }
 
     /**
@@ -224,8 +224,8 @@ public:
     void unregisterHandlersImpl()
     {
         auto& dispatcher = utils::Dispatcher::getInstance();
-        dispatcher.sink<events::GraphicsContextSetEvent>().disconnect<&SdlGpuRenderSystem::onGraphicsContextSet>(*this);
-        dispatcher.sink<ui::events::UpdateRendering>().disconnect<&SdlGpuRenderSystem::update>(*this);
+        dispatcher.sink<events::GraphicsContextSetEvent>().disconnect<&RenderSystem::onGraphicsContextSet>(*this);
+        dispatcher.sink<ui::events::UpdateRendering>().disconnect<&RenderSystem::update>(*this);
     }
 
 private:

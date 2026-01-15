@@ -7,6 +7,7 @@
 #include <memory>
 #include <mutex> // 引入 <mutex>
 #include <source_location>
+#include <string>
 
 namespace utils
 {
@@ -64,6 +65,16 @@ private:
     ~Logger() = default;
 };
 
+inline std::string normalizePath(const char* path)
+{
+    std::string result = path ? path : "";
+    for (auto& ch : result)
+    {
+        if (ch == '\\') ch = '/';
+    }
+    return result;
+}
+
 } // namespace utils
 
 // ----------------- 宏包裹日志 -----------------
@@ -72,7 +83,7 @@ private:
 #endif
 #define LOG_INFO(fmt, ...)                                                                                             \
     utils::Logger::getLogger()->info("[{}:{} {}] " fmt,                                                                \
-                                     std::source_location::current().file_name(),                                      \
+                                     utils::normalizePath(std::source_location::current().file_name()),                \
                                      std::source_location::current().line(),                                           \
                                      std::source_location::current().function_name(),                                  \
                                      ##__VA_ARGS__)
@@ -81,7 +92,7 @@ private:
 #endif
 #define LOG_WARN(fmt, ...)                                                                                             \
     utils::Logger::getLogger()->warn("[{}:{} {}] " fmt,                                                                \
-                                     std::source_location::current().file_name(),                                      \
+                                     utils::normalizePath(std::source_location::current().file_name()),                \
                                      std::source_location::current().line(),                                           \
                                      std::source_location::current().function_name(),                                  \
                                      ##__VA_ARGS__)
@@ -90,7 +101,7 @@ private:
 #endif
 #define LOG_ERROR(fmt, ...)                                                                                            \
     utils::Logger::getLogger()->error("[{}:{} {}] " fmt,                                                               \
-                                      std::source_location::current().file_name(),                                     \
+                                      utils::normalizePath(std::source_location::current().file_name()),               \
                                       std::source_location::current().line(),                                          \
                                       std::source_location::current().function_name(),                                 \
                                       ##__VA_ARGS__)
@@ -99,7 +110,7 @@ private:
 #endif
 #define LOG_DEBUG(fmt, ...)                                                                                            \
     utils::Logger::getLogger()->debug("[{}:{} {}] " fmt,                                                               \
-                                      std::source_location::current().file_name(),                                     \
+                                      utils::normalizePath(std::source_location::current().file_name()),               \
                                       std::source_location::current().line(),                                          \
                                       std::source_location::current().function_name(),                                 \
                                       ##__VA_ARGS__)

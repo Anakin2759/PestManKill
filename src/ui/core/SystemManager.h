@@ -28,7 +28,7 @@
 #include "src/ui/interface/Isystem.h"
 
 // 引入所有子系统头文件
-#include "src/ui/systems/SdlGpuRenderSystem.h"
+#include "src/ui/systems/RenderSystem.h"
 #include "src/ui/systems/AnimationSystem.h"
 #include "src/ui/systems/InteractionSystem.h"
 #include "src/ui/systems/LayoutSystem.h"
@@ -81,7 +81,7 @@ public:
         m_systems.emplace_back(systems::InteractionSystem{});
         m_systems.emplace_back(systems::AnimationSystem{});
         m_systems.emplace_back(systems::LayoutSystem{});
-        m_systems.emplace_back(systems::SdlGpuRenderSystem{});
+        m_systems.emplace_back(systems::RenderSystem{});
         m_systems.emplace_back(systems::WindowSystem{});
         m_systems.emplace_back(systems::ActionSystem{});
     }
