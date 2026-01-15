@@ -99,26 +99,29 @@ public:
 
         {
             auto& registry = utils::Registry::getInstance();
-            int w = 0;
-            int h = 0;
+            int width = 0;
+            int height = 0;
 
             if (m_graphicsContext != nullptr && m_graphicsContext->getWindow() != nullptr)
             {
-                SDL_GetWindowSizeInPixels(m_graphicsContext->getWindow(), &w, &h);
+                SDL_GetWindowSizeInPixels(m_graphicsContext->getWindow(), &width, &height);
             }
 
-            const float fw = static_cast<float>(w);
-            const float fh = static_cast<float>(h);
-
+            const auto fwid = static_cast<float>(width);
+            const auto fhei = static_cast<float>(height);
             auto canvasView = registry.view<components::MainWidgetTag, components::Size>();
-            for (auto e : canvasView)
+            for (auto entity : canvasView)
             {
-                auto& size = canvasView.get<components::Size>(e);
+                auto& size = canvasView.get<components::Size>(entity);
                 size.autoSize = false;
-                if (size.size.x() != fw || size.size.y() != fh)
+                if (size.size.x() != fwid || size.size.y() != fhei)
                 {
-                    size.size = {fw, fh};
-                    registry.emplace_or_replace<components::LayoutDirtyTag>(e);
+                    size.size = {fwid, fhei};
+                    registry.emplace_or_replace<components::LayoutDirtyTag>(entity);
+                }
+                {
+                    size.size = {fwid, fhei};
+                    registry.emplace_or_replace<components::LayoutDirtyTag>(entity);
                 }
             }
         }
@@ -134,7 +137,7 @@ public:
         ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
 
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0F);
 
         // 使用一个始终打开的 ImGui 窗口作为根画布 (Root Canvas)
         ImGui::Begin(
@@ -148,7 +151,7 @@ public:
 
         ImGui::PopStyleVar(2);
 
-        ImDrawList* draw_list = ImGui::GetWindowDrawList();
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
 
         // ----------------------------------------------------
         // II. ECS 渲染调度 (遍历顶层元素)
@@ -168,7 +171,7 @@ public:
             if (hierarchy.parent == entt::null)
             {
                 // 递归渲染。根画布的绝对位置是 (0, 0)
-                renderEntityRecursive(registry, entity, draw_list, ImVec2(0, 0), 1.0f);
+                renderEntityRecursive(registry, entity, drawList, ImVec2(0, 0), 1.0f);
             }
         }
 
@@ -198,7 +201,7 @@ private:
      */
     void renderEntityRecursive(entt::registry& registry,
                                entt::entity entity,
-                               ImDrawList* draw_list,
+                               ImDrawList* drawList,
                                const ImVec2& parentAbsolutePos,
                                float parentGlobalAlpha)
     {
@@ -232,12 +235,12 @@ private:
         // ----------------------------------------------------
         // 2. 核心渲染 (背景/边框)
         // ----------------------------------------------------
-        renderBackground(entity, draw_list, absolutePos, absoluteEndPos, globalAlpha);
+        renderBackground(entity, drawList, absolutePos, absoluteEndPos, globalAlpha);
 
         // ----------------------------------------------------
         // 3. 渲染特定内容
         // ----------------------------------------------------
-        renderSpecificComponent(registry, entity, draw_list, absolutePos, {size.size.x(), size.size.y()}, globalAlpha);
+        renderSpecificComponent(registry, entity, drawList, absolutePos, {size.size.x(), size.size.y()}, globalAlpha);
 
         // ----------------------------------------------------
         // 4. 递归渲染子元素 (适用于非 Window 的普通容器，如 VBox/HBox)
@@ -249,7 +252,7 @@ private:
             for (entt::entity child : hierarchy->children)
             {
                 // 递归调用，将当前元素的绝对位置作为子元素的父级绝对位置
-                renderEntityRecursive(registry, child, draw_list, absolutePos, globalAlpha);
+                renderEntityRecursive(registry, child, drawList, absolutePos, globalAlpha);
             }
         }
     }

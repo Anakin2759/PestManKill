@@ -29,7 +29,6 @@
 
 #include <utility>
 #include <SDL3/SDL.h>
-#include <imgui_impl_sdl3.h>
 #include "common/Events.h"
 #include "src/utils/Registry.h"   // 包含 Registry
 #include "src/utils/Dispatcher.h" // 包含 Dispatcher
@@ -37,6 +36,8 @@
 #include "common/Tags.h"          // 包含 HoveredTag, ActiveTag, DisabledTag, LayoutDirtyTag
 #include "src/ui/interface/Isystem.h"
 #include "common/Types.h" // 包含 Vec2
+
+
 namespace ui::systems
 {
 
@@ -168,7 +169,6 @@ private:
 
         while (SDL_PollEvent(&event))
         {
-            ImGui_ImplSDL3_ProcessEvent(&event);
             switch (event.type)
             {
                 case SDL_EVENT_QUIT:

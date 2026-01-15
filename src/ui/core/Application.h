@@ -30,15 +30,11 @@
 #pragma once
 
 #include <SDL3/SDL.h>
-#include <imgui.h>
-#include <imgui_impl_sdl3.h>
-#include <imgui_impl_sdlrenderer3.h>
 #include <stdexcept>
 #include <chrono>
 #include <utils.h>
 #include "SystemManager.h"
 #include "GraphicsContext.h"
-#include "ImguiContext.h"
 #include "EventLoop.h"
 #include "TaskChain.h"
 #include "ThreadPool.h"
@@ -71,9 +67,7 @@ public:
         }
         // 2. 初始化图形上下文
         m_graphicsContext = std::make_unique<GraphicsContext>(title, width, height);
-        // 3. 初始化 ImGui 上下文
-        m_imguiContext =
-            std::make_unique<ImguiContext>(m_graphicsContext->getWindow(), m_graphicsContext->getRenderer());
+        // 3. 注册系统事件处理器
         m_systems.registerAllHandlers();
 
         // 4. 设置图形上下文到系统管理器（必须在 registerAllHandlers 之后）
@@ -146,7 +140,10 @@ public:
 
     virtual ~Application()
     {
-        m_imguiContext.reset();
+        // 先注销系统，确保 GPU 资源与窗口正确释放
+        m_systems.unregisterAllHandlers();
+
+        m_graphicsContext.reset();
 
         SDL_Quit();
     }
@@ -158,9 +155,6 @@ public:
 
 private:
     std::unique_ptr<GraphicsContext> m_graphicsContext;
-
-    // ImGui 上下文管理
-    std::unique_ptr<ImguiContext> m_imguiContext;
 
     // 事件循环
     EventLoop m_eventLoop;

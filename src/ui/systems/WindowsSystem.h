@@ -57,11 +57,11 @@ public:
 
         auto* sizeComp = registry.try_get<components::Size>(rootEntity);
 
-        if (sizeComp)
+        if (sizeComp != nullptr)
         {
             // 1. 更新根实体的尺寸
-            float newW = static_cast<float>(newWidth);
-            float newH = static_cast<float>(newHeight);
+            auto newW = static_cast<float>(newWidth);
+            auto newH = static_cast<float>(newHeight);
 
             // 避免不必要的更新
             if (sizeComp->size.x() != newW || sizeComp->size.y() != newH)
@@ -74,7 +74,7 @@ public:
             }
         }
     }
-    void onClose(entt::entity rootEntity)
+    void onClose([[maybe_unused]] entt::entity rootEntity)
     {
         auto& dispatcher = ::utils::Dispatcher::getInstance();
         dispatcher.enqueue<ui::events::QuitRequested>();

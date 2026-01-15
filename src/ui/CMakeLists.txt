@@ -17,7 +17,6 @@ cmrc_add_resource_library(ui_fonts
 # 依赖项
 target_link_libraries(ui INTERFACE
     utils
-    imgui::imgui
     SDL3::SDL3
     EnTT::EnTT
     asio::asio
@@ -65,6 +64,7 @@ set(UI_HEADERS
     systems/AnimationSystem.h
     systems/LayoutSystem.h
     systems/RenderSystem.h
+    systems/SdlGpuRenderSystem.h
     systems/WindowsSystem.h
     
     # UI Core
