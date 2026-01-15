@@ -1,7 +1,5 @@
+#define UI_STAGE_PIXEL 1
 #include "common.hlsl"
-
-[[vk::push_constant]]
-PushConstants pc;
 
 // =========================================================================
 // Pixel Shader (Premultiplied Alpha, Correct Shadow Compositing)
@@ -22,13 +20,13 @@ float4 main_ps(PSInput input) : SV_Target
     // ------------------------------------------------------------
     // 1. 像素坐标（以矩形中心为原点）
     // ------------------------------------------------------------
-    float2 p = (input.texcoord - 0.5) * pc.rect_size;
-    float2 half_size = pc.rect_size * 0.5;
+    float2 p = (input.texcoord - 0.5) * rect_size;
+    float2 half_size = rect_size * 0.5;
 
     // ------------------------------------------------------------
     // 2. 主体 SDF
     // ------------------------------------------------------------
-    float dist = sdRoundedBox(p, half_size, pc.radius);
+    float dist = sdRoundedBox(p, half_size, radius);
 
     float edge = fwidth(dist);
     float body_mask = 1.0 - smoothstep(-edge, edge, dist);
@@ -38,13 +36,13 @@ float4 main_ps(PSInput input) : SV_Target
     // ------------------------------------------------------------
     float shadow_alpha = 0.0;
 
-    if (pc.shadow_soft > 0.0)
+    if (shadow_soft > 0.0)
     {
-        float2 shadow_p = p - float2(pc.shadow_offset_x, pc.shadow_offset_y);
-        float dist_shadow = sdRoundedBox(shadow_p, half_size, pc.radius);
+        float2 shadow_p = p - float2(shadow_offset_x, shadow_offset_y);
+        float dist_shadow = sdRoundedBox(shadow_p, half_size, radius);
 
         shadow_alpha =
-            1.0 - smoothstep(-pc.shadow_soft, pc.shadow_soft, dist_shadow);
+            1.0 - smoothstep(-shadow_soft, shadow_soft, dist_shadow);
 
         // 阴影只存在于主体外部
         shadow_alpha *= (1.0 - body_mask);
@@ -78,8 +76,8 @@ float4 main_ps(PSInput input) : SV_Target
     float3 out_rgb = body_rgb + shadow_rgb;
 
     // 全局透明度（UI 树 Alpha）
-    out_alpha *= pc.opacity;
-    out_rgb *= pc.opacity;
+    out_alpha *= opacity;
+    out_rgb *= opacity;
 
     // 剔除无效像素
     if (out_alpha < 0.001)

@@ -14,8 +14,8 @@
   以后用来替换RenderSystem，使用SDL3 GPU进行渲染,为后续移除imGui SDL Renderer做准备
 
   支持的图形后端列表
-    - Vulkan 优先
-    - DX12 暂时不支持
+    - Vulkan
+    - DX12
 
     使用SDL ttf渲染字体到GPU纹理上
     默认字体用 assets/fonts/NotoSansSC-VariableFont_wght.ttf
@@ -29,6 +29,7 @@
  */
 
 #pragma once
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <vector>
@@ -41,11 +42,13 @@
 #include <Eigen/Dense>
 #include <cmrc/cmrc.hpp>
 #include <utils.h>
+#include "Logger.h"
 #include "common/Components.h"
 #include "common/Tags.h"
 #include "common/Events.h"
 #include "interface/Isystem.h"
 #include "core/GraphicsContext.h"
+#include "core/Helper.h"
 
 CMRC_DECLARE(ui_fonts);
 
@@ -56,21 +59,92 @@ class GraphicsContext;
 
 namespace ui::systems
 {
+class GPUBackendHandler
+{
+protected:
+    std::shared_ptr<GPUBackendHandler> nextHandler;
+
+public:
+    GPUBackendHandler() = default;
+    GPUBackendHandler(const GPUBackendHandler&) = delete;
+    GPUBackendHandler& operator=(const GPUBackendHandler&) = delete;
+    GPUBackendHandler(GPUBackendHandler&&) = delete;
+    GPUBackendHandler& operator=(GPUBackendHandler&&) = delete;
+    virtual ~GPUBackendHandler() = default;
+
+    // 设置链中的下一个处理器
+    void setNext(std::shared_ptr<GPUBackendHandler> next) { nextHandler = next; }
+
+    // 处理请求的核心逻辑
+    virtual SDL_GPUDevice* handle(SDL_Window* window, std::string& outDriverName)
+    {
+        if (nextHandler)
+        {
+            return nextHandler->handle(window, outDriverName);
+        }
+        return nullptr;
+    }
+};
+class D3D12Handler final : public GPUBackendHandler
+{
+public:
+    SDL_GPUDevice* handle(SDL_Window* window, std::string& outDriverName) override
+    {
+        LOG_INFO("责任链：尝试初始化 D3D12...");
+
+        SDL_PropertiesID props = SDL_CreateProperties();
+        SDL_SetStringProperty(props, SDL_PROP_GPU_DEVICE_CREATE_NAME_STRING, "direct3d12");
+        SDL_SetBooleanProperty(props, SDL_PROP_GPU_DEVICE_CREATE_DEBUGMODE_BOOLEAN, true);
+        SDL_SetBooleanProperty(props, SDL_PROP_GPU_DEVICE_CREATE_SHADERS_DXIL_BOOLEAN, true);
+
+        SDL_GPUDevice* device = SDL_CreateGPUDeviceWithProperties(props);
+        SDL_DestroyProperties(props);
+
+        if (device != nullptr)
+        {
+            outDriverName = "direct3d12";
+            return device;
+        }
+
+        LOG_WARN("D3D12 不可用，传递给链中下一个处理器。原因: {}", SDL_GetError());
+        return GPUBackendHandler::handle(window, outDriverName);
+    }
+};
+class VulkanHandler final : public GPUBackendHandler
+{
+public:
+    SDL_GPUDevice* handle(SDL_Window* window, std::string& outDriverName) override
+    {
+        LOG_INFO("责任链：尝试初始化 Vulkan...");
+
+        SDL_PropertiesID props = SDL_CreateProperties();
+        SDL_SetStringProperty(props, SDL_PROP_GPU_DEVICE_CREATE_NAME_STRING, "vulkan");
+        SDL_SetBooleanProperty(props, SDL_PROP_GPU_DEVICE_CREATE_DEBUGMODE_BOOLEAN, false);
+        SDL_SetBooleanProperty(props, SDL_PROP_GPU_DEVICE_CREATE_SHADERS_SPIRV_BOOLEAN, true);
+
+        SDL_GPUDevice* device = SDL_CreateGPUDeviceWithProperties(props);
+        SDL_DestroyProperties(props);
+
+        if (device)
+        {
+            outDriverName = "vulkan";
+            return device;
+        }
+
+        LOG_WARN("Vulkan 不可用。原因: {}", SDL_GetError());
+        return GPUBackendHandler::handle(window, outDriverName);
+    }
+};
 
 /**
  * @brief Push Constants 结构体，与着色器 common.hlsl 中的定义对应
- * 必须保证 16 字节对齐
+ * 必须保证 16 字节对齐，字段顺序必须与 HLSL PushConstants 完全一致
  */
 struct alignas(16) UiPushConstants
 {
-    float screen_width;    // 屏幕宽度
-    float screen_height;   // 屏幕高度
-    float rect_width;      // 矩形宽度
-    float rect_height;     // 矩形高度
-    float r_top_left;      // 左上圆角
-    float r_top_right;     // 右上圆角
-    float r_bottom_right;  // 右下圆角
-    float r_bottom_left;   // 左下圆角
+    float screen_size[2];  // 屏幕尺寸 (float2)
+    float rect_size[2];    // 矩形尺寸 (float2)
+    float radius[4];       // 四角圆角 (float4: 左上, 右上, 右下, 左下)
     float shadow_soft;     // 阴影柔和度
     float shadow_offset_x; // 阴影 X 偏移
     float shadow_offset_y; // 阴影 Y 偏移
@@ -82,7 +156,7 @@ struct alignas(16) UiPushConstants
  *
  * 使用 SDL3 GPU API 实现高性能 UI 渲染，替代 ImGui DrawList
  */
-class SdlGpuRenderSystem : public interface::EnableRegister<SdlGpuRenderSystem>
+class SdlGpuRenderSystem final : public interface::EnableRegister<SdlGpuRenderSystem>
 {
 private:
     GraphicsContext* m_graphicsContext = nullptr;
@@ -92,6 +166,7 @@ private:
     SDL_GPUShader* m_fragmentShader = nullptr;
     SDL_GPUSampler* m_sampler = nullptr;
     TTF_Font* m_defaultFont = nullptr;
+    std::string m_gpuDriver; // GPU 驱动名称（vulkan 或 d3d12）
 
     // 渲染缓冲区 - 顶点结构与着色器 VSInput 对应
     struct Vertex
@@ -115,8 +190,14 @@ private:
     SDL_GPUBuffer* m_indexBuffer = nullptr;
     SDL_GPUTexture* m_whiteTexture = nullptr; // 默认白色纹理用于纯色渲染
 
-    // 纹理缓存（用于文本和图像）
-    std::unordered_map<std::string, SDL_GPUTexture*> m_textureCache;
+    // 纹理缓存（用于文本）
+    struct CachedTexture
+    {
+        SDL_GPUTexture* texture = nullptr;
+        uint32_t width = 0;
+        uint32_t height = 0;
+    };
+    std::unordered_map<std::string, CachedTexture> m_textureCache;
 
     // 当前屏幕尺寸
     float m_screenWidth = 0.0F;
@@ -169,32 +250,38 @@ private:
      */
     void initializeGPU()
     {
-        if (m_graphicsContext == nullptr || m_graphicsContext->getWindow() == nullptr)
-        {
-            return;
-        }
+        if (m_graphicsContext == nullptr || m_graphicsContext->getWindow() == nullptr) return;
 
-        // 创建 GPU 设备（优先 Vulkan）
-        m_gpuDevice = SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_SPIRV,
-                                          true, // debug mode
-                                          nullptr);
+        // 1. 组装责任链
+        auto d3d12 = std::make_shared<D3D12Handler>();
+        auto vulkan = std::make_shared<VulkanHandler>();
 
+        // 设置顺序：D3D12 -> Vulkan
+        d3d12->setNext(vulkan);
+
+        // 2. 启动链式处理
+        std::string finalDriverName;
+        m_gpuDevice = d3d12->handle(m_graphicsContext->getWindow(), finalDriverName);
+
+        // 3. 结果检查
         if (m_gpuDevice == nullptr)
         {
-            SDL_Log("Failed to create GPU device: %s", SDL_GetError());
+            LOG_ERROR("所有 GPU 后端均初始化失败！");
             return;
         }
 
-        // 声明窗口用于 GPU 渲染
+        m_gpuDriver = finalDriverName;
+
+        // 4. 声明窗口
         if (!SDL_ClaimWindowForGPUDevice(m_gpuDevice, m_graphicsContext->getWindow()))
         {
-            SDL_Log("Failed to claim window for GPU: %s", SDL_GetError());
+            LOG_ERROR("窗口声明失败: {}", SDL_GetError());
             SDL_DestroyGPUDevice(m_gpuDevice);
             m_gpuDevice = nullptr;
             return;
         }
 
-        SDL_Log("SDL GPU initialized successfully with %s", SDL_GetGPUDeviceDriver(m_gpuDevice));
+        LOG_INFO("GPU 初始化成功，最终使用后端: {}", m_gpuDriver);
     }
 
     /**
@@ -204,28 +291,50 @@ private:
     {
         if (m_gpuDevice == nullptr) return;
 
-        // 加载顶点着色器
-        m_vertexShader = loadShaderFromResource("assets/shader/vert.spv", SDL_GPU_SHADERSTAGE_VERTEX);
+        // 根据驱动类型选择着色器格式（使用已在 initializeGPU 中设置的 m_gpuDriver）
+        bool isVulkan = (m_gpuDriver == "vulkan");
 
-        // 加载片段着色器
-        m_fragmentShader = loadShaderFromResource("assets/shader/frag.spv", SDL_GPU_SHADERSTAGE_FRAGMENT);
+        if (isVulkan)
+        {
+            // 加载 SPIR-V 着色器（Vulkan）
+            m_vertexShader = loadShaderFromResource(
+                "assets/shader/vert.spv", SDL_GPU_SHADERSTAGE_VERTEX, SDL_GPU_SHADERFORMAT_SPIRV);
+            m_fragmentShader = loadShaderFromResource(
+                "assets/shader/frag.spv", SDL_GPU_SHADERSTAGE_FRAGMENT, SDL_GPU_SHADERFORMAT_SPIRV);
+        }
+        else
+        {
+            // 加载 DXIL 着色器（DX12）
+            m_vertexShader = loadShaderFromResource(
+                "assets/shader/vert.dxil", SDL_GPU_SHADERSTAGE_VERTEX, SDL_GPU_SHADERFORMAT_DXIL);
+            m_fragmentShader = loadShaderFromResource(
+                "assets/shader/frag.dxil", SDL_GPU_SHADERSTAGE_FRAGMENT, SDL_GPU_SHADERFORMAT_DXIL);
+        }
 
         if (m_vertexShader == nullptr || m_fragmentShader == nullptr)
         {
-            SDL_Log("Failed to load shaders");
+            LOG_ERROR("着色器加载失败 (驱动: {}, 顶点着色器: {}, 片段着色器: {})",
+                      m_gpuDriver,
+                      (m_vertexShader != nullptr ? "成功" : "失败"),
+                      (m_fragmentShader != nullptr ? "成功" : "失败"));
+        }
+        else
+        {
+            LOG_INFO("着色器加载成功 (驱动: {})", m_gpuDriver);
         }
     }
 
     /**
      * @brief 从 cmrc 嵌入资源加载着色器
      */
-    SDL_GPUShader* loadShaderFromResource(const char* resourcePath, SDL_GPUShaderStage stage)
+    SDL_GPUShader*
+        loadShaderFromResource(const char* resourcePath, SDL_GPUShaderStage stage, SDL_GPUShaderFormat format)
     {
         auto fs = cmrc::ui_fonts::get_filesystem();
 
         if (!fs.exists(resourcePath))
         {
-            SDL_Log("Shader resource not found: %s", resourcePath);
+            LOG_ERROR("着色器资源未找到: {}", resourcePath);
             return nullptr;
         }
 
@@ -236,14 +345,26 @@ private:
         shaderInfo.code_size = static_cast<size_t>(file.size());
         // 着色器入口点：顶点着色器是 main_vs，片段着色器是 main_ps
         shaderInfo.entrypoint = (stage == SDL_GPU_SHADERSTAGE_VERTEX) ? "main_vs" : "main_ps";
-        shaderInfo.format = SDL_GPU_SHADERFORMAT_SPIRV;
+        shaderInfo.format = format;
         shaderInfo.stage = stage;
-        // 片段着色器使用 1 个采样器
+        // 片段着色器使用 1 个采样器（用于纹理采样）
         shaderInfo.num_samplers = (stage == SDL_GPU_SHADERSTAGE_FRAGMENT) ? 1u : 0u;
-        // 不使用 uniform buffer，使用 push constants
-        shaderInfo.num_uniform_buffers = 0;
+        // 不使用 storage textures/buffers
+        shaderInfo.num_storage_textures = 0u;
+        shaderInfo.num_storage_buffers = 0u;
+        // 使用 uniform buffers 传递 Push Constants 数据
+        shaderInfo.num_uniform_buffers = 1u;
 
-        return SDL_CreateGPUShader(m_gpuDevice, &shaderInfo);
+        SDL_GPUShader* shader = SDL_CreateGPUShader(m_gpuDevice, &shaderInfo);
+        if (shader == nullptr)
+        {
+            LOG_ERROR("着色器创建失败: {} (错误: {})", resourcePath, SDL_GetError());
+        }
+        else
+        {
+            LOG_INFO("着色器创建成功: {} (大小: {} 字节)", resourcePath, file.size());
+        }
+        return shader;
     }
 
     /**
@@ -262,17 +383,20 @@ private:
         // Position (vec2)
         vertexAttributes[0].location = 0;
         vertexAttributes[0].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2;
-        vertexAttributes[0].offset = 0;
+        vertexAttributes[0].buffer_slot = 0;
+        vertexAttributes[0].offset = static_cast<uint32_t>(offsetof(Vertex, position));
 
         // TexCoord (vec2)
         vertexAttributes[1].location = 1;
         vertexAttributes[1].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2;
-        vertexAttributes[1].offset = sizeof(Eigen::Vector2f);
+        vertexAttributes[1].buffer_slot = 0;
+        vertexAttributes[1].offset = static_cast<uint32_t>(offsetof(Vertex, texCoord));
 
         // Color (vec4)
         vertexAttributes[2].location = 2;
         vertexAttributes[2].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4;
-        vertexAttributes[2].offset = sizeof(Eigen::Vector2f) * 2;
+        vertexAttributes[2].buffer_slot = 0;
+        vertexAttributes[2].offset = static_cast<uint32_t>(offsetof(Vertex, color));
 
         SDL_GPUVertexBufferDescription vertexBufferDesc = {};
         vertexBufferDesc.slot = 0;
@@ -287,38 +411,78 @@ private:
         vertexInputState.num_vertex_attributes = 3;
 
         // 颜色附件描述 - 使用预乘 Alpha 混合模式（与着色器输出匹配）
-        SDL_GPUColorTargetDescription colorTargetDesc = {};
-        colorTargetDesc.format = SDL_GetGPUSwapchainTextureFormat(m_gpuDevice, m_graphicsContext->getWindow());
-        colorTargetDesc.blend_state.enable_blend = true;
+        SDL_GPUColorTargetBlendState blendState = {};
+        blendState.enable_blend = true;
         // 预乘 Alpha: srcColor * 1 + dstColor * (1 - srcAlpha)
-        colorTargetDesc.blend_state.src_color_blendfactor = SDL_GPU_BLENDFACTOR_ONE;
-        colorTargetDesc.blend_state.dst_color_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
-        colorTargetDesc.blend_state.color_blend_op = SDL_GPU_BLENDOP_ADD;
-        colorTargetDesc.blend_state.src_alpha_blendfactor = SDL_GPU_BLENDFACTOR_ONE;
-        colorTargetDesc.blend_state.dst_alpha_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
-        colorTargetDesc.blend_state.alpha_blend_op = SDL_GPU_BLENDOP_ADD;
+        blendState.src_color_blendfactor = SDL_GPU_BLENDFACTOR_ONE;
+        blendState.dst_color_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
+        blendState.color_blend_op = SDL_GPU_BLENDOP_ADD;
+        blendState.src_alpha_blendfactor = SDL_GPU_BLENDFACTOR_ONE;
+        blendState.dst_alpha_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
+        blendState.alpha_blend_op = SDL_GPU_BLENDOP_ADD;
+        blendState.color_write_mask =
+            SDL_GPU_COLORCOMPONENT_R | SDL_GPU_COLORCOMPONENT_G | SDL_GPU_COLORCOMPONENT_B | SDL_GPU_COLORCOMPONENT_A;
+        blendState.enable_color_write_mask = true;
+
+        SDL_GPUColorTargetDescription colorTargetDesc = {}; // 颜色目标描述
+        colorTargetDesc.format =
+            SDL_GetGPUSwapchainTextureFormat(m_gpuDevice, m_graphicsContext->getWindow()); // 颜色格式
+        colorTargetDesc.blend_state = blendState;
 
         // 光栅化状态
         SDL_GPURasterizerState rasterizerState = {};
         rasterizerState.fill_mode = SDL_GPU_FILLMODE_FILL;
         rasterizerState.cull_mode = SDL_GPU_CULLMODE_NONE;
         rasterizerState.front_face = SDL_GPU_FRONTFACE_COUNTER_CLOCKWISE;
+        rasterizerState.enable_depth_clip = true;
+
+        // 多重采样状态（默认不开启）
+        SDL_GPUMultisampleState multisampleState = {};
+        multisampleState.sample_count = SDL_GPU_SAMPLECOUNT_1;
+        multisampleState.sample_mask = 0;
+        multisampleState.enable_mask = false;
+        multisampleState.enable_alpha_to_coverage = false;
+
+        // 深度/模板状态（不使用深度/模板）
+        SDL_GPUStencilOpState stencilState = {};
+        stencilState.fail_op = SDL_GPU_STENCILOP_KEEP;
+        stencilState.pass_op = SDL_GPU_STENCILOP_KEEP;
+        stencilState.depth_fail_op = SDL_GPU_STENCILOP_KEEP;
+        stencilState.compare_op = SDL_GPU_COMPAREOP_ALWAYS;
+
+        SDL_GPUDepthStencilState depthStencilState = {};
+        depthStencilState.compare_op = SDL_GPU_COMPAREOP_ALWAYS;
+        depthStencilState.back_stencil_state = stencilState;
+        depthStencilState.front_stencil_state = stencilState;
+        depthStencilState.compare_mask = 0xFF;
+        depthStencilState.write_mask = 0xFF;
+        depthStencilState.enable_depth_test = false;
+        depthStencilState.enable_depth_write = false;
+        depthStencilState.enable_stencil_test = false;
 
         // 创建图形管线
         SDL_GPUGraphicsPipelineCreateInfo pipelineInfo = {};
-        pipelineInfo.vertex_shader = m_vertexShader;
-        pipelineInfo.fragment_shader = m_fragmentShader;
-        pipelineInfo.vertex_input_state = vertexInputState;
-        pipelineInfo.primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
-        pipelineInfo.rasterizer_state = rasterizerState;
-        pipelineInfo.target_info.num_color_targets = 1;
-        pipelineInfo.target_info.color_target_descriptions = &colorTargetDesc;
+        pipelineInfo.vertex_shader = m_vertexShader;                                   // 顶点着色器
+        pipelineInfo.fragment_shader = m_fragmentShader;                               // 片段着色器
+        pipelineInfo.vertex_input_state = vertexInputState;                            // 顶点输入状态
+        pipelineInfo.primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;              // 图元类型
+        pipelineInfo.rasterizer_state = rasterizerState;                               // 光栅化状态
+        pipelineInfo.multisample_state = multisampleState;                             // 多重采样状态
+        pipelineInfo.depth_stencil_state = depthStencilState;                          // 深度/模板状态
+        pipelineInfo.target_info.num_color_targets = 1;                                // 设置为1个颜色目标
+        pipelineInfo.target_info.color_target_descriptions = &colorTargetDesc;         // 颜色目标描述
+        pipelineInfo.target_info.has_depth_stencil_target = false;                     // 不使用深度模板缓冲
+        pipelineInfo.target_info.depth_stencil_format = SDL_GPU_TEXTUREFORMAT_INVALID; // 无深度模板格式
 
         m_pipeline = SDL_CreateGPUGraphicsPipeline(m_gpuDevice, &pipelineInfo);
 
         if (m_pipeline == nullptr)
         {
-            SDL_Log("Failed to create graphics pipeline: %s", SDL_GetError());
+            LOG_ERROR("图形管线创建失败: {}", SDL_GetError());
+        }
+        else
+        {
+            LOG_INFO("图形管线创建成功");
         }
 
         // 创建采样器
@@ -339,7 +503,7 @@ private:
     {
         if (!TTF_Init())
         {
-            SDL_Log("Failed to initialize SDL_ttf: %s", SDL_GetError());
+            LOG_ERROR("Failed to initialize SDL_ttf: {}", SDL_GetError());
             return;
         }
 
@@ -349,7 +513,7 @@ private:
 
         if (!fs.exists(fontPath))
         {
-            SDL_Log("Font resource not found: %s", fontPath);
+            LOG_ERROR("Font resource not found: {}", fontPath);
             return;
         }
 
@@ -359,14 +523,14 @@ private:
         SDL_IOStream* fontIO = SDL_IOFromConstMem(fontFile.begin(), static_cast<size_t>(fontFile.size()));
         if (fontIO == nullptr)
         {
-            SDL_Log("Failed to create IOStream for font: %s", SDL_GetError());
+            LOG_INFO("Failed to create IOStream for font: %s", SDL_GetError());
             return;
         }
 
         m_defaultFont = TTF_OpenFontIO(fontIO, true, 16.0F);
         if (m_defaultFont == nullptr)
         {
-            SDL_Log("Failed to load default font: %s", SDL_GetError());
+            LOG_INFO("Failed to load default font: %s", SDL_GetError());
         }
     }
 
@@ -375,12 +539,17 @@ private:
      */
     void cleanup()
     {
+        if (m_gpuDevice == nullptr) return;
+
+        // 等待 GPU 空闲
+        SDL_WaitForGPUIdle(m_gpuDevice);
+
         // 清理纹理缓存
-        for (auto& [key, texture] : m_textureCache)
+        for (auto& [key, entry] : m_textureCache)
         {
-            if (texture != nullptr)
+            if (entry.texture != nullptr)
             {
-                SDL_ReleaseGPUTexture(m_gpuDevice, texture);
+                SDL_ReleaseGPUTexture(m_gpuDevice, entry.texture);
             }
         }
         m_textureCache.clear();
@@ -433,6 +602,12 @@ private:
         {
             TTF_CloseFont(m_defaultFont);
             m_defaultFont = nullptr;
+        }
+
+        // 释放窗口声明
+        if (m_graphicsContext != nullptr && m_graphicsContext->getWindow() != nullptr)
+        {
+            SDL_ReleaseWindowFromGPUDevice(m_gpuDevice, m_graphicsContext->getWindow());
         }
 
         if (m_gpuDevice != nullptr)
@@ -586,12 +761,7 @@ private:
         float globalAlpha = parentAlpha * (alphaComp ? alphaComp->value : 1.0F);
         Eigen::Vector2f absolutePos = parentPos + pos.value;
 
-        // 跳过 Window/Dialog（需要特殊处理）
-        if (registry.any_of<components::WindowTag>(entity) || registry.any_of<components::DialogTag>(entity))
-        {
-            // TODO: 实现窗口渲染
-            return;
-        }
+        // Window/Dialog 目前按普通容器渲染（背景 + 子元素），后续再做特殊处理
 
         // 收集背景渲染数据
         collectBackgroundData(registry, entity, absolutePos, size.size, globalAlpha);
@@ -708,15 +878,15 @@ private:
         RenderBatch batch;
         batch.texture = m_whiteTexture;
 
-        // 设置 Push Constants
-        batch.pushConstants.screen_width = m_screenWidth;
-        batch.pushConstants.screen_height = m_screenHeight;
-        batch.pushConstants.rect_width = size.x();
-        batch.pushConstants.rect_height = size.y();
-        batch.pushConstants.r_top_left = radius.x();
-        batch.pushConstants.r_top_right = radius.y();
-        batch.pushConstants.r_bottom_right = radius.z();
-        batch.pushConstants.r_bottom_left = radius.w();
+        // 设置 Push Constants（与着色器 PushConstants 结构体字段顺序一致）
+        batch.pushConstants.screen_size[0] = m_screenWidth;
+        batch.pushConstants.screen_size[1] = m_screenHeight;
+        batch.pushConstants.rect_size[0] = size.x();
+        batch.pushConstants.rect_size[1] = size.y();
+        batch.pushConstants.radius[0] = radius.x(); // 左上
+        batch.pushConstants.radius[1] = radius.y(); // 右上
+        batch.pushConstants.radius[2] = radius.z(); // 右下
+        batch.pushConstants.radius[3] = radius.w(); // 左下
         batch.pushConstants.shadow_soft = shadowSoft;
         batch.pushConstants.shadow_offset_x = shadowOffsetX;
         batch.pushConstants.shadow_offset_y = shadowOffsetY;
@@ -767,11 +937,37 @@ private:
         if (m_defaultFont == nullptr || text.empty()) return;
 
         // 使用 SDL_ttf 渲染文本到纹理
-        SDL_GPUTexture* textTexture = renderTextToTexture(text, color);
+        uint32_t textWidth = 0;
+        uint32_t textHeight = 0;
+        SDL_GPUTexture* textTexture = renderTextToTexture(text, color, textWidth, textHeight);
         if (textTexture == nullptr) return;
 
-        // TODO: 根据对齐方式计算位置
-        addImageBatch(textTexture, pos, size, {0, 0}, {1, 1}, {1, 1, 1, 1}, opacity);
+        Eigen::Vector2f textSize(static_cast<float>(textWidth), static_cast<float>(textHeight));
+
+        float drawX = pos.x();
+        float drawY = pos.y();
+
+        // 水平对齐
+        if (ui::helper::HasAlignment(alignment, policies::Alignment::HCENTER))
+        {
+            drawX += (size.x() - textSize.x()) * 0.5F;
+        }
+        else if (ui::helper::HasAlignment(alignment, policies::Alignment::RIGHT))
+        {
+            drawX += size.x() - textSize.x();
+        }
+
+        // 垂直对齐
+        if (ui::helper::HasAlignment(alignment, policies::Alignment::VCENTER))
+        {
+            drawY += (size.y() - textSize.y()) * 0.5F;
+        }
+        else if (ui::helper::HasAlignment(alignment, policies::Alignment::BOTTOM))
+        {
+            drawY += size.y() - textSize.y();
+        }
+
+        addImageBatch(textTexture, {drawX, drawY}, textSize, {0, 0}, {1, 1}, {1, 1, 1, 1}, opacity);
     }
 
     /**
@@ -788,14 +984,14 @@ private:
         RenderBatch batch;
         batch.texture = texture;
 
-        batch.pushConstants.screen_width = m_screenWidth;
-        batch.pushConstants.screen_height = m_screenHeight;
-        batch.pushConstants.rect_width = size.x();
-        batch.pushConstants.rect_height = size.y();
-        batch.pushConstants.r_top_left = 0.0F;
-        batch.pushConstants.r_top_right = 0.0F;
-        batch.pushConstants.r_bottom_right = 0.0F;
-        batch.pushConstants.r_bottom_left = 0.0F;
+        batch.pushConstants.screen_size[0] = m_screenWidth;
+        batch.pushConstants.screen_size[1] = m_screenHeight;
+        batch.pushConstants.rect_size[0] = size.x();
+        batch.pushConstants.rect_size[1] = size.y();
+        batch.pushConstants.radius[0] = 0.0F; // 左上
+        batch.pushConstants.radius[1] = 0.0F; // 右上
+        batch.pushConstants.radius[2] = 0.0F; // 右下
+        batch.pushConstants.radius[3] = 0.0F; // 左下
         batch.pushConstants.shadow_soft = 0.0F;
         batch.pushConstants.shadow_offset_x = 0.0F;
         batch.pushConstants.shadow_offset_y = 0.0F;
@@ -821,18 +1017,23 @@ private:
     /**
      * @brief 使用 SDL_ttf 渲染文本到 GPU 纹理
      */
-    SDL_GPUTexture* renderTextToTexture(const std::string& text, const Eigen::Vector4f& color)
+    SDL_GPUTexture* renderTextToTexture(const std::string& text,
+                                        const Eigen::Vector4f& color,
+                                        uint32_t& outWidth,
+                                        uint32_t& outHeight)
     {
         if (m_defaultFont == nullptr) return nullptr;
 
         // 检查缓存
-        std::string cacheKey =
-            text + "_" + std::to_string(color.x()) + "_" + std::to_string(color.y()) + "_" + std::to_string(color.z());
+        std::string cacheKey = text + "_" + std::to_string(color.x()) + "_" + std::to_string(color.y()) + "_" +
+                               std::to_string(color.z()) + "_" + std::to_string(color.w());
 
         auto it = m_textureCache.find(cacheKey);
         if (it != m_textureCache.end())
         {
-            return it->second;
+            outWidth = it->second.width;
+            outHeight = it->second.height;
+            return it->second.texture;
         }
 
         // 渲染文本到 Surface
@@ -841,10 +1042,19 @@ private:
                               static_cast<uint8_t>(color.z() * 255),
                               static_cast<uint8_t>(color.w() * 255)};
 
-        SDL_Surface* textSurface = TTF_RenderText_Blended(m_defaultFont, text.c_str(), text.size(), sdlColor);
+        SDL_Surface* rawSurface = TTF_RenderText_Blended(m_defaultFont, text.c_str(), text.size(), sdlColor);
+        if (rawSurface == nullptr)
+        {
+            LOG_INFO("Failed to render text: %s", SDL_GetError());
+            return nullptr;
+        }
+
+        // 转换为 RGBA32，确保格式与 GPU 纹理一致
+        SDL_Surface* textSurface = SDL_ConvertSurface(rawSurface, SDL_PIXELFORMAT_RGBA32);
+        SDL_DestroySurface(rawSurface);
         if (textSurface == nullptr)
         {
-            SDL_Log("Failed to render text: %s", SDL_GetError());
+            LOG_INFO("Failed to convert text surface: %s", SDL_GetError());
             return nullptr;
         }
 
@@ -886,7 +1096,8 @@ private:
                 SDL_GPUTextureTransferInfo transferInfo = {};
                 transferInfo.transfer_buffer = transferBuffer;
                 transferInfo.offset = 0;
-                transferInfo.pixels_per_row = static_cast<uint32_t>(textSurface->w);
+                const uint32_t bytesPerPixel = 4;
+                transferInfo.pixels_per_row = static_cast<uint32_t>(textSurface->pitch / bytesPerPixel);
                 transferInfo.rows_per_layer = static_cast<uint32_t>(textSurface->h);
 
                 SDL_GPUTextureRegion textureRegion = {};
@@ -906,7 +1117,10 @@ private:
         SDL_DestroySurface(textSurface);
 
         // 缓存纹理
-        m_textureCache[cacheKey] = texture;
+        m_textureCache[cacheKey] = {texture, textureInfo.width, textureInfo.height};
+
+        outWidth = textureInfo.width;
+        outHeight = textureInfo.height;
 
         return texture;
     }
@@ -985,13 +1199,13 @@ private:
             indexBinding.offset = 0;
             SDL_BindGPUIndexBuffer(renderPass, &indexBinding, SDL_GPU_INDEXELEMENTSIZE_16BIT);
 
-            // 绑定纹理和采样器
+            // 绑定纹理和采样器（着色器使用 register(s1, t1)，但 SDL GPU 绑定从 0 开始）
             if (batch.texture != nullptr && m_sampler != nullptr)
             {
                 SDL_GPUTextureSamplerBinding texSamplerBinding = {};
                 texSamplerBinding.texture = batch.texture;
                 texSamplerBinding.sampler = m_sampler;
-                SDL_BindGPUFragmentSamplers(renderPass, 1, &texSamplerBinding, 1);
+                SDL_BindGPUFragmentSamplers(renderPass, 0, &texSamplerBinding, 1);
             }
 
             // 推送 Push Constants

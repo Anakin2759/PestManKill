@@ -14,6 +14,8 @@ cmrc_add_resource_library(ui_fonts
     assets/fonts/NotoSansSC-VariableFont_wght.ttf
     assets/shader/vert.spv
     assets/shader/frag.spv
+    assets/shader/vert.dxil
+    assets/shader/frag.dxil
 )
 
 # 依赖项
@@ -74,7 +76,6 @@ set(UI_HEADERS
     core/helper.h
     core/SystemManager.h
     core/EventLoop.h
-    core/ImguiContext.h
     core/TaskChain.h
 
     # Interface
