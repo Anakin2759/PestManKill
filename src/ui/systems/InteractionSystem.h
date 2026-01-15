@@ -37,7 +37,6 @@
 #include "src/ui/interface/Isystem.h"
 #include "common/Types.h" // 包含 Vec2
 
-
 namespace ui::systems
 {
 
@@ -249,34 +248,6 @@ private:
             {
                 pos.x() += posComp->value.x();
                 pos.y() += posComp->value.y();
-            }
-
-            // 检查是否是 Window/Dialog 容器
-            // 如果是，需要获取 ImGui 窗口的内容区偏移（与 RenderSystem 保持一致）
-            if (registry.any_of<components::WindowTag, components::DialogTag>(e))
-            {
-                const auto* windowComp = registry.try_get<components::Window>(e);
-                if (windowComp)
-                {
-                    // 获取 ImGui 窗口状态以计算内容区偏移
-                    // ImGui::FindWindowByName 返回 ImGuiWindow*，但这是内部 API
-                    // 改用 SetNextWindowPos/Begin 配合 GetCursorScreenPos 的差值
-                    // 但由于我们在事件处理中而非渲染帧中，无法直接调用 ImGui::Begin
-                    // 因此使用预估值：标题栏高度约为 ImGui::GetFrameHeight()，无标题栏则为 0
-                    // 加上 ImGui 窗口的默认 Padding
-
-                    float titleBarOffset = windowComp->hasTitleBar ? ImGui::GetFrameHeight() : 0.0f;
-                    ImVec2 windowPadding = ImGui::GetStyle().WindowPadding;
-
-                    // 从当前实体到根已经累加了窗口的 Position
-                    // 现在需要为下一层（子元素）添加内容区偏移
-                    // 但我们是从根到叶遍历，所以在处理完窗口后加上偏移
-                    if (it + 1 != path.rend()) // 如果不是最终目标实体
-                    {
-                        pos.x() += windowPadding.x;
-                        pos.y() += titleBarOffset + windowPadding.y;
-                    }
-                }
             }
         }
         return pos;

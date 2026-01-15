@@ -55,7 +55,6 @@ target_link_libraries(${CLIENT_NAME} PRIVATE
     
     # UI 模块
     ui
-    imgui::imgui
     SDL3::SDL3
     
     # Abseil
@@ -97,7 +96,6 @@ if(BUILD_TESTING)
         net
         ui
         asio::asio
-        imgui::imgui
         SDL3::SDL3
     )
     

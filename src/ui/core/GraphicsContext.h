@@ -31,13 +31,12 @@ class GraphicsContext
 {
 private:
     SDL_Window* m_window = nullptr;
-    SDL_Renderer* m_renderer = nullptr;
     int m_width = 800;
     int m_height = 600;
 
 public:
     /**
-     * @brief 构造函数：创建 SDL 窗口和渲染器
+     * @brief 构造函数：创建 SDL 窗口 (不再创建 SDL_Renderer，由 SdlGpuRenderSystem 接管窗口)
      * @param title 窗口标题
      * @param width 窗口宽度
      * @param height 窗口高度
@@ -55,14 +54,6 @@ public:
         {
             throw std::runtime_error(std::string("SDL_CreateWindow failed: ") + SDL_GetError());
         }
-
-        // 创建渲染器
-        m_renderer = SDL_CreateRenderer(m_window, nullptr);
-        if (!m_renderer)
-        {
-            SDL_DestroyWindow(m_window);
-            throw std::runtime_error(std::string("SDL_CreateRenderer failed: ") + SDL_GetError());
-        }
     }
 
     /**
@@ -70,11 +61,6 @@ public:
      */
     ~GraphicsContext()
     {
-        if (m_renderer)
-        {
-            SDL_DestroyRenderer(m_renderer);
-            m_renderer = nullptr;
-        }
         if (m_window)
         {
             SDL_DestroyWindow(m_window);
@@ -87,21 +73,15 @@ public:
     GraphicsContext& operator=(const GraphicsContext&) = delete;
 
     GraphicsContext(GraphicsContext&& other) noexcept
-        : m_window(other.m_window), m_renderer(other.m_renderer), m_width(other.m_width), m_height(other.m_height)
+        : m_window(other.m_window), m_width(other.m_width), m_height(other.m_height)
     {
         other.m_window = nullptr;
-        other.m_renderer = nullptr;
     }
 
     GraphicsContext& operator=(GraphicsContext&& other) noexcept
     {
         if (this != &other)
         {
-            // 先清理自己的资源
-            if (m_renderer)
-            {
-                SDL_DestroyRenderer(m_renderer);
-            }
             if (m_window)
             {
                 SDL_DestroyWindow(m_window);
@@ -109,12 +89,10 @@ public:
 
             // 移动资源
             m_window = other.m_window;
-            m_renderer = other.m_renderer;
             m_width = other.m_width;
             m_height = other.m_height;
 
             other.m_window = nullptr;
-            other.m_renderer = nullptr;
         }
         return *this;
     }
@@ -130,7 +108,6 @@ public:
 
     // Getters
     [[nodiscard]] SDL_Window* getWindow() const { return m_window; }
-    [[nodiscard]] SDL_Renderer* getRenderer() const { return m_renderer; }
     [[nodiscard]] int getWidth() const { return m_width; }
     [[nodiscard]] int getHeight() const { return m_height; }
 };

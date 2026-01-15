@@ -12,6 +12,8 @@ cmrc_add_resource_library(ui_fonts
     ALIAS fonts              # 在 C++ 中调用的别名
     NAMESPACE ui_fonts          # C++ 命名空间
     assets/fonts/NotoSansSC-VariableFont_wght.ttf
+    assets/shader/vert.spv
+    assets/shader/frag.spv
 )
 
 # 依赖项
@@ -63,7 +65,6 @@ set(UI_HEADERS
     systems/InteractionSystem.h
     systems/AnimationSystem.h
     systems/LayoutSystem.h
-    systems/RenderSystem.h
     systems/SdlGpuRenderSystem.h
     systems/WindowsSystem.h
     

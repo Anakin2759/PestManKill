@@ -16,8 +16,6 @@ target_compile_definitions(ui_tests PRIVATE
 target_link_libraries(ui_tests PRIVATE
     EnTT::EnTT
     asio::asio
-
-    imgui::imgui
     SDL3::SDL3
     utils
     ui

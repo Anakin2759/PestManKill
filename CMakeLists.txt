@@ -57,7 +57,6 @@ add_subdirectory(third_party/SDL)
 add_subdirectory(third_party/SDL_ttf)
 add_subdirectory(third_party/stb)
 
-add_subdirectory(third_party/imgui)
 add_subdirectory(third_party/abseil-cpp)
 add_subdirectory(third_party/kcp)
 add_subdirectory(third_party/googletest)
