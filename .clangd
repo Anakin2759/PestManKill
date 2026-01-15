@@ -9,6 +9,8 @@ CompileFlags:
     # MSVC 兼容模式下使用 MSVC 风格的 C++ 标准标志
     - "/std:c++latest"
     - "/Zc:__cplusplus"
+    # Clang 需要显式指定 C++23 标准
+    - "-std=c++23"
     # 启用所有错误报告
     - "-ferror-limit=0"
     # 禁用宏回溯限制，便于调试

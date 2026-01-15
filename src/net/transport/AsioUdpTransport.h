@@ -14,15 +14,20 @@
  */
 
 #pragma once
+#include <span>
 #include "IUdpTransport.h"
 #include <array>
-#include <functional>
+#include <concepts>
 class AsioUdpTransport final : public IUdpTransport
 {
 public:
     AsioUdpTransport(asio::any_io_executor exec, uint16_t port);
-
-    void send(const asio::ip::udp::endpoint& to, std::span<const uint8_t> data) override;
+    /**
+     * @brief 发送数据包
+     * @param to 目标地址
+     * @param data 数据内容
+     */
+    void send(const asio::ip::udp::endpoint& endpoint, std::span<const uint8_t> data) override;
 
     /**
      * @brief 获取本地绑定端口
@@ -39,6 +44,7 @@ public:
      * @param handler 数据处理回调
      */
     template <typename PacketHandler>
+        requires std::invocable<PacketHandler>
     void startReceive(PacketHandler&& handler)
     {
         doReceive(std::forward<PacketHandler>(handler));
@@ -49,6 +55,7 @@ public:
      * @tparam PacketHandler 处理函数类型，签名应为 void(const asio::ip::udp::endpoint&, std::span<const uint8_t>)
      */
     template <typename PacketHandler>
+        requires std::invocable<PacketHandler>
     asio::awaitable<void> recvLoop(PacketHandler&& handler)
     {
         std::array<uint8_t, 2048> buf{};
@@ -63,9 +70,16 @@ public:
     }
 
 private:
+    /**
+     * @brief 内部接收实现
+     * @tparam PacketHandler 处理函数类型
+     * @param handler 数据处理回调
+     */
     template <typename PacketHandler>
+        requires std::invocable<PacketHandler>
     void doReceive(PacketHandler&& handler)
     {
+        // 开始异步接收
         m_socket.async_receive_from(asio::buffer(m_recvBuffer),
                                     m_recvEndpoint,
                                     [this, handler = std::forward<PacketHandler>(handler)](const asio::error_code& ec,
@@ -73,8 +87,10 @@ private:
                                     {
                                         if (!ec && bytes > 0)
                                         {
+                                            // 调用用户提供的处理函数
                                             handler(m_recvEndpoint,
                                                     std::span<const uint8_t>(m_recvBuffer.data(), bytes));
+                                            // 继续接收下一个数据包
                                             doReceive(std::move(handler));
                                         }
                                     });

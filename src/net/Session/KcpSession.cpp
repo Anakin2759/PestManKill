@@ -37,9 +37,8 @@ constexpr size_t RECV_BUFFER_SIZE = 2048;
 KcpSession::KcpSession(uint32_t conv,
                        IUdpTransport& transport,
                        asio::ip::udp::endpoint peer,
-                       asio::any_io_executor exec)
-    : m_kcp(ikcp_create(conv, this)), m_transport(transport), m_peer(std::move(peer)),
-      m_channel(std::move(exec), CHANNEL_CAPACITY)
+                       const asio::any_io_executor& exec)
+    : m_kcp(ikcp_create(conv, this)), m_transport(transport), m_peer(std::move(peer)), m_channel(exec, CHANNEL_CAPACITY)
 {
     if (m_kcp != nullptr)
     {
@@ -57,6 +56,10 @@ KcpSession::~KcpSession()
     }
 }
 
+/**
+ * @brief 输入数据到 KCP
+ * @param data 输入数据
+ */
 void KcpSession::input(std::span<const uint8_t> data)
 {
     if (m_kcp == nullptr)
@@ -64,18 +67,22 @@ void KcpSession::input(std::span<const uint8_t> data)
         return;
     }
 
+    // KCP C API uses `char*` as byte buffer.
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
     ikcp_input(m_kcp, reinterpret_cast<const char*>(data.data()), static_cast<long>(data.size()));
 
     // 尝试从 KCP 提取完整包并推入协程通道
-    std::vector<uint8_t> recv_buffer(RECV_BUFFER_SIZE);
-    int bytes_received = 0;
-    while ((bytes_received = ikcp_recv(
-                m_kcp, reinterpret_cast<char*>(recv_buffer.data()), static_cast<int>(recv_buffer.size()))) > 0)
+    std::vector<uint8_t> recvBuffer(RECV_BUFFER_SIZE);
+    int bytesReceived = 0;
+    while ((bytesReceived = ikcp_recv(m_kcp,
+                                      // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+                                      reinterpret_cast<char*>(recvBuffer.data()),
+                                      static_cast<int>(recvBuffer.size()))) > 0)
     {
-        recv_buffer.resize(static_cast<size_t>(bytes_received));
-        m_channel.try_send(std::error_code{}, recv_buffer);
-        recv_buffer.clear();
-        recv_buffer.resize(RECV_BUFFER_SIZE);
+        recvBuffer.resize(static_cast<size_t>(bytesReceived));
+        m_channel.try_send(std::error_code{}, recvBuffer);
+        recvBuffer.clear();
+        recvBuffer.resize(RECV_BUFFER_SIZE);
     }
 }
 
@@ -98,6 +105,8 @@ void KcpSession::send(std::span<const uint8_t> data)
     {
         return;
     }
+    // KCP C API uses `char*` as byte buffer.
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
     ikcp_send(m_kcp, reinterpret_cast<const char*>(data.data()), static_cast<int>(data.size()));
 }
 
@@ -125,7 +134,14 @@ int KcpSession::kcpOutput(const char* buf, int len, ikcpcb* /*kcp*/, void* user)
     {
         return -1;
     }
+
+    if (buf == nullptr || len <= 0)
+    {
+        return 0;
+    }
+
     self->m_transport.send(self->m_peer,
+                           // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
                            std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(buf), static_cast<size_t>(len)));
     return 0;
 }

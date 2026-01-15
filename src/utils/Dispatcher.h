@@ -24,6 +24,7 @@
 
 #pragma once
 #include <entt/entt.hpp>
+#include <span>
 
 namespace utils
 {
@@ -35,13 +36,13 @@ public:
         static entt::dispatcher instance;
         return instance;
     }
-
-private:
-    Dispatcher() = default;
-    ~Dispatcher() = default;
     Dispatcher(const Dispatcher&) = delete;
     Dispatcher& operator=(const Dispatcher&) = delete;
     Dispatcher(Dispatcher&&) = delete;
     Dispatcher& operator=(Dispatcher&&) = delete;
+
+private:
+    Dispatcher() = default;
+    ~Dispatcher() = default;
 };
 } // namespace utils

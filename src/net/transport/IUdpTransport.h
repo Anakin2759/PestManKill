@@ -21,7 +21,12 @@
 class IUdpTransport
 {
 public:
+    IUdpTransport() = default;
+    IUdpTransport(const IUdpTransport&) = default;
+    IUdpTransport& operator=(const IUdpTransport&) = delete;
+    IUdpTransport(IUdpTransport&&) = default;
+    IUdpTransport& operator=(IUdpTransport&&) = default;
     virtual ~IUdpTransport() = default;
 
-    virtual void send(const asio::ip::udp::endpoint& to, std::span<const uint8_t> data) = 0;
+    virtual void send(const asio::ip::udp::endpoint& endpoint, std::span<const uint8_t> data) = 0;
 };

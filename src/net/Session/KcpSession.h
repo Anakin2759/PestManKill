@@ -27,6 +27,7 @@ class KcpSession : public std::enable_shared_from_this<KcpSession>
 {
     // 定义协程通道：传递接收到的二进制包
     using Packet = std::vector<uint8_t>;
+    // 定义数据通道类型
     using DataChannel = asio::experimental::channel<asio::any_io_executor, void(std::error_code, Packet)>;
 
 public:
@@ -37,7 +38,10 @@ public:
      * @param peer 对端 UDP 地址
      * @param exec 执行器（通常是 IO 上下文的执行器）
      */
-    KcpSession(uint32_t conv, IUdpTransport& transport, asio::ip::udp::endpoint peer, asio::any_io_executor exec);
+    KcpSession(uint32_t conv,
+               IUdpTransport& transport,
+               asio::ip::udp::endpoint peer,
+               const asio::any_io_executor& exec);
 
     ~KcpSession();
 

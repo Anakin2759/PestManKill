@@ -18,6 +18,9 @@
     - Vulkan 优先
     - DX12 暂时不支持
 
+    使用SDL ttf渲染字体到GPU纹理上
+    默认字体用 assets/fonts/NotoSansSC-VariableFont_wght.ttf
+
  *
  * ************************************************************************
  * @copyright Copyright (c) 2026 AnakinLiu
