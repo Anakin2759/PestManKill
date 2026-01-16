@@ -292,7 +292,7 @@ private:
 
         // 递归处理子节点
         const auto* hierarchy = registry.try_get<components::Hierarchy>(entity);
-        if (hierarchy && !hierarchy->children.empty())
+        if (hierarchy != nullptr && !hierarchy->children.empty())
         {
             uint32_t childIndex = 0;
             for (entt::entity child : hierarchy->children)
@@ -300,7 +300,7 @@ private:
                 if (!registry.all_of<components::Position, components::Size>(child)) continue;
 
                 YGNodeRef childNode = buildYogaTree(registry, child);
-                if (childNode)
+                if (childNode != nullptr)
                 {
                     YGNodeInsertChild(node, childNode, childIndex++);
                 }
@@ -462,9 +462,13 @@ private:
     /**
      * @brief 递归应用 Yoga 布局结果到 ECS 组件
      */
-    void applyYogaLayout(entt::registry& registry, entt::entity entity, YGNodeRef node, float parentX, float parentY)
+    static void applyYogaLayout(entt::registry& registry, // NOLINT(misc-no-recursion)
+                                entt::entity entity,
+                                YGNodeRef node,
+                                float parentX,
+                                float parentY)
     {
-        if (!node) return;
+        if (node == nullptr) return;
 
         // 获取 Yoga 计算的布局结果
         float left = YGNodeLayoutGetLeft(node);
@@ -494,7 +498,7 @@ private:
         const uint32_t childCount = YGNodeGetChildCount(node);
         const auto* hierarchy = registry.try_get<components::Hierarchy>(entity);
 
-        if (hierarchy && childCount > 0)
+        if (hierarchy != nullptr && childCount > 0)
         {
             uint32_t yogaChildIndex = 0;
             for (entt::entity child : hierarchy->children)
@@ -523,7 +527,7 @@ private:
     {
         auto* pos = registry.try_get<components::Position>(root);
         auto* size = registry.try_get<components::Size>(root);
-        if (!pos || !size) return;
+        if (pos == nullptr || size == nullptr) return;
 
         // 检查是否有 PositionPolicy 组件来决定居中策略
         // 默认：如果位置是 (0,0) 且尺寸有效，则居中
@@ -579,7 +583,7 @@ private:
         {
             registry.emplace_or_replace<components::LayoutDirtyTag>(current);
             const auto* hierarchy = registry.try_get<components::Hierarchy>(current);
-            current = hierarchy ? hierarchy->parent : entt::null;
+            current = hierarchy != nullptr ? hierarchy->parent : entt::null;
         }
     }
 };

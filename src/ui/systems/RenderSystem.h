@@ -17,11 +17,12 @@
     - Vulkan 默认
     - DX12
 
-
     使用SDL ttf渲染字体到GPU纹理上
     默认字体用 assets/fonts/NotoSansSC-VariableFont_wght.ttf
     静态资源都用cmrc打包
-
+    驱动和窗口是1对多关系
+    所有窗口共用同一个GPU设备
+    窗口数量可能变化
  *
  * ************************************************************************
  * @copyright Copyright (c) 2026 AnakinLiu
@@ -32,12 +33,12 @@
 #pragma once
 #include <cstddef>
 #include <cstdint>
+#include <cmath>
 #include <memory>
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
 #include <string>
-#include <algorithm>
-#include <cctype>
 #include <cstdlib>
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_gpu.h>
@@ -47,19 +48,15 @@
 #include <cmrc/cmrc.hpp>
 #include <utils.h>
 #include "Logger.h"
+#include "Registry.h"
+#include "SDL3/SDL_video.h"
 #include "common/Components.h"
 #include "common/Tags.h"
 #include "common/Events.h"
 #include "interface/Isystem.h"
-#include "core/GraphicsContext.h"
 #include "core/Helper.h"
 
-CMRC_DECLARE(ui_fonts);
-
-namespace ui
-{
-class GraphicsContext;
-}
+CMRC_DECLARE(ui_fonts); // NOLINT
 
 namespace ui::systems
 {
@@ -80,11 +77,11 @@ public:
     void setNext(std::shared_ptr<GPUBackendHandler> next) { nextHandler = next; }
 
     // 处理请求的核心逻辑
-    virtual SDL_GPUDevice* handle(SDL_Window* window, std::string& outDriverName)
+    virtual SDL_GPUDevice* handle(std::string& outDriverName)
     {
         if (nextHandler)
         {
-            return nextHandler->handle(window, outDriverName);
+            return nextHandler->handle(outDriverName);
         }
         return nullptr;
     }
@@ -92,7 +89,7 @@ public:
 class D3D12Handler final : public GPUBackendHandler
 {
 public:
-    SDL_GPUDevice* handle(SDL_Window* window, std::string& outDriverName) override
+    SDL_GPUDevice* handle(std::string& outDriverName) override
     {
         LOG_INFO("责任链：尝试初始化 D3D12...");
 
@@ -111,13 +108,13 @@ public:
         }
 
         LOG_WARN("D3D12 不可用，传递给链中下一个处理器。原因: {}", SDL_GetError());
-        return GPUBackendHandler::handle(window, outDriverName);
+        return GPUBackendHandler::handle(outDriverName);
     }
 };
 class VulkanHandler final : public GPUBackendHandler
 {
 public:
-    SDL_GPUDevice* handle(SDL_Window* window, std::string& outDriverName) override
+    SDL_GPUDevice* handle(std::string& outDriverName) override
     {
         LOG_INFO("责任链：尝试初始化 Vulkan...");
 
@@ -136,7 +133,7 @@ public:
         }
 
         LOG_WARN("Vulkan 不可用。原因: {}", SDL_GetError());
-        return GPUBackendHandler::handle(window, outDriverName);
+        return GPUBackendHandler::handle(outDriverName);
     }
 };
 
@@ -153,7 +150,7 @@ struct alignas(16) UiPushConstants
     float shadow_offset_x; // 阴影 X 偏移
     float shadow_offset_y; // 阴影 Y 偏移
     float opacity;         // 整体透明度
-    float _padding;        // 填充到 16 字节倍数
+    float padding;         // 填充到 16 字节倍数
 };
 /**
  * @brief SDL GPU 渲染系统
@@ -189,11 +186,13 @@ class RenderSystem final : public interface::EnableRegister<RenderSystem>
     };
 
 public:
-    RenderSystem() = default;
+    RenderSystem() {
+        // 延迟初始化：等待 SDL Video 子系统就绪
+    };
     RenderSystem(const RenderSystem&) = delete;
     RenderSystem& operator=(const RenderSystem&) = delete;
-    RenderSystem(RenderSystem&&) = default;
-    RenderSystem& operator=(RenderSystem&&) = default;
+    RenderSystem(RenderSystem&&) noexcept = default;
+    RenderSystem& operator=(RenderSystem&&) noexcept = default;
     ~RenderSystem() { cleanup(); }
 
     /**
@@ -202,7 +201,8 @@ public:
     void registerHandlersImpl()
     {
         auto& dispatcher = utils::Dispatcher::getInstance();
-        dispatcher.sink<events::GraphicsContextSetEvent>().connect<&RenderSystem::onGraphicsContextSet>(*this);
+        dispatcher.sink<events::WindowGraphicsContextSetEvent>().connect<&RenderSystem::onWindowsGraphicsContextSet>(
+            *this);
         dispatcher.sink<ui::events::UpdateRendering>().connect<&RenderSystem::update>(*this);
     }
 
@@ -212,7 +212,8 @@ public:
     void unregisterHandlersImpl()
     {
         auto& dispatcher = utils::Dispatcher::getInstance();
-        dispatcher.sink<events::GraphicsContextSetEvent>().disconnect<&RenderSystem::onGraphicsContextSet>(*this);
+        dispatcher.sink<events::WindowGraphicsContextSetEvent>().disconnect<&RenderSystem::onWindowsGraphicsContextSet>(
+            *this);
         dispatcher.sink<ui::events::UpdateRendering>().disconnect<&RenderSystem::update>(*this);
     }
 
@@ -220,17 +221,24 @@ private:
     /**
      * @brief 处理图形上下文设置事件
      */
-    void onGraphicsContextSet(const events::GraphicsContextSetEvent& event)
+    void onWindowsGraphicsContextSet(const events::WindowGraphicsContextSetEvent& event)
     {
-        m_graphicsContext = static_cast<GraphicsContext*>(event.graphicsContext);
-
-        if (m_graphicsContext != nullptr)
+        ensureInitialized();
+        auto& registery = utils::Registry::getInstance();
+        auto* sdlWindow = registery.get<components::Window>(event.entity).sdlWindow;
+        if (sdlWindow == nullptr)
         {
-            initializeGPU();
-            loadShaders();
-            createPipeline();
-            loadDefaultFont();
+            return;
         }
+        // 声明窗口给 GPU 设备
+        claimWindowForGPUDevice(sdlWindow);
+        // 为窗口创建渲染管线
+        createPipeline(sdlWindow);
+    }
+
+    void onWindowsGraphicsContextUnset(const events::WindowGraphicsContextUnsetEvent& event)
+    {
+        // 目前不需要特殊处理
     }
 
     /**
@@ -238,8 +246,6 @@ private:
      */
     void initializeGPU()
     {
-        if (m_graphicsContext == nullptr || m_graphicsContext->getWindow() == nullptr) return;
-
         // 1. 组装责任链
         auto d3d12 = std::make_shared<D3D12Handler>();
         auto vulkan = std::make_shared<VulkanHandler>();
@@ -248,7 +254,7 @@ private:
         d3d12->setNext(nullptr);
         // 2. 启动链式处理
         std::string finalDriverName;
-        m_gpuDevice = vulkan->handle(m_graphicsContext->getWindow(), finalDriverName);
+        m_gpuDevice = vulkan->handle(finalDriverName);
 
         // 3. 结果检查
         if (m_gpuDevice == nullptr)
@@ -258,21 +264,34 @@ private:
         }
 
         m_gpuDriver = finalDriverName;
+    }
 
-        // 4. 声明窗口
-        if (!SDL_ClaimWindowForGPUDevice(m_gpuDevice, m_graphicsContext->getWindow()))
+    bool claimWindowForGPUDevice(SDL_Window* sdlWindow)
+    {
+        if (m_gpuDevice == nullptr || sdlWindow == nullptr)
         {
-            LOG_ERROR("窗口声明失败: {}", SDL_GetError());
-            SDL_DestroyGPUDevice(m_gpuDevice);
-            m_gpuDevice = nullptr;
-            return;
+            return false;
         }
 
+        if (m_claimedWindows.find(sdlWindow) != m_claimedWindows.end())
+        {
+            return true;
+        }
+
+        // 4. 声明窗口
+        if (!SDL_ClaimWindowForGPUDevice(m_gpuDevice, sdlWindow))
+        {
+            LOG_ERROR("窗口声明失败: {}", SDL_GetError());
+            return false;
+        }
+
+        m_claimedWindows.insert(sdlWindow);
         LOG_INFO("GPU 初始化成功，最终使用后端: {}", m_gpuDriver);
+        return true;
     }
 
     /**
-     * @brief 加载 SPIR-V 着色器（从 cmrc 嵌入资源）
+     * @brief 加载  着色器（从 cmrc 嵌入资源）
      */
     void loadShaders()
     {
@@ -355,11 +374,17 @@ private:
     }
 
     /**
-     * @brief 创建渲染管线
+     * @brief 创建渲染管线（只创建一次，多窗口共用）
      */
-    void createPipeline()
+    void createPipeline(SDL_Window* sdlWindow)
     {
         if (m_gpuDevice == nullptr || m_vertexShader == nullptr || m_fragmentShader == nullptr)
+        {
+            return;
+        }
+
+        // 管线只需创建一次，多窗口共用（假设所有窗口使用相同的交换链格式）
+        if (m_pipeline != nullptr)
         {
             return;
         }
@@ -411,9 +436,8 @@ private:
             SDL_GPU_COLORCOMPONENT_R | SDL_GPU_COLORCOMPONENT_G | SDL_GPU_COLORCOMPONENT_B | SDL_GPU_COLORCOMPONENT_A;
         blendState.enable_color_write_mask = true;
 
-        SDL_GPUColorTargetDescription colorTargetDesc = {}; // 颜色目标描述
-        colorTargetDesc.format =
-            SDL_GetGPUSwapchainTextureFormat(m_gpuDevice, m_graphicsContext->getWindow()); // 颜色格式
+        SDL_GPUColorTargetDescription colorTargetDesc = {};                                // 颜色目标描述
+        colorTargetDesc.format = SDL_GetGPUSwapchainTextureFormat(m_gpuDevice, sdlWindow); // 颜色格式
         colorTargetDesc.blend_state = blendState;
 
         // 光栅化状态
@@ -488,36 +512,37 @@ private:
      */
     void loadDefaultFont()
     {
-        if (!TTF_Init())
+        // SDL3_ttf: TTF_Init() 返回 bool，true 表示成功，false 表示失败
+        if (TTF_WasInit() == 0 && !TTF_Init())
         {
             LOG_ERROR("Failed to initialize SDL_ttf: {}", SDL_GetError());
             return;
         }
 
         // 从 cmrc 嵌入资源加载字体
-        auto fs = cmrc::ui_fonts::get_filesystem();
+        auto filesystem = cmrc::ui_fonts::get_filesystem();
         const char* fontPath = "assets/fonts/NotoSansSC-VariableFont_wght.ttf";
 
-        if (!fs.exists(fontPath))
+        if (!filesystem.exists(fontPath))
         {
             LOG_ERROR("Font resource not found: {}", fontPath);
             return;
         }
 
-        auto fontFile = fs.open(fontPath);
+        auto fontFile = filesystem.open(fontPath);
 
         // 使用 SDL_IOFromConstMem 从内存加载字体
         SDL_IOStream* fontIO = SDL_IOFromConstMem(fontFile.begin(), static_cast<size_t>(fontFile.size()));
         if (fontIO == nullptr)
         {
-            LOG_INFO("Failed to create IOStream for font: %s", SDL_GetError());
+            LOG_INFO("Failed to create IOStream for font: {}", SDL_GetError());
             return;
         }
 
         m_defaultFont = TTF_OpenFontIO(fontIO, true, 16.0F);
         if (m_defaultFont == nullptr)
         {
-            LOG_INFO("Failed to load default font: %s", SDL_GetError());
+            LOG_INFO("Failed to load default font: {}", SDL_GetError());
         }
     }
 
@@ -590,12 +615,15 @@ private:
             TTF_CloseFont(m_defaultFont);
             m_defaultFont = nullptr;
         }
-
         // 释放窗口声明
-        if (m_graphicsContext != nullptr && m_graphicsContext->getWindow() != nullptr)
+        for (auto* window : m_claimedWindows)
         {
-            SDL_ReleaseWindowFromGPUDevice(m_gpuDevice, m_graphicsContext->getWindow());
+            if (window != nullptr)
+            {
+                SDL_ReleaseWindowFromGPUDevice(m_gpuDevice, window);
+            }
         }
+        m_claimedWindows.clear();
 
         if (m_gpuDevice != nullptr)
         {
@@ -663,7 +691,8 @@ public:
      */
     void update() noexcept
     {
-        if (m_gpuDevice == nullptr || m_pipeline == nullptr || m_graphicsContext == nullptr)
+        ensureInitialized();
+        if (m_gpuDevice == nullptr || m_pipeline == nullptr)
         {
             return;
         }
@@ -675,50 +704,49 @@ public:
         }
 
         auto& registry = utils::Registry::getInstance();
+        auto windowView = registry.view<components::Window>();
 
-        // 更新主窗口大小
-        int width = 0;
-        int height = 0;
-        SDL_GetWindowSizeInPixels(m_graphicsContext->getWindow(), &width, &height);
-
-        m_screenWidth = static_cast<float>(width);
-        m_screenHeight = static_cast<float>(height);
-
-        // 更新主 Widget 大小
-        auto canvasView = registry.view<components::MainWidgetTag, components::Size>();
-        for (auto entity : canvasView)
+        // 遍历每个窗口进行渲染
+        for (auto windowEntity : windowView)
         {
-            auto& size = canvasView.get<components::Size>(entity);
-            size.autoSize = false;
-            if (size.size.x() != m_screenWidth || size.size.y() != m_screenHeight)
+            auto& windowComp = windowView.get<components::Window>(windowEntity);
+            if (windowComp.sdlWindow == nullptr) continue;
+
+            // 根据实体组件同步调整 SDL 窗口属性
+            syncSDLWindowProperties(registry, windowEntity, windowComp);
+
+            // 获取当前窗口大小
+            int width = 0;
+            int height = 0;
+            SDL_GetWindowSizeInPixels(windowComp.sdlWindow, &width, &height);
+            if (width <= 0 || height <= 0) continue;
+
+            m_screenWidth = static_cast<float>(width);
+            m_screenHeight = static_cast<float>(height);
+
+            // 更新当前窗口对应的主 Widget 大小
+            auto& sizeComp = registry.get<components::Size>(windowEntity);
+            sizeComp.autoSize = false;
+            if (sizeComp.size.x() != m_screenWidth || sizeComp.size.y() != m_screenHeight)
             {
-                size.size = {m_screenWidth, m_screenHeight};
-                registry.emplace_or_replace<components::LayoutDirtyTag>(entity);
+                sizeComp.size = {m_screenWidth, m_screenHeight};
+                registry.emplace_or_replace<components::LayoutDirtyTag>(windowEntity);
             }
-        }
 
-        // 清空渲染批次
-        m_batches.clear();
+            // 清空渲染批次
+            m_batches.clear();
 
-        // 遍历顶层实体并收集渲染数据
-        auto view = registry.view<const components::Position,
-                                  const components::Size,
-                                  const components::VisibleTag,
-                                  const components::Hierarchy>();
-
-        for (auto entity : view)
-        {
-            const auto& hierarchy = registry.get<const components::Hierarchy>(entity);
-            if (hierarchy.parent == entt::null)
+            // 收集当前窗口及其子元素的渲染数据
+            if (registry.any_of<components::VisibleTag>(windowEntity))
             {
-                collectRenderData(registry, entity, Eigen::Vector2f(0, 0), 1.0F);
+                collectRenderData(registry, windowEntity, Eigen::Vector2f(0, 0), 1.0F);
             }
-        }
 
-        // 执行 GPU 渲染
-        if (!m_batches.empty())
-        {
-            renderToGPU(width, height);
+            // 执行 GPU 渲染
+            if (!m_batches.empty())
+            {
+                renderToGPU(windowComp.sdlWindow, width, height);
+            }
         }
 
         // 清除脏标记
@@ -729,7 +757,287 @@ public:
         }
     }
 
+    /**
+     * @brief 根据实体组件同步调整 SDL 窗口属性
+     *
+     * 支持同步的属性：
+     * - 窗口标题 (Title 组件或 Window::title)
+     * - 窗口位置 (Position 组件，支持自动居中)
+     * - 窗口大小 (Size 组件)
+     * - 窗口大小约束 (Window::minSize/maxSize)
+     * - 窗口可调整大小 (Window::noResize)
+     * - 窗口透明度 (Alpha 组件)
+     * - 窗口可见性 (VisibleTag)
+     * - 模态属性 (Window::modal) - 用于 Dialog
+     */
+    void syncSDLWindowProperties(entt::registry& registry, entt::entity entity, components::Window& windowComp)
+    {
+        SDL_Window* sdlWindow = windowComp.sdlWindow;
+        if (sdlWindow == nullptr) return;
+
+        // 1. 同步窗口标题
+        syncWindowTitle(registry, entity, windowComp, sdlWindow);
+
+        // 2. 同步窗口大小（优先处理，在约束之前）
+        syncWindowSize(registry, entity, sdlWindow);
+
+        // 3. 同步窗口位置（在大小之后，确保居中计算正确）
+        syncWindowPosition(registry, entity, sdlWindow);
+
+        // 4. 同步窗口大小约束
+        syncWindowSizeConstraints(windowComp, sdlWindow);
+
+        // 5. 同步窗口可调整大小属性
+        syncWindowResizable(windowComp, sdlWindow);
+
+        // 6. 同步窗口透明度
+        syncWindowOpacity(registry, entity, sdlWindow);
+
+        // 7. 同步窗口可见性
+        syncWindowVisibility(registry, entity, sdlWindow);
+
+        // 8. 同步模态属性 (Dialog)
+        syncWindowModal(registry, entity, windowComp, sdlWindow);
+    }
+
+    /**
+     * @brief 同步窗口大小
+     */
+    void syncWindowSize(entt::registry& registry, entt::entity entity, SDL_Window* sdlWindow)
+    {
+        const auto* sizeComp = registry.try_get<components::Size>(entity);
+        if (sizeComp == nullptr) return;
+
+        // 只在非自动大小模式下同步
+        if (sizeComp->autoSize) return;
+
+        int currentW = 0;
+        int currentH = 0;
+        SDL_GetWindowSize(sdlWindow, &currentW, &currentH);
+
+        int targetW = static_cast<int>(sizeComp->size.x());
+        int targetH = static_cast<int>(sizeComp->size.y());
+
+        // 只在大小不同时才设置，避免不必要的窗口操作
+        if (currentW != targetW || currentH != targetH)
+        {
+            SDL_SetWindowSize(sdlWindow, targetW, targetH);
+        }
+    }
+
+    /**
+     * @brief 同步窗口位置
+     *
+     * 特殊逻辑：
+     * - 如果 Position 为 (0, 0)，则自动居中窗口
+     * - 否则使用指定位置
+     */
+    void syncWindowPosition(entt::registry& registry, entt::entity entity, SDL_Window* sdlWindow)
+    {
+        const auto* posComp = registry.try_get<components::Position>(entity);
+        if (posComp == nullptr) return;
+
+        // 特殊处理：(0, 0) 触发自动居中
+        constexpr float EPSILON = 0.01F;
+        if (std::abs(posComp->value.x()) < EPSILON && std::abs(posComp->value.y()) < EPSILON)
+        {
+            // 居中窗口
+            SDL_SetWindowPosition(sdlWindow, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+            return;
+        }
+
+        // 使用指定位置
+        int currentX = 0;
+        int currentY = 0;
+        SDL_GetWindowPosition(sdlWindow, &currentX, &currentY);
+
+        int targetX = static_cast<int>(posComp->value.x());
+        int targetY = static_cast<int>(posComp->value.y());
+
+        // 只在位置不同时才设置
+        if (currentX != targetX || currentY != targetY)
+        {
+            SDL_SetWindowPosition(sdlWindow, targetX, targetY);
+        }
+    }
+
+    /**
+     * @brief 同步窗口标题
+     */
+    void syncWindowTitle(entt::registry& registry,
+                         entt::entity entity,
+                         const components::Window& windowComp,
+                         SDL_Window* sdlWindow)
+    {
+        std::string newTitle;
+
+        // 优先使用 Title 组件
+        const auto* titleComp = registry.try_get<components::Title>(entity);
+        if (titleComp != nullptr && !titleComp->text.empty())
+        {
+            newTitle = titleComp->text;
+        }
+        else if (!windowComp.title.empty())
+        {
+            newTitle = windowComp.title;
+        }
+
+        if (!newTitle.empty())
+        {
+            const char* currentTitle = SDL_GetWindowTitle(sdlWindow);
+            if (currentTitle == nullptr || newTitle != currentTitle)
+            {
+                SDL_SetWindowTitle(sdlWindow, newTitle.c_str());
+            }
+        }
+    }
+
+    /**
+     * @brief 同步窗口大小约束
+     */
+    void syncWindowSizeConstraints(const components::Window& windowComp, SDL_Window* sdlWindow)
+    {
+        int currentMinW = 0;
+        int currentMinH = 0;
+        int currentMaxW = 0;
+        int currentMaxH = 0;
+        SDL_GetWindowMinimumSize(sdlWindow, &currentMinW, &currentMinH);
+        SDL_GetWindowMaximumSize(sdlWindow, &currentMaxW, &currentMaxH);
+
+        int newMinW = static_cast<int>(windowComp.minSize.x());
+        int newMinH = static_cast<int>(windowComp.minSize.y());
+        int newMaxW = (windowComp.maxSize.x() < FLT_MAX) ? static_cast<int>(windowComp.maxSize.x()) : 0;
+        int newMaxH = (windowComp.maxSize.y() < FLT_MAX) ? static_cast<int>(windowComp.maxSize.y()) : 0;
+
+        if (newMinW != currentMinW || newMinH != currentMinH)
+        {
+            SDL_SetWindowMinimumSize(sdlWindow, newMinW, newMinH);
+        }
+
+        if (newMaxW != currentMaxW || newMaxH != currentMaxH)
+        {
+            SDL_SetWindowMaximumSize(sdlWindow, newMaxW, newMaxH);
+        }
+    }
+
+    /**
+     * @brief 同步窗口可调整大小属性
+     */
+    void syncWindowResizable(const components::Window& windowComp, SDL_Window* sdlWindow)
+    {
+        SDL_WindowFlags flags = SDL_GetWindowFlags(sdlWindow);
+        bool currentlyResizable = (flags & SDL_WINDOW_RESIZABLE) != 0;
+        bool shouldBeResizable = !windowComp.noResize;
+
+        if (currentlyResizable != shouldBeResizable)
+        {
+            SDL_SetWindowResizable(sdlWindow, shouldBeResizable);
+        }
+    }
+
+    /**
+     * @brief 同步窗口透明度
+     */
+    void syncWindowOpacity(entt::registry& registry, entt::entity entity, SDL_Window* sdlWindow)
+    {
+        const auto* alphaComp = registry.try_get<components::Alpha>(entity);
+        if (alphaComp != nullptr)
+        {
+            float currentOpacity = SDL_GetWindowOpacity(sdlWindow);
+            // 只在透明度差异超过阈值时更新，避免频繁调用
+            constexpr float OPACITY_THRESHOLD = 0.01F;
+            if (std::abs(currentOpacity - alphaComp->value) > OPACITY_THRESHOLD)
+            {
+                SDL_SetWindowOpacity(sdlWindow, alphaComp->value);
+            }
+        }
+    }
+
+    /**
+     * @brief 同步窗口可见性
+     */
+    void syncWindowVisibility(entt::registry& registry, entt::entity entity, SDL_Window* sdlWindow)
+    {
+        bool shouldBeVisible = registry.any_of<components::VisibleTag>(entity);
+        SDL_WindowFlags flags = SDL_GetWindowFlags(sdlWindow);
+        bool currentlyVisible = (flags & SDL_WINDOW_HIDDEN) == 0;
+
+        if (shouldBeVisible && !currentlyVisible)
+        {
+            SDL_ShowWindow(sdlWindow);
+        }
+        else if (!shouldBeVisible && currentlyVisible)
+        {
+            SDL_HideWindow(sdlWindow);
+        }
+    }
+
+    /**
+     * @brief 同步模态属性 (用于 Dialog)
+     */
+    void syncWindowModal(entt::registry& registry,
+                         entt::entity entity,
+                         const components::Window& windowComp,
+                         SDL_Window* sdlWindow)
+    {
+        // 检查是否是 Dialog 实体
+        bool isDialog = registry.any_of<components::DialogTag>(entity);
+        if (!isDialog) return;
+
+        SDL_WindowFlags flags = SDL_GetWindowFlags(sdlWindow);
+        bool currentlyModal = (flags & SDL_WINDOW_MODAL) != 0;
+
+        if (windowComp.modal && !currentlyModal)
+        {
+            // 设置为模态窗口 - 需要找到父窗口
+            // 通常模态窗口相对于主窗口，这里简化处理：将第一个非当前窗口作为父窗口
+            SDL_Window* parentWindow = findParentWindow(sdlWindow);
+            if (parentWindow != nullptr)
+            {
+                SDL_SetWindowModal(sdlWindow, true);
+            }
+        }
+        else if (!windowComp.modal && currentlyModal)
+        {
+            SDL_SetWindowModal(sdlWindow, false);
+        }
+    }
+
+    /**
+     * @brief 查找父窗口 (用于模态设置)
+     */
+    SDL_Window* findParentWindow(SDL_Window* currentWindow) const
+    {
+        for (SDL_Window* window : m_claimedWindows)
+        {
+            if (window != nullptr && window != currentWindow)
+            {
+                return window;
+            }
+        }
+        return nullptr;
+    }
+
 private:
+    void ensureInitialized()
+    {
+        if ((SDL_WasInit(SDL_INIT_VIDEO) & SDL_INIT_VIDEO) == 0)
+        {
+            return;
+        }
+
+        if (m_gpuDevice == nullptr)
+        {
+            initializeGPU();
+            loadShaders();
+        }
+
+        if (m_defaultFont == nullptr)
+        {
+            loadDefaultFont();
+        }
+    }
+
     /**
      * @brief 递归收集实体渲染数据
      */
@@ -878,7 +1186,7 @@ private:
         batch.pushConstants.shadow_offset_x = shadowOffsetX;
         batch.pushConstants.shadow_offset_y = shadowOffsetY;
         batch.pushConstants.opacity = opacity;
-        batch.pushConstants._padding = 0.0F;
+        batch.pushConstants.padding = 0.0F;
 
         // 创建矩形顶点（四个角）
         Eigen::Vector2f max = pos + size;
@@ -983,7 +1291,7 @@ private:
         batch.pushConstants.shadow_offset_x = 0.0F;
         batch.pushConstants.shadow_offset_y = 0.0F;
         batch.pushConstants.opacity = opacity;
-        batch.pushConstants._padding = 0.0F;
+        batch.pushConstants.padding = 0.0F;
 
         Eigen::Vector2f max = pos + size;
 
@@ -1115,7 +1423,7 @@ private:
     /**
      * @brief 执行 GPU 渲染（批次渲染）
      */
-    void renderToGPU(int width, int height)
+    void renderToGPU(SDL_Window* window, int width, int height)
     {
         // 获取命令缓冲区
         SDL_GPUCommandBuffer* cmdBuf = SDL_AcquireGPUCommandBuffer(m_gpuDevice);
@@ -1123,8 +1431,7 @@ private:
 
         // 获取交换链纹理
         SDL_GPUTexture* swapchainTexture = nullptr;
-        if (!SDL_WaitAndAcquireGPUSwapchainTexture(
-                cmdBuf, m_graphicsContext->getWindow(), &swapchainTexture, nullptr, nullptr))
+        if (!SDL_WaitAndAcquireGPUSwapchainTexture(cmdBuf, window, &swapchainTexture, nullptr, nullptr))
         {
             SDL_CancelGPUCommandBuffer(cmdBuf);
             return;
@@ -1318,7 +1625,6 @@ private:
     }
 
 private:
-    GraphicsContext* m_graphicsContext = nullptr;
     SDL_GPUDevice* m_gpuDevice = nullptr;
     SDL_GPUGraphicsPipeline* m_pipeline = nullptr;
     SDL_GPUShader* m_vertexShader = nullptr;
@@ -1333,6 +1639,7 @@ private:
     SDL_GPUTexture* m_whiteTexture = nullptr; // 默认白色纹理用于纯色渲染
 
     std::unordered_map<std::string, CachedTexture> m_textureCache;
+    std::unordered_set<SDL_Window*> m_claimedWindows;
 
     // 当前屏幕尺寸
     float m_screenWidth = 0.0F;

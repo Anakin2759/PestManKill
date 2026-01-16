@@ -46,9 +46,14 @@ struct ApplicationReadyEvent
  * @brief 图形上下文设置事件
  * [BUFFERED] 使用 enqueue - 在下一帧开始时统一处理
  */
-struct GraphicsContextSetEvent
+struct WindowGraphicsContextSetEvent
 {
-    void* graphicsContext;
+    entt::entity entity;
+};
+
+struct WindowGraphicsContextUnsetEvent
+{
+    entt::entity entity;
 };
 
 // =====================================================================
@@ -214,12 +219,18 @@ struct UpdateEvent
 {
 };
 
+struct CreateWindow
+{
+    std::string title;
+    std::string alias;
+};
 /**
  * @brief 关闭窗口事件
  * [IMMEDIATE] 使用 trigger
  */
 struct CloseWindow
 {
+    entt::entity entity;
 };
 
 /**

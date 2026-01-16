@@ -13,7 +13,7 @@
  *
  * 使用指南：
  * - trigger: 用于需要立即响应的事件，如 QuitRequested, UpdateRendering
- * - enqueue: 用于可以延迟处理的事件，如 SDLEvent, GraphicsContextSetEvent
+ * - enqueue: 用于可以延迟处理的事件，如 SDLEvent, WindowGraphicsContextSetEvent
  * - update: 在事件循环每帧调用，处理所有缓冲区事件
  *
  * ************************************************************************
@@ -23,6 +23,7 @@
  */
 
 #pragma once
+#include <sys/stat.h>
 #include <entt/entt.hpp>
 #include <span>
 

@@ -19,11 +19,13 @@
 #include <entt/entt.hpp>
 #include <string>
 #include <string_view>
+#include "SDL3/SDL_video.h"
 #include "src/ui/common/Components.h"
 #include "src/ui/common/Tags.h"
 #include "src/ui/common/Policies.h"
 #include <utils.h>
 #include "common/Types.h" // 包含 Vec2, Color 等类型
+#include <common/Events.h>
 namespace ui::factory
 {
 
@@ -65,15 +67,15 @@ inline void CreateFadeInAnimation(entt::entity entity, float duration)
 
     // 确保有 Alpha
     auto& alpha = utils::Registry::getInstance().get_or_emplace<components::Alpha>(entity);
-    alpha.value = 0.0f;
+    alpha.value = 0.0F;
 
     auto& time = utils::Registry::getInstance().get_or_emplace<components::AnimationTime>(entity);
     time.duration = duration;
-    time.elapsed = 0.0f;
+    time.elapsed = 0.0F;
 
     auto& alphaAnim = utils::Registry::getInstance().get_or_emplace<components::AnimationAlpha>(entity);
-    alphaAnim.from = 0.0f;
-    alphaAnim.to = 1.0f;
+    alphaAnim.from = 0.0F;
+    alphaAnim.to = 1.0F;
 
     utils::Registry::getInstance().emplace_or_replace<components::AnimatingTag>(entity);
 }
@@ -98,7 +100,7 @@ inline entt::entity CreateButton(const std::string& content, const std::string& 
     auto& text = utils::Registry::getInstance().emplace<components::Text>(entity);
     text.content = content;
     text.alignment = ui::policies::Alignment::CENTER;
-    text.fontSize = 0.0f;
+    text.fontSize = 0.0F;
 
     // 默认尺寸自适应
     utils::Registry::getInstance().get<components::Size>(entity).autoSize = true;
@@ -149,7 +151,7 @@ inline entt::entity
     // buffer 默认为空
 
     // 文本输入框通常有固定最小尺寸
-    utils::Registry::getInstance().get<components::Size>(entity).minSize = {100.0f, multiline ? 80.0f : 30.0f};
+    utils::Registry::getInstance().get<components::Size>(entity).minSize = {100.0F, multiline ? 80.0F : 30.0F};
 
     return entity;
 }
@@ -162,7 +164,7 @@ inline entt::entity
  * @param alias 组件别名
  */
 inline entt::entity
-    CreateImage(void* textureId, float defaultWidth = 50.0f, float defaultHeight = 50.0f, const std::string& alias = "")
+    CreateImage(void* textureId, float defaultWidth = 50.0F, float defaultHeight = 50.0F, const std::string& alias = "")
 {
     auto entity = CreateBaseWidget(alias);
 
@@ -237,7 +239,7 @@ inline entt::entity CreateSpacer(int stretchFactor = 1, const std::string& alias
     // Spacer 必须有 Size 才能让布局系统计算
     utils::Registry::getInstance().emplace<components::Size>(entity);
     utils::Registry::getInstance().get<components::Size>(entity).autoSize = false;
-    utils::Registry::getInstance().get<components::Size>(entity).size = {0.0f, 0.0f};
+    utils::Registry::getInstance().get<components::Size>(entity).size = {0.0F, 0.0F};
 
     // 新节点默认标记为需要布局计算
     utils::Registry::getInstance().emplace_or_replace<components::LayoutDirtyTag>(entity);
@@ -278,14 +280,21 @@ inline entt::entity CreateDialog(std::string_view title, const std::string& alia
     // 类型 Tag
     utils::Registry::getInstance().emplace<components::DialogTag>(entity);
 
+    // 先设置 Size，再创建 SDL 窗口
+    utils::Registry::getInstance().get<components::Size>(entity).autoSize = false;
+
     // 内容容器组件 (包含 title, min/max size)
-    auto& dialog = utils::Registry::getInstance().emplace<components::Dialog>(entity);
+    auto& dialog = utils::Registry::getInstance().emplace<components::Window>(entity);
     dialog.title = std::string(title);
     dialog.modal = true; // 对话框通常是模态的
-
-    // 对话框通常有固定的 Position 和 Size
-    utils::Registry::getInstance().get<components::Size>(entity).autoSize = false;
-    utils::Registry::getInstance().get<components::Size>(entity).size = {400.0f, 300.0f};
+    dialog.hasTitleBar = false;
+    dialog.noResize = false;
+    dialog.noMove = false;
+    dialog.sdlWindow =
+        SDL_CreateWindow(dialog.title.c_str(),
+                         static_cast<int>(utils::Registry::getInstance().get<components::Size>(entity).size.x()),
+                         static_cast<int>(utils::Registry::getInstance().get<components::Size>(entity).size.y()),
+                         SDL_WINDOW_RESIZABLE);
 
     // 对话框通常有一个 LayoutInfo 来排列内部元素
     utils::Registry::getInstance().emplace<components::LayoutInfo>(entity);
@@ -293,6 +302,7 @@ inline entt::entity CreateDialog(std::string_view title, const std::string& alia
 
     // 自动标记为需要布局
     utils::Registry::getInstance().emplace_or_replace<components::LayoutDirtyTag>(entity);
+    utils::Dispatcher::getInstance().trigger<events::WindowGraphicsContextSetEvent>({entity});
 
     return entity;
 }
@@ -322,7 +332,6 @@ inline entt::entity CreateWindow(std::string_view title, const std::string& alia
 
     // 窗口容器通常有固定的默认尺寸
     utils::Registry::getInstance().get<components::Size>(entity).autoSize = false;
-    utils::Registry::getInstance().get<components::Size>(entity).size = {600.0f, 400.0f};
 
     // 窗口需要布局和内边距
     utils::Registry::getInstance().emplace<components::LayoutInfo>(entity);
@@ -330,6 +339,14 @@ inline entt::entity CreateWindow(std::string_view title, const std::string& alia
 
     // 自动标记为需要布局
     utils::Registry::getInstance().emplace_or_replace<components::LayoutDirtyTag>(entity);
+
+    window.sdlWindow =
+        SDL_CreateWindow(window.title.c_str(),
+                         static_cast<int>(utils::Registry::getInstance().get<components::Size>(entity).size.x()),
+                         static_cast<int>(utils::Registry::getInstance().get<components::Size>(entity).size.y()),
+                         SDL_WINDOW_RESIZABLE);
+
+    utils::Dispatcher::getInstance().trigger<events::WindowGraphicsContextSetEvent>({entity});
 
     return entity;
 }
@@ -403,16 +420,6 @@ inline entt::entity
     auto entity = CreateTextEdit(std::string(placeholder), true, alias);
     auto& edit = utils::Registry::getInstance().get<components::TextEdit>(entity);
     edit.buffer = std::string(initialText);
-    return entity;
-}
-
-/**
- * @brief 创建主窗口实体
- */
-inline entt::entity createMainWindow()
-{
-    auto entity = CreateWindow("Main Window");
-
     return entity;
 }
 

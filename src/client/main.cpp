@@ -40,11 +40,11 @@ void CreateMainWindow()
 {
     auto& registry = utils::Registry::getInstance();
 
-    // 创建主游戏窗口（使用 FillParent 策略自动填满）
     auto gameWindow = ui::factory::CreateWindow("Game", "gameWindow");
     auto& sizeComp = registry.get<ui::components::Size>(gameWindow);
-    sizeComp.widthPolicy = ui::policies::Size::FillParent;
-    sizeComp.heightPolicy = ui::policies::Size::FillParent;
+    sizeComp.widthPolicy = ui::policies::Size::Fixed;
+    sizeComp.heightPolicy = ui::policies::Size::Fixed;
+    sizeComp.size = {1200.0F, 800.0F};
 
     // 设置标题栏
     auto& windowComp = registry.get<ui::components::Window>(gameWindow);
@@ -97,16 +97,12 @@ void CreateMenuDialog()
     }
     // 创建菜单对话框
     auto menuDialog = ui::factory::CreateDialog("PestManKill Menu", "menuDialog");
-    registry.get<ui::components::Size>(menuDialog).size = {400.0F, 300.0F};
+    registry.get<ui::components::Size>(menuDialog).size = {800.0F, 300.0F};
     // 位置 (0,0) 会触发自动居中
-
-    // 隐藏标题栏
-    auto& dialogComp = registry.get<ui::components::Dialog>(menuDialog);
-    dialogComp.hasTitleBar = false;
 
     // 添加窗口背景
     auto& mainBg = registry.emplace<ui::components::Background>(menuDialog);
-    mainBg.color = {0.15F, 0.15F, 0.15F, 0.95f};
+    mainBg.color = {0.15F, 0.15F, 0.15F, 0.95F};
     mainBg.borderRadius = {8.0F, 8.0F, 8.0F, 8.0F};
     mainBg.enabled = true;
 
@@ -210,7 +206,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
     try
     {
         // 创建并运行 UI 应用程序
-        ui::Application app("PestManKill Client", 1024, 768);
+        ui::Application app(argc, argv);
 
         // 创建菜单对话框
         CreateMenuDialog();

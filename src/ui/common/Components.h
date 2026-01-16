@@ -15,6 +15,7 @@
  * ************************************************************************
  */
 #pragma once
+
 #include "Types.h"
 #include <string>
 #include <vector>
@@ -22,7 +23,7 @@
 #include <cfloat>
 #include <entt/entt.hpp>
 #include "Policies.h"
-
+#include <SDL3/SDL.h>
 namespace ui::components
 {
 
@@ -306,26 +307,11 @@ struct Window
     Vec2 maxSize{FLT_MAX, FLT_MAX};
     bool hasTitleBar = true;
     bool hasToolbar = false;
-    bool modal = true;
-    bool noResize = false;
-    bool noMove = false;
+    bool modal = true;     // 窗口通常是模态的
+    bool noResize = false; // 禁止调整大小
+    bool noMove = false;   // 禁止移动
     bool noCollapse = false;
-};
-
-/**
- * @brief 对话框组件
- */
-struct Dialog
-{
-    static constexpr float MIN_WID = 200.0F;
-    static constexpr float MIN_HIG = 150.0F;
-    std::string title;
-    Vec2 minSize{MIN_WID, MIN_HIG};
-    Vec2 maxSize{FLT_MAX, FLT_MAX};
-    bool hasTitleBar = true;
-    bool modal = false;
-    bool noResize = false;
-    bool noMove = false;
+    SDL_Window* sdlWindow = nullptr;
 };
 
 /**

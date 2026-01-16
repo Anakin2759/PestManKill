@@ -21,9 +21,6 @@
 #include <entt/entt.hpp>
 #include <SDL3/SDL.h>
 
-// 引入图形上下文
-#include "GraphicsContext.h"
-
 // 引入系统接口
 #include "src/ui/interface/Isystem.h"
 
@@ -32,15 +29,10 @@
 #include "src/ui/systems/AnimationSystem.h"
 #include "src/ui/systems/InteractionSystem.h"
 #include "src/ui/systems/LayoutSystem.h"
-#include "src/ui/systems/WindowsSystem.h" // 保持与 Application.h 中的一致
+#include "src/ui/systems/WidgetSystem.h" // 保持与 Application.h 中的一致
 #include "src/ui/systems/ActionSystem.h"
 #include "src/ui/common/Events.h"
 #include <utils.h>
-
-namespace ui::events
-{
-struct GraphicsContextSetEvent;
-}
 
 namespace ui
 {
@@ -52,8 +44,6 @@ namespace ui
 class SystemManager
 {
 private:
-    // GraphicsContext 引用（由 Application 注入）
-    GraphicsContext* m_graphicsContext = nullptr;
 
     // 使用 entt::poly 动态管理所有系统
     std::vector<entt::poly<interface::ISystem>> m_systems;
@@ -82,7 +72,7 @@ public:
         m_systems.emplace_back(systems::AnimationSystem{});
         m_systems.emplace_back(systems::LayoutSystem{});
         m_systems.emplace_back(systems::RenderSystem{});
-        m_systems.emplace_back(systems::WindowSystem{});
+        m_systems.emplace_back(systems::WidgetSystem{});
         m_systems.emplace_back(systems::ActionSystem{});
     }
 
@@ -93,18 +83,6 @@ public:
     SystemManager& operator=(const SystemManager&) = delete;
     SystemManager(SystemManager&&) = delete;
     SystemManager& operator=(SystemManager&&) = delete;
-
-    /**
-     * @brief setGraphicsContext 设置图形上下文
-     * @param context GraphicsContext* 图形上下文指针
-     */
-    void setGraphicsContext(GraphicsContext* context)
-    {
-        m_graphicsContext = context;
-        // 通过事件分发器发布上下文设置事件
-        auto& dispatcher = utils::Dispatcher::getInstance();
-        dispatcher.enqueue<events::GraphicsContextSetEvent>(context);
-    }
 
     /**
      * @brief 注册所有系统的事件处理器

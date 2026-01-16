@@ -34,7 +34,6 @@
 #include <chrono>
 #include <utils.h>
 #include "SystemManager.h"
-#include "GraphicsContext.h"
 #include "EventLoop.h"
 #include "TaskChain.h"
 #include "ThreadPool.h"
@@ -58,55 +57,16 @@ public:
      * @param width 窗口宽度
      * @param height 窗口高度
      */
-    explicit Application(const char* title = "PestManKill UI", int width = DEFAULT_WIDTH, int height = DEFAULT_HEIGHT)
+    explicit Application(int argc, char* argv[])
     {
         // 1. 初始化 SDL 子系统（必须在 GraphicsContext 之前）
         if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS))
         {
             throw std::runtime_error(std::string("SDL_Init failed: ") + SDL_GetError());
         }
-        // 2. 初始化图形上下文
-        m_graphicsContext = std::make_unique<GraphicsContext>(title, width, height);
+
         // 3. 注册系统事件处理器
         m_systems.registerAllHandlers();
-
-        // 4. 设置图形上下文到系统管理器（必须在 registerAllHandlers 之后）
-        m_systems.setGraphicsContext(m_graphicsContext.get());
-
-        // 立即处理排队的事件，确保 GraphicsContext 被分发
-        utils::Dispatcher::getInstance().update();
-
-        // 5. 初始化 ECS 主画布实体（MainWidgetTag）。
-        // LayoutSystem 只依赖 Position/Size：画布尺寸由该实体的 Size 提供。
-        {
-            auto& registry = utils::Registry::getInstance();
-            bool hasMainWidget = false;
-            auto view = registry.view<ui::components::MainWidgetTag>();
-            hasMainWidget = (view.begin() != view.end());
-
-            if (!hasMainWidget)
-            {
-                m_rootEntity = registry.create();
-                auto& baseInfo = registry.emplace<ui::components::BaseInfo>(m_rootEntity);
-                baseInfo.alias = "rootCanvas";
-
-                registry.emplace<ui::components::UiTag>(m_rootEntity);
-                registry.emplace<ui::components::MainWidgetTag>(m_rootEntity);
-                registry.emplace<ui::components::VisibleTag>(m_rootEntity);
-                registry.emplace<ui::components::Hierarchy>(m_rootEntity);
-
-                auto& pos = registry.emplace<ui::components::Position>(m_rootEntity);
-                pos.value = {0.0F, 0.0F};
-
-                auto& size = registry.emplace<ui::components::Size>(m_rootEntity);
-                size.autoSize = false;
-                size.size = {static_cast<float>(width), static_cast<float>(height)};
-                size.widthPolicy = ui::policies::Size::Fixed;
-                size.heightPolicy = ui::policies::Size::Fixed;
-
-                registry.emplace_or_replace<ui::components::LayoutDirtyTag>(m_rootEntity);
-            }
-        }
 
         // 顺序执行事件缓冲处理->输入->渲染任务
         m_scheduler.attach<ui::QueuedTaskChain>();
@@ -143,8 +103,6 @@ public:
         // 先注销系统，确保 GPU 资源与窗口正确释放
         m_systems.unregisterAllHandlers();
 
-        m_graphicsContext.reset();
-
         SDL_Quit();
     }
 
@@ -154,19 +112,12 @@ public:
     void exec() { m_eventLoop.exec(); }
 
 private:
-    std::unique_ptr<GraphicsContext> m_graphicsContext;
-
-    // 事件循环
     EventLoop m_eventLoop;
-
     entt::scheduler m_scheduler;
-
     // 核心 ECS 系统封装
     SystemManager m_systems;
-
     // ECS 根实体，代表整个屏幕/应用区域
     entt::entity m_rootEntity = entt::null;
-
     // 时间管理
     using Clock = std::chrono::high_resolution_clock;
     using TimePoint = std::chrono::time_point<Clock>;

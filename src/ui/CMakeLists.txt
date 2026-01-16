@@ -68,7 +68,7 @@ set(UI_HEADERS
     systems/AnimationSystem.h
     systems/LayoutSystem.h
     systems/RenderSystem.h
-    systems/WindowsSystem.h
+    systems/WidgetSystem.h
     
     # UI Core
     core/Application.h
