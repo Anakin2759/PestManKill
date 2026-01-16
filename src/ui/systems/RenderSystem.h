@@ -240,16 +240,6 @@ private:
     {
         if (m_graphicsContext == nullptr || m_graphicsContext->getWindow() == nullptr) return;
 
-        auto toLower = [](std::string value)
-        {
-            std::transform(
-                value.begin(), value.end(), value.begin(), [](unsigned char ch) { return std::tolower(ch); });
-            return value;
-        };
-
-        const char* backendEnv = std::getenv("PMK_GPU_BACKEND");
-        std::string preferredBackend = toLower(backendEnv ? backendEnv : "");
-
         // 1. 组装责任链
         auto d3d12 = std::make_shared<D3D12Handler>();
         auto vulkan = std::make_shared<VulkanHandler>();
