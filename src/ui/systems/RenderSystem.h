@@ -14,8 +14,9 @@
 
   支持的图形后端列表
 
+    - Vulkan 默认
     - DX12
-    - Vulkan(待更新)
+
 
     使用SDL ttf渲染字体到GPU纹理上
     默认字体用 assets/fonts/NotoSansSC-VariableFont_wght.ttf
@@ -35,6 +36,9 @@
 #include <vector>
 #include <unordered_map>
 #include <string>
+#include <algorithm>
+#include <cctype>
+#include <cstdlib>
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_gpu.h>
 #include <SDL3_ttf/SDL_ttf.h>
@@ -125,7 +129,7 @@ public:
         SDL_GPUDevice* device = SDL_CreateGPUDeviceWithProperties(props);
         SDL_DestroyProperties(props);
 
-        if (device)
+        if (device != nullptr)
         {
             outDriverName = "vulkan";
             return device;
@@ -158,16 +162,6 @@ struct alignas(16) UiPushConstants
  */
 class RenderSystem final : public interface::EnableRegister<RenderSystem>
 {
-private:
-    GraphicsContext* m_graphicsContext = nullptr;
-    SDL_GPUDevice* m_gpuDevice = nullptr;
-    SDL_GPUGraphicsPipeline* m_pipeline = nullptr;
-    SDL_GPUShader* m_vertexShader = nullptr;
-    SDL_GPUShader* m_fragmentShader = nullptr;
-    SDL_GPUSampler* m_sampler = nullptr;
-    TTF_Font* m_defaultFont = nullptr;
-    std::string m_gpuDriver; // GPU 驱动名称（vulkan 或 d3d12）
-
     // 渲染缓冲区 - 顶点结构与着色器 VSInput 对应
     struct Vertex
     {
@@ -176,20 +170,16 @@ private:
         float color[4];    // COLOR0
     };
 
-    // 渲染批次，每个批次对应一个 Draw Call 和独立的 Push Constants
+    /**
+     * @brief 渲染批次结构
+     */
     struct RenderBatch
     {
         std::vector<Vertex> vertices;
         std::vector<uint16_t> indices;
-        UiPushConstants pushConstants;
+        UiPushConstants pushConstants{};
         SDL_GPUTexture* texture = nullptr;
     };
-
-    std::vector<RenderBatch> m_batches;
-    SDL_GPUBuffer* m_vertexBuffer = nullptr;
-    SDL_GPUBuffer* m_indexBuffer = nullptr;
-    SDL_GPUTexture* m_whiteTexture = nullptr; // 默认白色纹理用于纯色渲染
-
     // 纹理缓存（用于文本）
     struct CachedTexture
     {
@@ -197,15 +187,13 @@ private:
         uint32_t width = 0;
         uint32_t height = 0;
     };
-    std::unordered_map<std::string, CachedTexture> m_textureCache;
-
-    // 当前屏幕尺寸
-    float m_screenWidth = 0.0F;
-    float m_screenHeight = 0.0F;
 
 public:
     RenderSystem() = default;
-
+    RenderSystem(const RenderSystem&) = delete;
+    RenderSystem& operator=(const RenderSystem&) = delete;
+    RenderSystem(RenderSystem&&) = default;
+    RenderSystem& operator=(RenderSystem&&) = default;
     ~RenderSystem() { cleanup(); }
 
     /**
@@ -252,16 +240,25 @@ private:
     {
         if (m_graphicsContext == nullptr || m_graphicsContext->getWindow() == nullptr) return;
 
+        auto toLower = [](std::string value)
+        {
+            std::transform(
+                value.begin(), value.end(), value.begin(), [](unsigned char ch) { return std::tolower(ch); });
+            return value;
+        };
+
+        const char* backendEnv = std::getenv("PMK_GPU_BACKEND");
+        std::string preferredBackend = toLower(backendEnv ? backendEnv : "");
+
         // 1. 组装责任链
         auto d3d12 = std::make_shared<D3D12Handler>();
         auto vulkan = std::make_shared<VulkanHandler>();
 
-        // 设置顺序：D3D12 -> Vulkan
-        d3d12->setNext(vulkan);
-
+        vulkan->setNext(d3d12);
+        d3d12->setNext(nullptr);
         // 2. 启动链式处理
         std::string finalDriverName;
-        m_gpuDevice = d3d12->handle(m_graphicsContext->getWindow(), finalDriverName);
+        m_gpuDevice = vulkan->handle(m_graphicsContext->getWindow(), finalDriverName);
 
         // 3. 结果检查
         if (m_gpuDevice == nullptr)
@@ -1329,6 +1326,27 @@ private:
 
         return buffer;
     }
+
+private:
+    GraphicsContext* m_graphicsContext = nullptr;
+    SDL_GPUDevice* m_gpuDevice = nullptr;
+    SDL_GPUGraphicsPipeline* m_pipeline = nullptr;
+    SDL_GPUShader* m_vertexShader = nullptr;
+    SDL_GPUShader* m_fragmentShader = nullptr;
+    SDL_GPUSampler* m_sampler = nullptr;
+    TTF_Font* m_defaultFont = nullptr;
+    std::string m_gpuDriver; // GPU 驱动名称（vulkan 或 d3d12）
+
+    std::vector<RenderBatch> m_batches;
+    SDL_GPUBuffer* m_vertexBuffer = nullptr;
+    SDL_GPUBuffer* m_indexBuffer = nullptr;
+    SDL_GPUTexture* m_whiteTexture = nullptr; // 默认白色纹理用于纯色渲染
+
+    std::unordered_map<std::string, CachedTexture> m_textureCache;
+
+    // 当前屏幕尺寸
+    float m_screenWidth = 0.0F;
+    float m_screenHeight = 0.0F;
 };
 
 } // namespace ui::systems
