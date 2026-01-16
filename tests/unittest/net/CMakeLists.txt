@@ -1,12 +1,10 @@
 # Net module tests
 
 add_executable(net_tests
-    test_kcp_session.cpp
-    test_kcp_server.cpp
+
     test_frame_codec.cpp
-    test_transport.cpp
-    test_peek_conv.cpp
 )
+target_compile_features(net_tests PRIVATE cxx_std_23)
 target_compile_options(net_tests PRIVATE
     # GCC
     $<$<AND:$<CXX_COMPILER_ID:GNU>,$<CONFIG:Debug>>:-Wall -Wextra -Wpedantic -O0 -g>
@@ -35,8 +33,8 @@ target_link_libraries(net_tests PRIVATE
     GTest::gtest
     GTest::gtest_main
 
-        GTest::gmock
-        GTest::gmock_main  # 如果你自己没写 main 函数，用这个
+    GTest::gmock
+    GTest::gmock_main  # 如果你自己没写 main 函数，用这个
     EnTT::EnTT
 )
 

@@ -7,8 +7,8 @@ add_library(net STATIC
     App/KcpEndpoint.cpp
     App/Client.cpp
 )
-# C++23 标准
-target_compile_options(net INTERFACE
+
+target_compile_options(net PRIVATE
     # GCC
     $<$<AND:$<CXX_COMPILER_ID:GNU>,$<CONFIG:Debug>>:-Wall -Wextra -Wpedantic -O0 -g -std=c++23>
     $<$<AND:$<CXX_COMPILER_ID:GNU>,$<CONFIG:Release>>:-Wall -O3 -DNDEBUG -std=c++23>
@@ -28,11 +28,12 @@ target_compile_options(net INTERFACE
 )
 
 
-target_include_directories(net PUBLIC
+target_include_directories(net PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/third_party/kcp
 )
 
-target_link_libraries(net PUBLIC
+target_link_libraries(net PRIVATE
     kcp
     asio::asio
     nlohmann_json::nlohmann_json
@@ -46,6 +47,4 @@ set(NET_HEADERS
     App/KcpEndpoint.h
     App/Client.h
 )
-
-# 添加到目标源文件（仅用于 IDE 显示）
-target_sources(net INTERFACE ${NET_HEADERS})
+target_sources(net PRIVATE ${NET_HEADERS})

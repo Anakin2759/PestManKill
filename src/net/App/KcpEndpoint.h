@@ -19,7 +19,6 @@
 #include "../Session/KcpSession.h"
 #include <unordered_map>
 #include <chrono>
-#include <iostream>
 #include <utility>
 
 class KcpEndpoint
@@ -76,6 +75,7 @@ public:
             // 检查超时清理
             if (now_tp - m_lastActive[conv] > timeout_sec)
             {
+                sess->close();
                 onSessionClosed(conv);
                 m_lastActive.erase(conv);
                 iter = m_sessions.erase(iter); // 安全删除
@@ -99,10 +99,7 @@ protected:
      * @param conv 会话的 Conv ID
      * @param session 新创建的 KCP 会话
      */
-    virtual void onSession([[maybe_unused]] uint32_t conv, [[maybe_unused]] std::shared_ptr<KcpSession> session)
-    {
-        std::cout << "Log: New KCP session created with Conv " << conv << std::endl;
-    }
+    virtual void onSession([[maybe_unused]] uint32_t conv, [[maybe_unused]] std::shared_ptr<KcpSession> session) {}
 
     /**
      * @brief 会话关闭回调

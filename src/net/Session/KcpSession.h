@@ -20,6 +20,7 @@
 #include <asio/experimental/channel.hpp>
 #include <expected>
 #include <span>
+#include <atomic>
 #include <memory>
 #include <vector>
 
@@ -61,6 +62,16 @@ public:
     asio::awaitable<std::expected<Packet, std::error_code>> recv();
 
     void send(std::span<const uint8_t> data);
+
+    /**
+     * @brief 主动关闭会话，唤醒等待中的协程
+     */
+    void close();
+
+    /**
+     * @brief 获取因通道满而丢弃的包数量
+     */
+    [[nodiscard]] size_t droppedPackets() const noexcept;
     /**
      * @brief 更新 KCP 状态，需定期调用
      * @param now 当前时间戳（毫秒）
@@ -86,4 +97,6 @@ private:
     IUdpTransport& m_transport;
     asio::ip::udp::endpoint m_peer;
     DataChannel m_channel;
+    std::atomic<size_t> m_droppedPackets{0};
+    std::atomic<bool> m_closed{false};
 };

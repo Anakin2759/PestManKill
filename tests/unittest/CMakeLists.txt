@@ -13,5 +13,5 @@
 # ----------------------------
 # Subdirectories for each module
 # ----------------------------
-#add_subdirectory(net)
+add_subdirectory(net)
 add_subdirectory(ui)

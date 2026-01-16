@@ -40,17 +40,6 @@ public:
     void stop();
 
     /**
-     * @brief 开始接收数据（非协程版本，用于测试）
-     * @param handler 数据处理回调
-     */
-    template <typename PacketHandler>
-        requires std::invocable<PacketHandler>
-    void startReceive(PacketHandler&& handler)
-    {
-        doReceive(std::forward<PacketHandler>(handler));
-    }
-
-    /**
      * @brief 协程接口：异步接收 UDP 包
      * @tparam PacketHandler 处理函数类型，签名应为 void(const asio::ip::udp::endpoint&, std::span<const uint8_t>)
      */
@@ -70,33 +59,5 @@ public:
     }
 
 private:
-    /**
-     * @brief 内部接收实现
-     * @tparam PacketHandler 处理函数类型
-     * @param handler 数据处理回调
-     */
-    template <typename PacketHandler>
-        requires std::invocable<PacketHandler>
-    void doReceive(PacketHandler&& handler)
-    {
-        // 开始异步接收
-        m_socket.async_receive_from(asio::buffer(m_recvBuffer),
-                                    m_recvEndpoint,
-                                    [this, handler = std::forward<PacketHandler>(handler)](const asio::error_code& ec,
-                                                                                           std::size_t bytes) mutable
-                                    {
-                                        if (!ec && bytes > 0)
-                                        {
-                                            // 调用用户提供的处理函数
-                                            handler(m_recvEndpoint,
-                                                    std::span<const uint8_t>(m_recvBuffer.data(), bytes));
-                                            // 继续接收下一个数据包
-                                            doReceive(std::move(handler));
-                                        }
-                                    });
-    }
-
     asio::ip::udp::socket m_socket;
-    std::array<uint8_t, 2048> m_recvBuffer{};
-    asio::ip::udp::endpoint m_recvEndpoint;
 };

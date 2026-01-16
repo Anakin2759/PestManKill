@@ -1,7 +1,6 @@
 #include "Server.h"
 #include <cstdint>
 #include <asio.hpp>
-#include <iostream>
 #include <utility>
 
 Server::Server(IUdpTransport& transport, asio::any_io_executor io_exec, size_t thread_count)
@@ -27,8 +26,6 @@ void Server::onSession(std::uint32_t conv, std::shared_ptr<KcpSession> session)
     // 2. 启动玩家业务协程
     // 注意：这里将协程派发到线程池执行，而 KCP 的 input/update 依然在 IO 线程
     asio::co_spawn(player_executor, playerRoutine(conv, std::move(session)), asio::detached);
-
-    std::cout << "Log: Player " << conv << " connected. Business logic moved to thread pool." << std::endl;
 }
 
 asio::awaitable<void> Server::playerRoutine(uint32_t conv, std::shared_ptr<KcpSession> session)
@@ -54,10 +51,7 @@ asio::awaitable<void> Server::playerRoutine(uint32_t conv, std::shared_ptr<KcpSe
             session->send(msg);
         }
     }
-    catch (const std::exception& e)
+    catch (const std::exception&)
     {
-        std::cerr << "Player " << conv << " exception: " << e.what() << std::endl;
     }
-
-    std::cout << "Log: Player " << conv << " disconnected." << std::endl;
 }
