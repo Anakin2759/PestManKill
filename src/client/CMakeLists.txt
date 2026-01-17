@@ -48,10 +48,8 @@ target_link_libraries(${CLIENT_NAME} PRIVATE
     nlohmann_json::nlohmann_json
     
     # 网络模块
-    net
-    asio::asio
-    kcp
     
+    asio::asio
     # UI 模块
     ui
     SDL3::SDL3
@@ -63,6 +61,7 @@ target_link_libraries(${CLIENT_NAME} PRIVATE
     absl::hash
     absl::flat_hash_map
     absl::raw_hash_set
+    net
     
 )
 

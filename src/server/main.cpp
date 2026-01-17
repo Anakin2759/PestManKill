@@ -23,14 +23,9 @@
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/sinks/rotating_file_sink.h>
-#include "src/shared/common/Common.h"
-#include "src/shared/messages/request/UseCardRequest.h"
-#include "src/shared/messages/request/SettlementRequest.h"
-#include "src/shared/messages/response/UseCardResponse.h"
-#include "src/shared/messages/response/SettlementResponse.h"
+
 #include <nlohmann/json.hpp>
 #include <entt/entt.hpp>
-#include "src/server/systems/systems.h"
 
 std::atomic<bool> g_running{true};
 

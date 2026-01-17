@@ -52,7 +52,13 @@ public:
 
         for (;;)
         {
-            std::size_t n = co_await m_socket.async_receive_from(asio::buffer(buf), from, asio::use_awaitable);
+            asio::error_code ec;
+            std::size_t n = co_await m_socket.async_receive_from(
+                asio::buffer(buf), from, asio::redirect_error(asio::use_awaitable, ec));
+            if (ec)
+            {
+                co_return;
+            }
 
             handler(from, std::span<const uint8_t>(buf.data(), n));
         }

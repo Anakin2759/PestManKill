@@ -25,13 +25,7 @@ CompileFlags:
     - "-Wno-unused-parameter"
     - "-Wno-missing-field-initializers"
 
-    # MSVC 兼容模式
-    - "--target=x86_64-pc-windows-msvc"
-
-    - "-ID:/MSVC/VC/Tools/MSVC/14.50.35717/include"
-    - "-IC:/Program Files (x86)/Windows Kits/10/Include/10.0.26100.0/ucrt"
-    - "-IC:/Program Files (x86)/Windows Kits/10/Include/10.0.26100.0/shared"
-    - "-IC:/Program Files (x86)/Windows Kits/10/Include/10.0.26100.0/um"
+    - "--query-driver=cl.exe"
     
     # 启用 MSVC 扩展以支持特定语法
     # 使用与 MSVC 相同的扩展和兼容性选项
@@ -41,14 +35,6 @@ CompileFlags:
     # 注意: 不要使用 -fdelayed-template-parsing，它与 C++20 concepts/requires 不兼容
     # 设置 MSVC 兼容的语言版本
     - "-fms-compatibility-version=19.50"
-    # 显式定义 C++20/23 特性宏，解决 std::span 等误报
-    - "-D__cpp_lib_span=202002L"
-    - "-D__cpp_lib_concepts=202002L"
-    - "-D__cpp_lib_ranges=202002L"
-    - "-D__cpp_lib_format=202302L"
-    - "-D_HAS_CXX17=1"
-    - "-D_HAS_CXX20=1"
-    - "-D_HAS_CXX23=1"
 ---
 # 诊断配置
 Diagnostics:

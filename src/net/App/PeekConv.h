@@ -1,3 +1,17 @@
+/**
+ * ************************************************************************
+ *
+ * @file PeekConv.h
+ * @author AnakinLiu (azrael2759@qq.com)
+ * @date 2026-01-16
+ * @version 0.1
+ * @brief 从数据片段中提取 KCP 会话标识 conv 的函数
+ * 
+ * ************************************************************************
+ * @copyright Copyright (c) 2026 AnakinLiu
+ * For study and research only, no reprinting.
+ * ************************************************************************
+ */
 #pragma once
 #include <cstdint>
 #include <span>

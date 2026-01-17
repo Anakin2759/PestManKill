@@ -1,7 +1,6 @@
 #pragma once
 #include "KcpEndpoint.h"
 #include <asio.hpp>
-#include <iostream>
 #include <bit>
 #include <cstring>
 #include <utility>
@@ -17,6 +16,9 @@ public:
     void stop();
 
 protected:
+    /**
+     * @brief 识别逻辑：直接解析包里的 conv
+     */
     uint32_t selectConv(const asio::ip::udp::endpoint&, std::span<const uint8_t> data) override;
 
     /**

@@ -23,7 +23,8 @@ AsioUdpTransport::AsioUdpTransport(asio::any_io_executor exec, uint16_t port)
 
 void AsioUdpTransport::send(const asio::ip::udp::endpoint& to, std::span<const uint8_t> data)
 {
-    m_socket.send_to(asio::buffer(data.data(), data.size()), to);
+    asio::error_code ec;
+    m_socket.send_to(asio::buffer(data.data(), data.size()), to, 0, ec);
 }
 
 uint16_t AsioUdpTransport::localPort() const

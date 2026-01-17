@@ -73,7 +73,15 @@ public:
             sess->update(now_ms);
 
             // 检查超时清理
-            if (now_tp - m_lastActive[conv] > timeout_sec)
+            auto last_iter = m_lastActive.find(conv);
+            if (last_iter == m_lastActive.end())
+            {
+                m_lastActive.emplace(conv, now_tp);
+                ++iter;
+                continue;
+            }
+
+            if (now_tp - last_iter->second > timeout_sec)
             {
                 sess->close();
                 onSessionClosed(conv);

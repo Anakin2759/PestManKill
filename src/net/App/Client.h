@@ -1,3 +1,18 @@
+/**
+ * ************************************************************************
+ * 
+ * @file Client.h
+ * @author AnakinLiu (azrael2759@qq.com)
+ * @date 2026-01-16
+ * @version 0.1
+ * @brief  KCP 客户端实现
+    
+ * 
+ * ************************************************************************
+ * @copyright Copyright (c) 2026 AnakinLiu
+ * For study and research only, no reprinting.
+ * ************************************************************************
+ */
 #pragma once
 #include "KcpEndpoint.h"
 #include <asio.hpp>

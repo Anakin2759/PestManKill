@@ -49,6 +49,8 @@ public:
     // 禁止拷贝
     KcpSession(const KcpSession&) = delete;
     KcpSession& operator=(const KcpSession&) = delete;
+    KcpSession(KcpSession&&) = delete;
+    KcpSession& operator=(KcpSession&&) = delete;
 
     /**
      * @brief 供 Endpoint 调用：喂入底层 UDP 数据
@@ -93,10 +95,10 @@ private:
     static int kcpOutput(const char* buf, int len, ikcpcb* kcp, void* user);
 
 private:
-    ikcpcb* m_kcp{nullptr};
-    IUdpTransport& m_transport;
-    asio::ip::udp::endpoint m_peer;
-    DataChannel m_channel;
-    std::atomic<size_t> m_droppedPackets{0};
-    std::atomic<bool> m_closed{false};
+    ikcpcb* m_kcp{nullptr};                  // KCP 控制块
+    IUdpTransport& m_transport;              // 底层 UDP 传输接口
+    asio::ip::udp::endpoint m_peer;          // 对端地址
+    DataChannel m_channel;                   // 数据通道
+    std::atomic<size_t> m_droppedPackets{0}; // 因通道满而丢弃的包数量
+    std::atomic<bool> m_closed{false};       // 会话关闭标志
 };

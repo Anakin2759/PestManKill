@@ -7,7 +7,8 @@ add_library(net STATIC
     App/KcpEndpoint.cpp
     App/Client.cpp
 )
-
+# C++23 标准
+target_compile_features(net PRIVATE cxx_std_23)
 target_compile_options(net PRIVATE
     # GCC
     $<$<AND:$<CXX_COMPILER_ID:GNU>,$<CONFIG:Debug>>:-Wall -Wextra -Wpedantic -O0 -g -std=c++23>
@@ -47,4 +48,4 @@ set(NET_HEADERS
     App/KcpEndpoint.h
     App/Client.h
 )
-target_sources(net PRIVATE ${NET_HEADERS})
+target_sources(net PUBLIC ${NET_HEADERS})

@@ -99,6 +99,10 @@ asio::awaitable<std::expected<KcpSession::Packet, std::error_code>> KcpSession::
 {
     try
     {
+        if (m_closed.load(std::memory_order_acquire))
+        {
+            co_return std::unexpected(std::make_error_code(std::errc::operation_canceled));
+        }
         Packet data = co_await m_channel.async_receive(asio::use_awaitable);
         co_return data;
     }
