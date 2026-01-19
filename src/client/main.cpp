@@ -130,7 +130,7 @@ void CreateMenuDialog()
     ui::helper::AddChild(menuDialog, spacer1);
 
     // 创建开始游戏按钮
-    auto startBtn = ui::factory::CreateButton("开始游戏", "startBtn");
+    auto startBtn = ui::factory::CreateButton("开始", "startBtn");
     ui::helper::SetFixedSize(startBtn, 150.0F, 40.0F);
     auto& startText = registry.get<ui::components::Text>(startBtn);
     startText.alignment = ui::policies::Alignment::CENTER;
@@ -147,8 +147,9 @@ void CreateMenuDialog()
     startClickable.onClick = [menuDialog]()
     {
         CreateMainWindow();
-        // 隐藏菜单对话框
-        ui::helper::Hide(menuDialog);
+        // 销毁菜单对话框
+        auto& dispatcher = utils::Dispatcher::getInstance();
+        dispatcher.trigger<ui::events::CloseWindow>(ui::events::CloseWindow{menuDialog});
     };
     ui::helper::AddChild(menuDialog, startBtn);
 

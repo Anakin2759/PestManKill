@@ -9,7 +9,7 @@
  *
  * 将原始输入事件映射到UI实体的交互组件上，并更新 Hover/Active/Dirty 等 ECS 状态。
  * 负责处理点击、悬停等交互逻辑，触发相应的UI事件和通知后台。
-    从SDL或ImGui获取鼠标位置和按键状态。
+    从SDL获取鼠标位置和按键状态。
     遍历所有可交互实体，执行点碰撞测试 (Hit Test)。
     更新实体的 HoveredTag 和 ActiveTag 组件。
     处理点击事件，触发 ButtonClickedEvent 等UI事件。
@@ -19,7 +19,6 @@
 
     目标：
     实现高效、准确的UI交互处理，提升用户体验。
-    不再依赖 ImGui 的输入处理，完全自主控制交互逻辑。
  *
  * ************************************************************************
  */
@@ -47,6 +46,7 @@ public:
     {
         auto& dispatcher = utils::Dispatcher::getInstance();
         dispatcher.sink<ui::events::SDLEvent>().connect<&InteractionSystem::onSDLEvent>(*this);
+        DetailExposed();
     }
 
     void unregisterHandlersImpl() {}
@@ -62,7 +62,7 @@ private:
         auto& registry = ::utils::Registry::getInstance();
         auto& dispatcher = ::utils::Dispatcher::getInstance();
 
-        // 获取鼠标位置（SDL API 直接获取，不依赖 ImGui IO 帧更新）
+        // 获取鼠标位置（SDL API 直接获取）
         float mouseX = 0.0F, mouseY = 0.0F;
         SDL_GetMouseState(&mouseX, &mouseY);
         Vec2 mousePos(mouseX, mouseY);
@@ -169,9 +169,8 @@ private:
      * @brief 处理 SDL每tick事件
      *
      * - 负责 SDL_PollEvent 事件
-     * - 将事件转发给 ImGui 后端 (ImGui_ImplSDL3_ProcessEvent)
      * - 识别 Quit / Window Resized，并通过回调交由上层处理
-     * - 直接从 SDL 事件中追踪鼠标状态（避免依赖 ImGui IO 时序问题）
+     * - 直接从 SDL 事件中追踪鼠标状态
      */
     void onSDLEvent(ui::events::SDLEvent& sdlEvent)
     {
@@ -184,10 +183,42 @@ private:
             switch (event.type)
             {
                 case SDL_EVENT_QUIT:
-                case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
                     dispatcher.enqueue<ui::events::QuitRequested>();
                     break;
-                case SDL_EVENT_WINDOW_RESIZED:
+
+                case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+                {
+                    auto& registry = ::utils::Registry::getInstance();
+                    // 查找对应的 Window 实体
+                    entt::entity targetWindow = entt::null;
+                    auto view = registry.view<components::Window>();
+                    for (auto entity : view)
+                    {
+                        if (view.get<components::Window>(entity).windowID == event.window.windowID)
+                        {
+                            targetWindow = entity;
+                            break;
+                        }
+                    }
+
+                    if (registry.valid(targetWindow))
+                    {
+                        dispatcher.enqueue<ui::events::CloseWindow>(ui::events::CloseWindow{targetWindow});
+                    }
+                    else
+                    {
+                        // 如果找不到窗口实体（可能是因为各种原因），但收到了关闭请求，保底退出
+                        // 不过通常只要我们管理得当，windowID 应该能对应上
+                        // 如果是最后的主窗口关闭，WidgetSystem::onCloseWindow 里面会负责发出 QuitRequested
+                    }
+                    break;
+                }
+
+                // 窗口暴露/需要重绘：仅触发渲染，不更新尺寸（因为 data1/data2 无效）
+                case SDL_EVENT_WINDOW_EXPOSED:
+                    dispatcher.trigger<ui::events::UpdateRendering>();
+                    break;
+
                 case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
                 {
                     auto& registry = ::utils::Registry::getInstance();
@@ -203,7 +234,8 @@ private:
                             break;
                         }
                     }
-                    dispatcher.trigger<ui::events::UpdateRendering>();
+                    dispatcher.trigger<ui::events::UpdateLayout>(ui::events::UpdateLayout{});
+                    dispatcher.trigger<ui::events::UpdateRendering>(ui::events::UpdateRendering{});
                     break;
                 }
                 case SDL_EVENT_WINDOW_MOVED:
@@ -223,7 +255,6 @@ private:
                     dispatcher.trigger<ui::events::UpdateRendering>();
                     break;
                 }
-                case SDL_EVENT_WINDOW_EXPOSED:
                 case SDL_EVENT_WINDOW_RESTORED:
                 case SDL_EVENT_WINDOW_MAXIMIZED:
                     dispatcher.trigger<ui::events::UpdateRendering>();
@@ -286,8 +317,6 @@ private:
      * @param entity 当前实体
      * @return ImVec2 实体的绝对位置
      *
-     * @note 对于 Window/Dialog 容器的子元素，需要加上 ImGui 窗口的内容区偏移
-     *       以与 RenderSystem 中的渲染位置保持一致。
      */
     Vec2 getAbsolutePosition(entt::registry& registry, entt::entity entity)
     {
@@ -389,6 +418,74 @@ private:
         }
 
         return rootWindow;
+    }
+
+    /**
+     * @brief 对SDL添加事件监听器的接口增加cpp模板风格封装
+     * @param func {comment}
+     */
+    template <typename F>
+    static void AddEventWatch(F func)
+    {
+        if constexpr (std::is_convertible_v<F, SDL_EventFilter>)
+        {
+            SDL_AddEventWatch(func, nullptr);
+        }
+        else
+        {
+            auto* ptr = new F(std::move(func));
+            SDL_AddEventWatch(
+                [](void* userdata, SDL_Event* event) -> bool
+                {
+                    auto& f = *static_cast<F*>(userdata);
+                    if constexpr (std::is_invocable_v<F, void*, SDL_Event*>)
+                    {
+                        return f(userdata, event);
+                    }
+                    else
+                    {
+                        return f(event);
+                    }
+                },
+                ptr);
+        }
+    }
+
+    static void DetailExposed()
+    {
+        // Add event watch to handle blocking modal loops (e.g., resizing on Windows)
+        SDL_AddEventWatch(
+            [](void*, SDL_Event* event) -> bool
+            {
+                // 对于大小改变，因为是在 Windows 消息循环中阻塞发生的，需要立即更新数据模型
+                if (event->type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED)
+                {
+                    auto& registry = utils::Registry::getInstance();
+                    auto view = registry.view<components::Window, components::Size>();
+                    for (auto entity : view)
+                    {
+                        if (view.get<components::Window>(entity).windowID == event->window.windowID)
+                        {
+                            auto& size = view.get<components::Size>(entity);
+                            size.size.x() = static_cast<float>(event->window.data1);
+                            size.size.y() = static_cast<float>(event->window.data2);
+                            registry.emplace_or_replace<components::LayoutDirtyTag>(entity);
+                            break;
+                        }
+                    }
+                }
+
+                // 无论是大小改变还是窗口重绘，都需要立即重新渲染以避免黑屏或卡顿
+                if (event->type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED || event->type == SDL_EVENT_WINDOW_EXPOSED)
+                {
+                    auto& dispatcher = utils::Dispatcher::getInstance();
+                    // 强制触发布局和渲染更新
+                    dispatcher.trigger<ui::events::UpdateLayout>(ui::events::UpdateLayout{});
+                    dispatcher.trigger<ui::events::UpdateRendering>(ui::events::UpdateRendering{});
+                }
+                return true;
+            },
+            nullptr);
     }
 };
 

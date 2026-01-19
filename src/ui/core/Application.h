@@ -95,7 +95,7 @@ public:
     {
         m_scheduler.update(LOOP_DELAY_MS);
         utils::ThreadPool::enqueue([this]() { m_eventLoop.quit(); });
-        // m_eventLoop.quit();
+        m_eventLoop.quit();
     }
 
     virtual ~Application()

@@ -203,6 +203,8 @@ public:
         auto& dispatcher = utils::Dispatcher::getInstance();
         dispatcher.sink<events::WindowGraphicsContextSetEvent>().connect<&RenderSystem::onWindowsGraphicsContextSet>(
             *this);
+        dispatcher.sink<events::WindowGraphicsContextUnsetEvent>()
+            .connect<&RenderSystem::onWindowsGraphicsContextUnset>(*this);
         dispatcher.sink<ui::events::UpdateRendering>().connect<&RenderSystem::update>(*this);
     }
 
@@ -214,6 +216,8 @@ public:
         auto& dispatcher = utils::Dispatcher::getInstance();
         dispatcher.sink<events::WindowGraphicsContextSetEvent>().disconnect<&RenderSystem::onWindowsGraphicsContextSet>(
             *this);
+        dispatcher.sink<events::WindowGraphicsContextUnsetEvent>()
+            .disconnect<&RenderSystem::onWindowsGraphicsContextUnset>(*this);
         dispatcher.sink<ui::events::UpdateRendering>().disconnect<&RenderSystem::update>(*this);
     }
 
@@ -239,7 +243,23 @@ private:
 
     void onWindowsGraphicsContextUnset(const events::WindowGraphicsContextUnsetEvent& event)
     {
-        // 目前不需要特殊处理
+        auto& registry = utils::Registry::getInstance();
+        // 尝试获取窗口组件以查找 SDL_Window
+        if (auto* windowComp = registry.try_get<components::Window>(event.entity))
+        {
+            SDL_Window* sdlWindow = SDL_GetWindowFromID(windowComp->windowID);
+            if (sdlWindow != nullptr)
+            {
+                // 检查是否在已声明窗口列表中
+                auto it = m_claimedWindows.find(sdlWindow);
+                if (it != m_claimedWindows.end())
+                {
+                    SDL_ReleaseWindowFromGPUDevice(m_gpuDevice, sdlWindow);
+                    m_claimedWindows.erase(it);
+                    LOG_INFO("已从 GPU 设备释放窗口 (ID: {})", windowComp->windowID);
+                }
+            }
+        }
     }
 
     /**

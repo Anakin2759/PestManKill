@@ -33,23 +33,33 @@ namespace ui::systems
 class WidgetSystem : public ui::interface::EnableRegister<WidgetSystem>
 {
 public:
-    void registerHandlersImpl() {}
+    void registerHandlersImpl()
+    {
+        auto& dispatcher = utils::Dispatcher::getInstance();
+        dispatcher.sink<events::CloseWindow>().connect<&WidgetSystem::onCloseWindow>(*this);
+    }
+
     void unregisterHandlersImpl() {}
 
-    void onCloseWindow(events::CloseWindow event)
+    void onCloseWindow(const events::CloseWindow& event)
     {
-        auto& registery = utils::Registry::getInstance();
-        if (!registery.valid(event.entity))
+        // 调用递归销毁
+        if (utils::Registry::getInstance().valid(event.entity))
         {
-            return;
+            destroyWidget(event.entity);
         }
-        // SDL_DistoryWindow(registery.get<components::Window>(event.entity).sdlWindow);
 
-        registery.destroy(event.entity);
+        // 检查是否还有任何窗口实体
+        auto& registry = utils::Registry::getInstance();
 
-        auto& dispatcher = ::utils::Dispatcher::getInstance();
-        dispatcher.enqueue<ui::events::QuitRequested>();
+        if (registry.view<components::Window>().empty())
+        {
+            // 没有窗口实体了，发出退出请求
+            utils::Dispatcher::getInstance().trigger<ui::events::QuitRequested>();
+        }
     }
+
+    static void onRemoveWidget(entt::entity entity) { destroyWidget(entity); }
 
     /**
      * @brief 手动标记实体及其父链需要重新布局（用于直接修改组件后）
@@ -80,9 +90,41 @@ public:
     }
 
     /**
-     * @brief 按照父子层级销毁控件实体及其子实体
+     * @brief 按照父子层级销毁控件实体及其子实体，并清理SDL资源
      */
-    static void destroyWidget(entt::entity entity) {};
+    static void destroyWidget(entt::entity entity)
+    {
+        auto& registry = utils::Registry::getInstance();
+        if (!registry.valid(entity)) return;
+
+        // 1. 递归销毁子节点
+        if (auto* hierarchy = registry.try_get<components::Hierarchy>(entity))
+        {
+            // 复制一份子节点列表，防止在销毁过程中因引用失效导致崩溃
+            auto children = hierarchy->children;
+            for (auto child : children)
+            {
+                destroyWidget(child);
+            }
+        }
+
+        // 2. 如果是窗口，查找并销毁关联的 SDL_Window 资源
+        if (auto* windowComp = registry.try_get<components::Window>(entity))
+        {
+            // 通过 WindowID 找回 SDL_Window 指针
+            if (SDL_Window* sdlWindow = SDL_GetWindowFromID(windowComp->windowID))
+            {
+                // 通知 RenderSystem 解绑上下文（尽管 RenderSystem 可能目前未执行动作，保留逻辑完整性）
+                ::utils::Dispatcher::getInstance().trigger<events::WindowGraphicsContextUnsetEvent>(
+                    events::WindowGraphicsContextUnsetEvent{entity});
+
+                SDL_DestroyWindow(sdlWindow);
+            }
+        }
+
+        // 3. 最后销毁实体本身
+        registry.destroy(entity);
+    }
 
     static void setSize() {}
 };
