@@ -311,7 +311,7 @@ struct Window
     bool noResize = false; // 禁止调整大小
     bool noMove = false;   // 禁止移动
     bool noCollapse = false;
-    SDL_Window* sdlWindow = nullptr;
+    uint32_t windowID = 0;
 };
 
 /**

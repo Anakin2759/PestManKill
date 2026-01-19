@@ -286,15 +286,21 @@ inline entt::entity CreateDialog(std::string_view title, const std::string& alia
     // 内容容器组件 (包含 title, min/max size)
     auto& dialog = utils::Registry::getInstance().emplace<components::Window>(entity);
     dialog.title = std::string(title);
-    dialog.modal = true; // 对话框通常是模态的
+    dialog.modal = false;
     dialog.hasTitleBar = false;
     dialog.noResize = false;
     dialog.noMove = false;
-    dialog.sdlWindow =
-        SDL_CreateWindow(dialog.title.c_str(),
-                         static_cast<int>(utils::Registry::getInstance().get<components::Size>(entity).size.x()),
-                         static_cast<int>(utils::Registry::getInstance().get<components::Size>(entity).size.y()),
-                         SDL_WINDOW_RESIZABLE);
+
+    // 使用默认大小创建窗口（避免 0x0 窗口），Show() 时会同步实际尺寸
+    constexpr int DEFAULT_DIALOG_WIDTH = 400;
+    constexpr int DEFAULT_DIALOG_HEIGHT = 300;
+    SDL_Window* sdlWindow = SDL_CreateWindow(
+        dialog.title.c_str(), DEFAULT_DIALOG_WIDTH, DEFAULT_DIALOG_HEIGHT, SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN);
+
+    dialog.windowID = SDL_GetWindowID(sdlWindow);
+
+    // 窗口默认隐藏，需要显式调用 Show() 才显示
+    utils::Registry::getInstance().remove<components::VisibleTag>(entity);
 
     // 对话框通常有一个 LayoutInfo 来排列内部元素
     utils::Registry::getInstance().emplace<components::LayoutInfo>(entity);
@@ -340,11 +346,16 @@ inline entt::entity CreateWindow(std::string_view title, const std::string& alia
     // 自动标记为需要布局
     utils::Registry::getInstance().emplace_or_replace<components::LayoutDirtyTag>(entity);
 
-    window.sdlWindow =
-        SDL_CreateWindow(window.title.c_str(),
-                         static_cast<int>(utils::Registry::getInstance().get<components::Size>(entity).size.x()),
-                         static_cast<int>(utils::Registry::getInstance().get<components::Size>(entity).size.y()),
-                         SDL_WINDOW_RESIZABLE);
+    // 使用默认大小创建窗口（避免 0x0 窗口），Show() 时会同步实际尺寸
+    constexpr int DEFAULT_WINDOW_WIDTH = 800;
+    constexpr int DEFAULT_WINDOW_HEIGHT = 600;
+    SDL_Window* sdlWindow = SDL_CreateWindow(
+        window.title.c_str(), DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT, SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN);
+
+    window.windowID = SDL_GetWindowID(sdlWindow);
+
+    // 窗口默认隐藏，需要显式调用 Show() 才显示
+    utils::Registry::getInstance().remove<components::VisibleTag>(entity);
 
     utils::Dispatcher::getInstance().trigger<events::WindowGraphicsContextSetEvent>({entity});
 

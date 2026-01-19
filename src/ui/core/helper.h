@@ -18,6 +18,7 @@
 #pragma once
 #include <entt/entt.hpp>
 #include <algorithm>           // For std::clamp
+#include <SDL3/SDL.h>          // For SDL window functions
 #include "common/Components.h" // 包含所有数据组件
 #include "common/Tags.h"       // 包含所有 Tag 组件
 #include "common/Policies.h"   // 包含所有枚举
@@ -97,6 +98,86 @@ inline void SetVisible(::entt::entity entity, bool visible)
     {
         registry.remove<components::VisibleTag>(entity);
     }
+}
+
+/**
+ * @brief 显示窗口/对话框
+ *
+ * 对于窗口/对话框：同步 Size 组件到 SDL 窗口，居中显示
+ * 对于普通控件：添加 VisibleTag
+ */
+inline void Show(::entt::entity entity)
+{
+    auto& registry = utils::Registry::getInstance();
+    if (!registry.valid(entity)) return;
+
+    // 检查是否是窗口/对话框
+    auto* windowComp = registry.try_get<components::Window>(entity);
+    if (windowComp != nullptr && windowComp->windowID != 0)
+    {
+        // 同步 Size 组件到 SDL 窗口
+        auto* sizeComp = registry.try_get<components::Size>(entity);
+        if (sizeComp != nullptr)
+        {
+            int targetW = static_cast<int>(sizeComp->size.x());
+            int targetH = static_cast<int>(sizeComp->size.y());
+            if (targetW > 0 && targetH > 0)
+            {
+                SDL_Window* sdlWindow = SDL_GetWindowFromID(windowComp->windowID);
+                if (sdlWindow)
+                {
+                    SDL_SetWindowSize(sdlWindow, targetW, targetH);
+                }
+            }
+        }
+        SDL_Window* sdlWindow = SDL_GetWindowFromID(windowComp->windowID);
+        if (sdlWindow)
+        {
+            // 居中窗口
+            SDL_SetWindowPosition(sdlWindow, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+            // 显示窗口
+            SDL_ShowWindow(sdlWindow);
+
+            // 更新 Position 组件为实际位置
+            int posX = 0, posY = 0;
+            SDL_GetWindowPosition(sdlWindow, &posX, &posY);
+            auto* posComp = registry.try_get<components::Position>(entity);
+            if (posComp != nullptr)
+            {
+                posComp->value = Eigen::Vector2f{static_cast<float>(posX), static_cast<float>(posY)};
+            }
+        }
+    }
+
+    // 添加 VisibleTag
+    registry.emplace_or_replace<components::VisibleTag>(entity);
+    MarkLayoutDirty(entity);
+}
+
+/**
+ * @brief 隐藏窗口/对话框/控件
+ *
+ * 对于窗口/对话框：隐藏 SDL 窗口
+ * 对于普通控件：移除 VisibleTag
+ */
+inline void Hide(::entt::entity entity)
+{
+    auto& registry = utils::Registry::getInstance();
+    if (!registry.valid(entity)) return;
+
+    // 检查是否是窗口/对话框
+    auto* windowComp = registry.try_get<components::Window>(entity);
+    if (windowComp != nullptr && windowComp->windowID != 0)
+    {
+        SDL_Window* sdlWindow = SDL_GetWindowFromID(windowComp->windowID);
+        if (sdlWindow)
+        {
+            SDL_HideWindow(sdlWindow);
+        }
+    }
+
+    // 移除 VisibleTag
+    registry.remove<components::VisibleTag>(entity);
 }
 
 /**
@@ -360,39 +441,6 @@ inline void StopAnimation(::entt::entity entity)
 // ===================== 层级操作 (核心功能补全) =====================
 
 /**
- * @brief 添加子实体到父容器中 (核心 Hierarchy 操作)
- */
-inline void AddChild(::entt::entity parent, ::entt::entity child)
-{
-    auto& registry = utils::Registry::getInstance();
-    if (!registry.valid(parent) || !registry.valid(child)) return;
-
-    // 1. 设置子实体的 Hierarchy
-    auto& childHierarchy = registry.get_or_emplace<components::Hierarchy>(child);
-
-    // 如果子实体已经有父级，则先从旧父级移除
-    if (childHierarchy.parent != ::entt::null && childHierarchy.parent != parent)
-    {
-        // 实际应用中需要一个 RemoveChild 函数
-        // RemoveChild(childHierarchy.parent, child);
-    }
-    childHierarchy.parent = parent;
-
-    // 2. 更新父实体的 Hierarchy
-    auto& parentHierarchy = registry.get_or_emplace<components::Hierarchy>(parent);
-
-    // 确保子实体不在列表中
-    auto& children = parentHierarchy.children;
-    if (!std::ranges::contains(children, child))
-    {
-        children.push_back(child);
-    }
-
-    // 3. 标记新节点及其祖先为脏，触发布局计算
-    MarkLayoutDirty(child);
-}
-
-/**
  * @brief 移除子实体 (从 Hierarchy 中断开，但实体本身可能仍然存在)
  */
 inline void RemoveChild(::entt::entity parent, ::entt::entity child)
@@ -407,6 +455,7 @@ inline void RemoveChild(::entt::entity parent, ::entt::entity child)
     {
         // 1. 从父级的 children 列表中移除
         auto& children = parentHierarchy->children;
+        // 使用 erase-remove idiom 或 std::erase (C++20)
         std::erase(children, child);
 
         // 2. 清除子级的 parent 指针
@@ -415,6 +464,48 @@ inline void RemoveChild(::entt::entity parent, ::entt::entity child)
         // 3. 标记父级为脏
         MarkLayoutDirty(parent);
     }
+}
+
+/**
+ * @brief 添加子实体到父容器中 (核心 Hierarchy 操作)
+ */
+inline void AddChild(::entt::entity parent, ::entt::entity child)
+{
+    auto& registry = utils::Registry::getInstance();
+    if (!registry.valid(parent) || !registry.valid(child)) return;
+
+    // 1. 设置子实体的 Hierarchy
+    auto& childHierarchy = registry.get_or_emplace<components::Hierarchy>(child);
+
+    // 如果子实体已经有父级，则先从旧父级移除
+    if (childHierarchy.parent != ::entt::null && childHierarchy.parent != parent)
+    {
+        RemoveChild(childHierarchy.parent, child);
+    }
+    childHierarchy.parent = parent;
+
+    // 2. 更新父实体的 Hierarchy
+    auto& parentHierarchy = registry.get_or_emplace<components::Hierarchy>(parent);
+
+    // 确保子实体不在列表中
+    auto& children = parentHierarchy.children;
+    bool alreadyChild = false;
+    for (auto c : children)
+    {
+        if (c == child)
+        {
+            alreadyChild = true;
+            break;
+        }
+    }
+
+    if (!alreadyChild)
+    {
+        children.push_back(child);
+    }
+
+    // 3. 标记新节点及其祖先为脏，触发布局计算
+    MarkLayoutDirty(child);
 }
 
 /**

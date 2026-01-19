@@ -67,8 +67,23 @@ private:
         SDL_GetMouseState(&mouseX, &mouseY);
         Vec2 mousePos(mouseX, mouseY);
 
-        // 首先检测鼠标落在哪个顶层窗口/对话框内
-        entt::entity topWindow = findTopWindowAtPoint(registry, mousePos);
+        // 获取当前获焦的 SDL 窗口
+        SDL_Window* focusedSDLWindow = SDL_GetMouseFocus();
+        if (focusedSDLWindow == nullptr) return;
+
+        // 查找对应的 Window 实体
+        entt::entity topWindow = entt::null;
+        auto view = registry.view<components::Window>();
+        for (auto entity : view)
+        {
+            if (view.get<components::Window>(entity).windowID == SDL_GetWindowID(focusedSDLWindow))
+            {
+                topWindow = entity;
+                break;
+            }
+        }
+
+        if (topWindow == entt::null) return;
 
         // 获取 Z-Order 排序的可交互实体（只在当前窗口内搜索）
         auto interactables = getZOrderedInteractables(registry, topWindow);
@@ -163,8 +178,6 @@ private:
         auto& dispatcher = ::utils::Dispatcher::getInstance();
 
         auto& event = sdlEvent.event;
-        bool mousePressed = false;
-        bool mouseReleased = false;
 
         while (SDL_PollEvent(&event))
         {
@@ -175,29 +188,79 @@ private:
                     dispatcher.enqueue<ui::events::QuitRequested>();
                     break;
                 case SDL_EVENT_WINDOW_RESIZED:
-                    // 可以触发 WindowResized 事件
+                case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+                {
+                    auto& registry = ::utils::Registry::getInstance();
+                    auto view = registry.view<components::Window, components::Size>();
+                    for (auto entity : view)
+                    {
+                        if (view.get<components::Window>(entity).windowID == event.window.windowID)
+                        {
+                            auto& size = view.get<components::Size>(entity);
+                            size.size.x() = static_cast<float>(event.window.data1);
+                            size.size.y() = static_cast<float>(event.window.data2);
+                            registry.emplace_or_replace<components::LayoutDirtyTag>(entity);
+                            break;
+                        }
+                    }
+                    dispatcher.trigger<ui::events::UpdateRendering>();
+                    break;
+                }
+                case SDL_EVENT_WINDOW_MOVED:
+                {
+                    auto& registry = ::utils::Registry::getInstance();
+                    auto view = registry.view<components::Window, components::Position>();
+                    for (auto entity : view)
+                    {
+                        if (view.get<components::Window>(entity).windowID == event.window.windowID)
+                        {
+                            auto& pos = view.get<components::Position>(entity);
+                            pos.value.x() = static_cast<float>(event.window.data1);
+                            pos.value.y() = static_cast<float>(event.window.data2);
+                            break;
+                        }
+                    }
+                    dispatcher.trigger<ui::events::UpdateRendering>();
+                    break;
+                }
+                case SDL_EVENT_WINDOW_EXPOSED:
+                case SDL_EVENT_WINDOW_RESTORED:
+                case SDL_EVENT_WINDOW_MAXIMIZED:
+                    dispatcher.trigger<ui::events::UpdateRendering>();
+                    break;
+                case SDL_EVENT_MOUSE_MOTION:
+                    getInput(false, false);
+                    dispatcher.trigger<ui::events::UpdateRendering>();
                     break;
                 case SDL_EVENT_MOUSE_BUTTON_DOWN:
                     if (event.button.button == SDL_BUTTON_LEFT)
                     {
-                        mousePressed = true;
                         m_mouseDown = true;
+                        getInput(true, false);
+                    }
+                    else
+                    {
+                        getInput(false, false);
                     }
                     break;
                 case SDL_EVENT_MOUSE_BUTTON_UP:
                     if (event.button.button == SDL_BUTTON_LEFT)
                     {
-                        mouseReleased = true;
                         m_mouseDown = false;
+                        getInput(false, true);
                     }
+                    else
+                    {
+                        getInput(false, false);
+                    }
+                    break;
+                case SDL_EVENT_MOUSE_WHEEL:
+                    dispatcher.trigger<ui::events::UpdateRendering>();
                     break;
                 default:
                     break;
             }
         }
-
-        // 处理交互检测（在事件处理完成后）
-        getInput(mousePressed, mouseReleased);
     }
 
     entt::entity m_activeEntity = entt::null;  // 当前处于 Active (鼠标按下) 状态的实体
@@ -243,6 +306,9 @@ private:
         for (auto it = path.rbegin(); it != path.rend(); ++it)
         {
             entt::entity e = *it;
+            // 窗口本身的 Position 是屏幕坐标，在窗口内交互时应视为原点(0,0)，忽略其屏幕位置偏移
+            if (registry.any_of<components::WindowTag, components::DialogTag>(e)) continue;
+
             const auto* posComp = registry.try_get<components::Position>(e);
             if (posComp)
             {
@@ -266,7 +332,11 @@ private:
 
         for (auto entity : view)
         {
-            if (registry.any_of<components::DisabledTag>(entity)) continue; // 忽略禁用的实体
+            // 忽略禁用或不可见的实体
+            if (registry.any_of<components::DisabledTag>(entity) || !registry.any_of<components::VisibleTag>(entity))
+            {
+                continue;
+            }
 
             // 检查该实体是否属于 topWindow
             entt::entity rootWindow = findRootWindow(registry, entity);
@@ -319,49 +389,6 @@ private:
         }
 
         return rootWindow;
-    }
-
-    /**
-     * @brief 查找鼠标位置所在的最前面的窗口/对话框
-     * @return 窗口实体，如果不在任何窗口内则返回 entt::null
-     */
-    entt::entity findTopWindowAtPoint(entt::registry& registry, const Vec2& point)
-    {
-        // 收集所有顶层窗口/对话框
-        std::vector<std::pair<int, entt::entity>> windows;
-
-        auto view = registry.view<const components::Position, const components::Size, const components::Hierarchy>();
-        for (auto entity : view)
-        {
-            // 只检查窗口和对话框
-            if (!registry.any_of<components::WindowTag, components::DialogTag>(entity)) continue;
-
-            const auto& hierarchy = registry.get<const components::Hierarchy>(entity);
-            // 只检查顶层（没有父级的）窗口
-            if (hierarchy.parent != entt::null) continue;
-
-            // 计算窗口在列表中的顺序作为 Z-Order（后创建的在前面）
-            // 使用 entity 的底层值作为近似创建顺序
-            int zOrder = static_cast<int>(static_cast<uint32_t>(entity));
-            windows.emplace_back(zOrder, entity);
-        }
-
-        // 按 Z-Order 降序排列（值越大的越后创建，应该在最前面）
-        std::sort(windows.begin(), windows.end(), [](const auto& a, const auto& b) { return a.first > b.first; });
-
-        // 从前到后检测哪个窗口包含该点
-        for (const auto& [zOrder, windowEntity] : windows)
-        {
-            const auto& pos = registry.get<const components::Position>(windowEntity);
-            const auto& size = registry.get<const components::Size>(windowEntity);
-
-            if (isPointInRect(point, pos.value, size.size))
-            {
-                return windowEntity;
-            }
-        }
-
-        return entt::null;
     }
 };
 

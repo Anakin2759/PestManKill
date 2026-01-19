@@ -79,9 +79,12 @@ public:
         }
     }
 
-    static void setSize()
-    {
-    }
+    /**
+     * @brief 按照父子层级销毁控件实体及其子实体
+     */
+    static void destroyWidget(entt::entity entity) {};
+
+    static void setSize() {}
 };
 
 } // namespace ui::systems

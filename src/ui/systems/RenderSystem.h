@@ -225,7 +225,8 @@ private:
     {
         ensureInitialized();
         auto& registery = utils::Registry::getInstance();
-        auto* sdlWindow = registery.get<components::Window>(event.entity).sdlWindow;
+        uint32_t windowID = registery.get<components::Window>(event.entity).windowID;
+        SDL_Window* sdlWindow = SDL_GetWindowFromID(windowID);
         if (sdlWindow == nullptr)
         {
             return;
@@ -694,6 +695,7 @@ public:
         ensureInitialized();
         if (m_gpuDevice == nullptr || m_pipeline == nullptr)
         {
+            LOG_WARN("GPU 设备或管线未初始化");
             return;
         }
 
@@ -706,32 +708,35 @@ public:
         auto& registry = utils::Registry::getInstance();
         auto windowView = registry.view<components::Window>();
 
+        // 检查是否有窗口
+        if (windowView.begin() == windowView.end())
+        {
+            LOG_WARN("没有找到任何窗口实体");
+            return;
+        }
+
         // 遍历每个窗口进行渲染
         for (auto windowEntity : windowView)
         {
             auto& windowComp = windowView.get<components::Window>(windowEntity);
-            if (windowComp.sdlWindow == nullptr) continue;
+            SDL_Window* sdlWindow = SDL_GetWindowFromID(windowComp.windowID);
+            if (sdlWindow == nullptr)
+            {
+                LOG_WARN("窗口实体的 sdlWindow 为空");
+                continue;
+            }
 
             // 根据实体组件同步调整 SDL 窗口属性
-            syncSDLWindowProperties(registry, windowEntity, windowComp);
+            syncSDLWindowProperties(registry, windowEntity, windowComp, sdlWindow);
 
             // 获取当前窗口大小
             int width = 0;
             int height = 0;
-            SDL_GetWindowSizeInPixels(windowComp.sdlWindow, &width, &height);
+            SDL_GetWindowSizeInPixels(sdlWindow, &width, &height);
             if (width <= 0 || height <= 0) continue;
 
             m_screenWidth = static_cast<float>(width);
             m_screenHeight = static_cast<float>(height);
-
-            // 更新当前窗口对应的主 Widget 大小
-            auto& sizeComp = registry.get<components::Size>(windowEntity);
-            sizeComp.autoSize = false;
-            if (sizeComp.size.x() != m_screenWidth || sizeComp.size.y() != m_screenHeight)
-            {
-                sizeComp.size = {m_screenWidth, m_screenHeight};
-                registry.emplace_or_replace<components::LayoutDirtyTag>(windowEntity);
-            }
 
             // 清空渲染批次
             m_batches.clear();
@@ -739,13 +744,20 @@ public:
             // 收集当前窗口及其子元素的渲染数据
             if (registry.any_of<components::VisibleTag>(windowEntity))
             {
-                collectRenderData(registry, windowEntity, Eigen::Vector2f(0, 0), 1.0F);
+                // 窗口实体的 Position 是屏幕坐标，而渲染是在窗口坐标系中进行的 (0,0 为窗口左上角)
+                // 因此需要抵消窗口自身的位置偏移，确保窗口内容从 (0,0) 开始渲染
+                Eigen::Vector2f rootOffset = Eigen::Vector2f(0, 0);
+                if (const auto* pos = registry.try_get<components::Position>(windowEntity))
+                {
+                    rootOffset = -pos->value;
+                }
+                collectRenderData(registry, windowEntity, rootOffset, 1.0F);
             }
 
             // 执行 GPU 渲染
             if (!m_batches.empty())
             {
-                renderToGPU(windowComp.sdlWindow, width, height);
+                renderToGPU(sdlWindow, width, height);
             }
         }
 
@@ -770,38 +782,37 @@ public:
      * - 窗口可见性 (VisibleTag)
      * - 模态属性 (Window::modal) - 用于 Dialog
      */
-    void syncSDLWindowProperties(entt::registry& registry, entt::entity entity, components::Window& windowComp)
+    void syncSDLWindowProperties(entt::registry& registry,
+                                 entt::entity entity,
+                                 components::Window& windowComp,
+                                 SDL_Window* sdlWindow)
     {
-        SDL_Window* sdlWindow = windowComp.sdlWindow;
         if (sdlWindow == nullptr) return;
 
         // 1. 同步窗口标题
         syncWindowTitle(registry, entity, windowComp, sdlWindow);
 
-        // 2. 同步窗口大小（优先处理，在约束之前）
-        syncWindowSize(registry, entity, sdlWindow);
-
-        // 3. 同步窗口位置（在大小之后，确保居中计算正确）
+        // 2. 同步窗口位置
         syncWindowPosition(registry, entity, sdlWindow);
 
-        // 4. 同步窗口大小约束
+        // 3. 同步窗口大小约束
         syncWindowSizeConstraints(windowComp, sdlWindow);
 
-        // 5. 同步窗口可调整大小属性
+        // 4. 同步窗口可调整大小属性
         syncWindowResizable(windowComp, sdlWindow);
 
-        // 6. 同步窗口透明度
+        // 5. 同步窗口透明度
         syncWindowOpacity(registry, entity, sdlWindow);
 
-        // 7. 同步窗口可见性
+        // 6. 同步窗口可见性
         syncWindowVisibility(registry, entity, sdlWindow);
 
-        // 8. 同步模态属性 (Dialog)
+        // 7. 同步模态属性 (Dialog)
         syncWindowModal(registry, entity, windowComp, sdlWindow);
     }
 
     /**
-     * @brief 同步窗口大小
+     * @brief 同步窗口大小（保留但不再自动调用，供外部需要时使用）
      */
     void syncWindowSize(entt::registry& registry, entt::entity entity, SDL_Window* sdlWindow)
     {
@@ -828,34 +839,35 @@ public:
     /**
      * @brief 同步窗口位置
      *
-     * 特殊逻辑：
-     * - 如果 Position 为 (0, 0)，则自动居中窗口
-     * - 否则使用指定位置
+     * 逻辑：
+     * - 首次渲染时，从 SDL 窗口读取实际位置并更新 Position 组件
+     * - 之后只在 Position 组件被代码修改时才更新窗口位置
      */
     void syncWindowPosition(entt::registry& registry, entt::entity entity, SDL_Window* sdlWindow)
     {
-        const auto* posComp = registry.try_get<components::Position>(entity);
+        auto* posComp = registry.try_get<components::Position>(entity);
         if (posComp == nullptr) return;
 
-        // 特殊处理：(0, 0) 触发自动居中
-        constexpr float EPSILON = 0.01F;
-        if (std::abs(posComp->value.x()) < EPSILON && std::abs(posComp->value.y()) < EPSILON)
-        {
-            // 居中窗口
-            SDL_SetWindowPosition(sdlWindow, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
-            return;
-        }
-
-        // 使用指定位置
+        // 获取当前窗口实际位置
         int currentX = 0;
         int currentY = 0;
         SDL_GetWindowPosition(sdlWindow, &currentX, &currentY);
 
+        // 如果 Position 组件是默认值 (0, 0)，说明是首次渲染，从窗口同步位置
+        constexpr float EPSILON = 0.01F;
+        if (std::abs(posComp->value.x()) < EPSILON && std::abs(posComp->value.y()) < EPSILON)
+        {
+            // 更新 Position 组件为窗口实际位置
+            posComp->value = Eigen::Vector2f{static_cast<float>(currentX), static_cast<float>(currentY)};
+            return;
+        }
+
+        // 后续帧：只在 Position 组件与实际窗口位置不同时才设置
         int targetX = static_cast<int>(posComp->value.x());
         int targetY = static_cast<int>(posComp->value.y());
 
-        // 只在位置不同时才设置
-        if (currentX != targetX || currentY != targetY)
+        // 只在位置明显不同时才设置（避免浮点误差导致的抖动）
+        if (std::abs(currentX - targetX) > 1 || std::abs(currentY - targetY) > 1)
         {
             SDL_SetWindowPosition(sdlWindow, targetX, targetY);
         }

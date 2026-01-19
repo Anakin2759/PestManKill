@@ -78,6 +78,9 @@ void CreateMainWindow()
 
     ui::helper::AddChild(gameWindow, openMenuDialogBtn);
 
+    // 显示主窗口（同步尺寸并居中）
+    ui::helper::Show(gameWindow);
+
     LOG_INFO("主窗口已创建");
 }
 
@@ -144,11 +147,8 @@ void CreateMenuDialog()
     startClickable.onClick = [menuDialog]()
     {
         CreateMainWindow();
-        auto& registry = utils::Registry::getInstance();
-        if (registry.valid(menuDialog) && registry.any_of<ui::components::VisibleTag>(menuDialog))
-        {
-            registry.remove<ui::components::VisibleTag>(menuDialog);
-        }
+        // 隐藏菜单对话框
+        ui::helper::Hide(menuDialog);
     };
     ui::helper::AddChild(menuDialog, startBtn);
 
@@ -198,6 +198,9 @@ void CreateMenuDialog()
     versionText.alignment = ui::policies::Alignment::CENTER;
     versionText.color = {0.6F, 0.6F, 0.6F, 1.0F};
     ui::helper::AddChild(menuDialog, versionLabel);
+
+    // 显示菜单对话框（同步尺寸并居中）
+    ui::helper::Show(menuDialog);
 }
 } // namespace
 int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
