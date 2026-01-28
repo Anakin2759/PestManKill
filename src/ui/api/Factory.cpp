@@ -148,7 +148,7 @@ entt::entity CreateDialog(std::string_view title, std::string_view alias)
     size.sizePolicy = ui::policies::Size::Fixed;
     auto& dialog = Registry::Emplace<components::Window>(entity);
     dialog.title = std::string(title);
-    dialog.flags = policies::WindowFlag::NoTitleBar;
+    dialog.flags |= policies::WindowFlag::NoTitleBar;
     constexpr int DEFAULT_DIALOG_WIDTH = 400;
     constexpr int DEFAULT_DIALOG_HEIGHT = 300;
     SDL_Window* sdlWindow = SDL_CreateWindow(

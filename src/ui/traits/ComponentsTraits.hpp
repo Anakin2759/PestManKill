@@ -60,7 +60,7 @@ using DataComponents = TypeList<components::BaseInfo,
                                 components::ProgressBar>;
 
 // ===================== 标签列表 =====================
-using TagComponents = TypeList<components::MainWidgetTag,
+using TagComponents = TypeList<
                                components::UiTag,
                                components::ButtonTag,
                                components::LabelTag,

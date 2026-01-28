@@ -120,6 +120,12 @@ public:
         return getInstance().m_registry.on_update<Type>();
     }
 
+    template <ComponentOrUiTag Type>
+    static auto Clear()
+    {
+        return getInstance().m_registry.clear<Type>();
+    }
+
 private:
     Registry() = default;
 

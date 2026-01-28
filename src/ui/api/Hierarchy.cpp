@@ -16,7 +16,7 @@ void RemoveChild(::entt::entity parent, ::entt::entity child)
         auto& children = parentHierarchy->children;
         std::erase(children, child);
         childHierarchy->parent = ::entt::null;
-        layout::MarkLayoutDirty(parent);
+        utils::MarkLayoutDirty(parent);
     }
 }
 
@@ -47,7 +47,7 @@ void AddChild(::entt::entity parent, ::entt::entity child)
         children.push_back(child);
     }
 
-    layout::MarkLayoutDirty(child);
+    utils::MarkLayoutDirty(child);
 }
 
 } // namespace ui::hierarchy

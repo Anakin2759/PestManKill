@@ -7,7 +7,6 @@ set(UI_SOURCES
     core/Application.cpp
     core/EventLoop.cpp
     core/SystemManager.cpp
-    core/TaskChain.cpp
     api/Size.cpp
     api/Visibility.cpp
     api/Layout.cpp

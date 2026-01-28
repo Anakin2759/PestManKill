@@ -7,7 +7,6 @@
  * @brief UI ECS 标记组件定义 (纯空结构体 Tag)
  *
  * 用于标记UI元素的类型。
-    -MainWidgetTag: 主组件标记，通常是根实体或主要容器
     -ButtonTag: 按钮标记
     -LabelTag: 文本标签标记
     -TextTag: 文本通用标记
@@ -34,12 +33,6 @@ namespace ui::components
 
 // ===================== I. UI 类型标记 (用于 RenderSystem 视图查询) =====================
 
-/**
- * @brief 主组件标记，通常是根实体或主要容器
- */
-struct MainWidgetTag
-{
-};
 
 /**
  * @brief 标记该实体属于 UI 模块

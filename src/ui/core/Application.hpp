@@ -68,7 +68,7 @@ public:
 
 private:
     EventLoop m_eventLoop;
-    entt::scheduler m_scheduler;
+
     // 核心 ECS 系统封装
     SystemManager m_systems;
     // ECS 根实体，代表整个屏幕/应用区域

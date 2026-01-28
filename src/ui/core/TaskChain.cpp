@@ -15,15 +15,7 @@ InputTaskChain::InputTaskChain(const allocator_type& alloc, delta_type delay)
 
 void InputTaskChain::update(const delta_type delta, [[maybe_unused]] void* data)
 {
-    if (m_remainingTime > delta)
-    {
-        m_remainingTime -= delta;
-        return;
-    }
-    m_remainingTime = m_delayTime;
-
-    Dispatcher::Enqueue<ui::events::SDLEvent>(ui::events::SDLEvent{});
-    m_remainingTime = m_delayTime;
+    
 }
 
 void InputTaskChain::succeeded()
@@ -97,41 +89,11 @@ void EventTaskChain::update(const delta_type delta, [[maybe_unused]] void* data)
         return;
     }
     m_remainingTime = m_delayTime;
-
+    Dispatcher::Update<events::QueuedTask>();
     Dispatcher::Update();
 }
 
-void EventTaskChain::succeeded()
-{
-    Logger::info("[event task] EventTask succeeded");
-}
-void EventTaskChain::failed()
-{
-    Logger::info("[event task] EventTask failed");
-}
-void EventTaskChain::aborted()
-{
-    Logger::info("[event task] EventTask aborted");
-}
 
-QueuedTaskChain::QueuedTaskChain(const allocator_type& alloc) : entt::process{alloc} {}
 
-void QueuedTaskChain::update([[maybe_unused]] const delta_type delta, [[maybe_unused]] void* data)
-{
-    Dispatcher::Update<events::QueuedTask>();
-}
-
-void QueuedTaskChain::succeeded()
-{
-    Logger::info("[queued task] QueuedTask succeeded");
-}
-void QueuedTaskChain::failed()
-{
-    Logger::info("[queued task] QueuedTask failed");
-}
-void QueuedTaskChain::aborted()
-{
-    Logger::info("[queued task] QueuedTask aborted");
-}
 
 } // namespace ui

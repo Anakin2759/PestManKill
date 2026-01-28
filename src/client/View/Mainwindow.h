@@ -160,8 +160,8 @@ inline void CreateMainWindow()
                                        ui::text::SetTextEditContent(chatInput, "");
                                        ui::text::SetTextContent(chatInput, "");
 
-                                       ui::layout::MarkLayoutDirty(chatInput);
-                                       ui::layout::MarkLayoutDirty(messageArea);
+                                       ui::utils::MarkLayoutDirty(chatInput);
+                                       ui::utils::MarkLayoutDirty(messageArea);
                                    }
                                });
 

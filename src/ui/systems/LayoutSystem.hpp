@@ -104,22 +104,13 @@ public:
     {
         Dispatcher::Sink<events::UpdateLayout>().connect<&LayoutSystem::update>(*this);
 
-        // 注册自动脏化观察器
-
-        Registry::OnUpdate<components::Size>().connect<&LayoutSystem::onSizeChanged>(*this);
-        Registry::OnUpdate<components::LayoutInfo>().connect<&LayoutSystem::onLayoutInfoChanged>(*this);
-        Registry::OnUpdate<components::Padding>().connect<&LayoutSystem::onPaddingChanged>(*this);
-        Registry::OnUpdate<components::Hierarchy>().connect<&LayoutSystem::onHierarchyChanged>(*this);
+        
     }
 
     void unregisterHandlersImpl()
     {
         Dispatcher::Sink<events::UpdateLayout>().disconnect<&LayoutSystem::update>(*this);
 
-        Registry::OnUpdate<components::Size>().disconnect<&LayoutSystem::onSizeChanged>(*this);
-        Registry::OnUpdate<components::LayoutInfo>().disconnect<&LayoutSystem::onLayoutInfoChanged>(*this);
-        Registry::OnUpdate<components::Padding>().disconnect<&LayoutSystem::onPaddingChanged>(*this);
-        Registry::OnUpdate<components::Hierarchy>().disconnect<&LayoutSystem::onHierarchyChanged>(*this);
     }
 
     /**
@@ -127,25 +118,13 @@ public:
      */
     void update() noexcept
     {
-        // LayoutSystem 仅依赖 ECS 组件：画布尺寸来自主画布实体（MainWidgetTag）的 Size。
-        const Vec2 canvas = getCanvasSizeFromEcs();
-        const bool canvasValid = (canvas.x() > 0.0F && canvas.y() > 0.0F);
-
         // 检查是否有脏节点
         auto dirtyView = Registry::View<components::LayoutDirtyTag>();
-        if (dirtyView.begin() == dirtyView.end()) return;
+        if (dirtyView.empty()) return;
 
         // 查找所有顶层容器
-        std::vector<entt::entity> rootEntities;
-        auto view = Registry::View<components::Hierarchy, components::Position>();
-        for (auto entity : view)
-        {
-            const auto& hierarchy = Registry::Get<components::Hierarchy>(entity);
-            if (hierarchy.parent == entt::null)
-            {
-                rootEntities.push_back(entity);
-            }
-        }
+
+        auto view = Registry::View<components::Hierarchy, components::Position, components::Size>();
 
         // 清理上一帧的 Yoga 节点
         clearYogaNodes();
@@ -153,7 +132,7 @@ public:
         bool needRetryForCentering = false;
 
         // 对每个根节点构建 Yoga 树并计算布局
-        for (entt::entity root : rootEntities)
+        for (auto root : view)
         {
             // 构建 Yoga 节点树
             YGNodeRef rootNode = buildYogaTree(root);
@@ -163,103 +142,34 @@ public:
             // 3. 获取根容器尺寸（用于布局计算）
             float rootWidth = YGUndefined;
             float rootHeight = YGUndefined;
-
-            if (const auto* sizeComp = Registry::TryGet<components::Size>(root))
-            {
-                // 处理 FillParent（屏幕尺寸）
-                if (policies::HasFlag(sizeComp->sizePolicy, policies::Size::HFill))
-                {
-                    rootWidth = canvasValid ? canvas.x() : sizeComp->size.x();
-                }
-                else
-                {
-                    rootWidth = sizeComp->size.x();
-                }
-
-                if (policies::HasFlag(sizeComp->sizePolicy, policies::Size::VFill))
-                {
-                    rootHeight = canvasValid ? canvas.y() : sizeComp->size.y();
-                }
-                else
-                {
-                    rootHeight = sizeComp->size.y();
-                }
-            }
-
+            auto sizeComp = Registry::TryGet<components::Size>(root);
+            rootWidth = sizeComp->size.x();
+            rootHeight = sizeComp->size.y();
             // 4. 计算布局
             YGNodeCalculateLayout(rootNode, rootWidth, rootHeight, YGDirectionLTR);
 
             // 5. 回写布局结果到 ECS
             applyYogaLayout(root, rootNode, 0.0F, 0.0F);
 
-            // 6. 应用窗口居中策略（针对顶层容器，使用画布尺寸）
-            if (canvasValid)
-            {
-                applyWindowCentering(root, canvas.x(), canvas.y());
-            }
-            else
-            {
-                // 如果当前根节点需要居中，但画布尺寸尚未准备好，则保留脏标记，下一帧自动重算。
-                if (wantsWindowCentering(root))
-                {
-                    needRetryForCentering = true;
-                }
-            }
+            applyWindowCentering(root, rootWidth, rootHeight);
         }
 
         // 清除所有脏标记。
         // 若画布尺寸尚未准备好且存在需要居中的根节点，则保留脏标记以便下一帧重算。
         if (!needRetryForCentering)
         {
-            for (auto entity : dirtyView)
-            {
-                Registry::Remove<components::LayoutDirtyTag>(entity);
-            }
+            Registry::Clear<components::LayoutDirtyTag>();
         }
     }
-
-    Vec2 getCanvasSizeFromEcs() const // NOLINT(readability-convert-member-functions-to-static)
+    /**
+     * @brief 获取窗口尺寸
+     */
+    Vec2 getWindowSize(entt::entity entity) const // NOLINT(readability-convert-member-functions-to-static)
     {
-        auto view = Registry::View<components::MainWidgetTag, components::Size>();
-        // NOLINTNEXTLINE
-        for (auto entity : view)
-        {
-            const auto& size = Registry::Get<components::Size>(entity);
-            return size.size;
-        }
+        const auto& size = Registry::Get<components::Size>(entity);
+        return size.size;
+
         return {0.0F, 0.0F};
-    }
-
-    bool wantsWindowCentering(entt::entity root) const
-    {
-        auto* pos = Registry::TryGet<components::Position>(root);
-        auto* size = Registry::TryGet<components::Size>(root);
-        if (pos == nullptr || size == nullptr) return false;
-
-        // 默认：位置是 (0,0) 且尺寸有效，则视为需要自动居中
-        bool wantCenter =
-            (pos->value.x() == 0.0F && pos->value.y() == 0.0F && size->size.x() > 0.0F && size->size.y() > 0.0F);
-
-        if (auto* pos = Registry::TryGet<components::Position>(root))
-        {
-            const bool hCenter = policies::HasFlag(pos->positionPolicy, policies::Position::HCenter);
-            const bool vCenter = policies::HasFlag(pos->positionPolicy, policies::Position::VCenter);
-
-            if (hCenter || vCenter)
-            {
-                wantCenter = true;
-            }
-
-            const bool hFixed = policies::HasFlag(pos->positionPolicy, policies::Position::HFixed);
-            const bool vFixed = policies::HasFlag(pos->positionPolicy, policies::Position::VFixed);
-
-            if (hFixed && vFixed)
-            {
-                wantCenter = false;
-            }
-        }
-
-        return wantCenter;
     }
 
 private:
@@ -587,42 +497,55 @@ private:
         }
     }
 
-    /**
-     * @brief 递归应用 Yoga 布局结果到 ECS 组件
-     */
-    static void applyYogaLayout( // NOLINT(misc-no-recursion)
-        entt::entity entity,
-        YGNodeRef node,
-        float parentX,
-        float parentY)
+    static void applyYogaLayout(entt::entity entity, YGNodeRef node, float parentX, float parentY)
     {
         if (node == nullptr) return;
 
-        // 获取 Yoga 计算的布局结果
+        bool isDirty = false; // 用于跟踪当前实体是否发生了布局变化
+
+        // 1. 获取 Yoga 计算结果
         float left = YGNodeLayoutGetLeft(node);
         float top = YGNodeLayoutGetTop(node);
         float width = YGNodeLayoutGetWidth(node);
         float height = YGNodeLayoutGetHeight(node);
 
-        // 安全检查：跳过无效值
+        // 安全检查
         if (std::isnan(left)) left = 0.0F;
         if (std::isnan(top)) top = 0.0F;
 
-        // 回写到 Position 组件（相对于父容器）
+        // 2. 回写 Position 并检查差异
         if (auto* pos = Registry::TryGet<components::Position>(entity))
         {
-            pos->value.x() = left;
-            pos->value.y() = top;
+            if (pos->value.x() != left || pos->value.y() != top)
+            {
+                pos->value.x() = left;
+                pos->value.y() = top;
+                isDirty = true;
+            }
         }
 
-        // 回写到 Size 组件（仅当值有效时）
+        // 3. 回写 Size 并检查差异
         if (auto* size = Registry::TryGet<components::Size>(entity))
         {
-            if (!std::isnan(width) && width > 0) size->size.x() = width;
-            if (!std::isnan(height) && height > 0) size->size.y() = height;
+            // 只有当 Yoga 返回了有效的正数尺寸且与当前值不同时才更新
+            bool widthChanged = (!std::isnan(width) && width > 0 && size->size.x() != width);
+            bool heightChanged = (!std::isnan(height) && height > 0 && size->size.y() != height);
+
+            if (widthChanged || heightChanged)
+            {
+                if (widthChanged) size->size.x() = width;
+                if (heightChanged) size->size.y() = height;
+                isDirty = true;
+            }
         }
 
-        // 递归处理子节点
+        // 如果位置或尺寸变了，标记该实体为脏
+        if (isDirty)
+        {
+            utils::MarkRenderDirty(entity);
+        }
+
+        // 4. 递归处理子节点
         const uint32_t childCount = YGNodeGetChildCount(node);
         const auto* hierarchy = Registry::TryGet<components::Hierarchy>(entity);
 
@@ -634,7 +557,6 @@ private:
             uint32_t yogaChildIndex = 0;
             for (entt::entity child : hierarchy->children)
             {
-                // Spacer 没有 Size 组件，但仍需遍历以同步 Yoga 子节点索引
                 const bool isSpacer = Registry::AnyOf<components::SpacerTag>(child);
                 const bool hasLayoutComponents = Registry::AllOf<components::Position, components::Size>(child);
 
@@ -643,42 +565,46 @@ private:
                 if (yogaChildIndex < childCount)
                 {
                     YGNodeRef childNode = YGNodeGetChild(node, yogaChildIndex);
+
+                    // 递归
                     applyYogaLayout(child, childNode, left, top);
 
-                    // 收集子元素边界用于计算 ScrollArea 内容大小
-                    // 注意：这里的 layout 结果是相对于父容器的
-                    float childLeft = YGNodeLayoutGetLeft(childNode);
-                    float childTop = YGNodeLayoutGetTop(childNode);
-                    float childWidth = YGNodeLayoutGetWidth(childNode);
-                    float childHeight = YGNodeLayoutGetHeight(childNode);
+                    // 收集边界用于 ScrollArea
+                    float cL = YGNodeLayoutGetLeft(childNode);
+                    float cT = YGNodeLayoutGetTop(childNode);
+                    float cW = YGNodeLayoutGetWidth(childNode);
+                    float cH = YGNodeLayoutGetHeight(childNode);
 
-                    if (std::isnan(childLeft)) childLeft = 0.0F;
-                    if (std::isnan(childTop)) childTop = 0.0F;
-                    if (std::isnan(childWidth)) childWidth = 0.0F;
-                    if (std::isnan(childHeight)) childHeight = 0.0F;
-
-                    maxContentRight = std::max(maxContentRight, childLeft + childWidth);
-                    maxContentBottom = std::max(maxContentBottom, childTop + childHeight);
+                    maxContentRight =
+                        std::max(maxContentRight, (std::isnan(cL) ? 0.0f : cL) + (std::isnan(cW) ? 0.0f : cW));
+                    maxContentBottom =
+                        std::max(maxContentBottom, (std::isnan(cT) ? 0.0f : cT) + (std::isnan(cH) ? 0.0f : cH));
 
                     yogaChildIndex++;
                 }
             }
         }
 
-        // 如果是 ScrollArea，更新内容大小
+        // 5. 特殊处理 ScrollArea 内容尺寸
         if (auto* scrollArea = Registry::TryGet<components::ScrollArea>(entity))
         {
-            // 获取内边距
-            float paddingRight = 0.0F;
-            float paddingBottom = 0.0F;
+            float pR = 0.0F, pB = 0.0F;
             if (auto* padding = Registry::TryGet<components::Padding>(entity))
             {
-                paddingRight = padding->values.y();
-                paddingBottom = padding->values.w();
+                pR = padding->values.y();
+                pB = padding->values.w();
             }
 
-            scrollArea->contentSize.x() = maxContentRight + paddingRight;
-            scrollArea->contentSize.y() = maxContentBottom + paddingBottom;
+            float newContentW = maxContentRight + pR;
+            float newContentH = maxContentBottom + pB;
+
+            if (scrollArea->contentSize.x() != newContentW || scrollArea->contentSize.y() != newContentH)
+            {
+                scrollArea->contentSize.x() = newContentW;
+                scrollArea->contentSize.y() = newContentH;
+                // 如果滚动区域的内容大小变了，通常也需要重新渲染
+                utils::MarkRenderDirty(entity);
+            }
         }
     }
 
@@ -694,58 +620,55 @@ private:
     {
         auto* pos = Registry::TryGet<components::Position>(root);
         auto* size = Registry::TryGet<components::Size>(root);
-        if (pos == nullptr || size == nullptr) return;
 
-        // 检查是否有 Position 组件来决定居中策略
-        bool centerH = false;
-        bool centerV = false;
+        // 基础检查：没有组件或尺寸无效则不处理
+        if (!pos || !size || size->size.x() <= 0.0F || size->size.y() <= 0.0F)
+        {
+            return;
+        }
 
-        // 默认：如果位置是 (0,0) 且尺寸有效，则视为需要自动居中
+        // 1. 判断是否需要居中
+        // 策略 A: 显式指定了 Default 策略
+        bool isDefault = (pos->positionPolicy == policies::Position::Default);
+
+        // 策略 B: 显式指定了居中 Flag
+        bool centerH = policies::HasFlag(pos->positionPolicy, policies::Position::HCenter);
+        bool centerV = policies::HasFlag(pos->positionPolicy, policies::Position::VCenter);
+
+        // 策略 C: 隐式检查（保留你之前的坐标 0,0 判断，但作为次级优先级）
+        // 如果你希望彻底弃用 0,0 判断，可以删掉这一行
         bool implicitCenter = (pos->value.x() == 0.0F && pos->value.y() == 0.0F);
 
-        // 如果有明确的位置策略，检查是否要求居中
-        // Position 组件中包含了策略
-        if (pos != nullptr)
-        {
-            centerH = policies::HasFlag(pos->positionPolicy, policies::Position::HCenter);
-            centerV = policies::HasFlag(pos->positionPolicy, policies::Position::VCenter);
+        // 覆盖逻辑：如果设置了 Fixed，强制取消对应的居中意图
+        if (policies::HasFlag(pos->positionPolicy, policies::Position::HFixed)) centerH = false;
+        if (policies::HasFlag(pos->positionPolicy, policies::Position::VFixed)) centerV = false;
 
-            // 如果两个都显式指定为 FIXED，则不使用隐式居中
-            if (policies::HasFlag(pos->positionPolicy, policies::Position::HFixed) &&
-                policies::HasFlag(pos->positionPolicy, policies::Position::VFixed))
-            {
-                implicitCenter = false;
-            }
+        // 2. 综合决策：如果是 Default 且没有被 Fixed 覆盖，则全居中
+        if (isDefault)
+        {
+            // 在 Default 策略下，除非显式指定了 Fixed，否则默认水平垂直双居中
+            if (!policies::HasFlag(pos->positionPolicy, policies::Position::HFixed)) centerH = true;
+            if (!policies::HasFlag(pos->positionPolicy, policies::Position::VFixed)) centerV = true;
+        }
+        else if (!centerH && !centerV && implicitCenter)
+        {
+            // 如果不是 Default，也没有 Flag，但坐标是 0,0 且没被 Fixed，也可以补救性居中
+            if (!policies::HasFlag(pos->positionPolicy, policies::Position::HFixed)) centerH = true;
+            if (!policies::HasFlag(pos->positionPolicy, policies::Position::VFixed)) centerV = true;
         }
 
-        if (!centerH && !centerV && implicitCenter)
+        // 3. 执行应用
+        if (centerH)
         {
-            centerH = true;
-            centerV = true;
+            pos->value.x() = (screenWidth - size->size.x()) / 2.0F;
         }
-
-        if (size->size.x() > 0 && size->size.y() > 0)
+        if (centerV)
         {
-            if (centerH) pos->value.x() = (screenWidth - size->size.x()) / 2.0F;
-            if (centerV) pos->value.y() = (screenHeight - size->size.y()) / 2.0F;
-        }
-    }
-
-    // ===================== 脏标记回调 =====================
-
-    void onSizeChanged(entt::entity entity) { markEntityAndParentsDirty(entity); }
-
-    void onLayoutInfoChanged(entt::entity entity) { Registry::EmplaceOrReplace<components::LayoutDirtyTag>(entity); }
-
-    void onPaddingChanged(entt::entity entity) { Registry::EmplaceOrReplace<components::LayoutDirtyTag>(entity); }
-
-    void onHierarchyChanged(entt::entity entity)
-    {
-        if (Registry::AnyOf<components::LayoutInfo>(entity))
-        {
-            Registry::EmplaceOrReplace<components::LayoutDirtyTag>(entity);
+            pos->value.y() = (screenHeight - size->size.y()) / 2.0F;
         }
     }
+
+
 
     void markEntityAndParentsDirty(entt::entity entity)
     {

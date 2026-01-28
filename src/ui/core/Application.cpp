@@ -24,32 +24,29 @@ Application::Application(int argc, char* argv[])
     Logger::info("SDL 初始化成功");
 
     m_systems.registerAllHandlers();
-
-    m_scheduler.attach<ui::QueuedTaskChain>();
-    m_scheduler.attach<ui::EventTaskChain>(FRAME_DELAY_MS);
-    m_scheduler.attach<ui::InputTaskChain>(FRAME_DELAY_MS);
-    m_scheduler.attach<ui::RenderTaskChain>(RENDER_DELAY_MS);
-
+    auto taskChain = tasks::QueuedTask{} | tasks::InputTask{} | tasks::RenderTask{};
     m_eventLoop.registerDefaultHandler(
-        [this]()
+        [this, taskChain = std::move(taskChain)]() mutable
         {
             auto now = std::chrono::steady_clock::now();
 
-            // 2. 计算差值（毫秒级，保留浮点精度）
-            std::chrono::duration<float, std::milli> diff = now - m_lastUpdateTime;
-            float dtMs = diff.count();
+            // 1. 使用 duration_cast 显式转换精度，并直接获取 count
+            // 建议先转为默认的有符号 milliseconds，再 count() 之后 static_cast
+            auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(now - m_lastUpdateTime);
+            uint32_t dtMs = static_cast<uint32_t>(diff.count());
 
-            // 3. 更新最后一次时间点
+            // 2. 更新时间点
             m_lastUpdateTime = now;
 
-            // 4. 安全保护：防止 dt 过大（如断点调试后）
-            if (dtMs > static_cast<float>(MAX_FRAME_TIME_MS))
+            // 3. 安全保护
+            if (dtMs > MAX_FRAME_TIME_MS)
             {
-                dtMs = static_cast<float>(MAX_FRAME_TIME_MS);
+                dtMs = MAX_FRAME_TIME_MS;
             }
 
-            // 5. 将毫秒差值填入调度器
-            m_scheduler.update(dtMs);
+            // 4. 执行任务链
+            taskChain(dtMs);
+
             SDL_Delay(LOOP_DELAY_MS);
         });
 

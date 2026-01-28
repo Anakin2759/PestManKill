@@ -13,7 +13,7 @@ void SetButtonText(::entt::entity entity, const std::string& content)
     {
         auto& text = Registry::GetOrEmplace<components::Text>(entity);
         text.content = content;
-        layout::MarkLayoutDirty(entity);
+        utils::MarkLayoutDirty(entity);
     }
 }
 
@@ -33,7 +33,7 @@ void SetLabelText(::entt::entity entity, const std::string& content)
     {
         auto& text = Registry::GetOrEmplace<components::Text>(entity);
         text.content = content;
-        layout::MarkLayoutDirty(entity);
+        utils::MarkLayoutDirty(entity);
     }
 }
 
@@ -42,7 +42,7 @@ void SetTextContent(::entt::entity entity, const std::string& content)
     if (!Registry::Valid(entity)) return;
     auto& text = Registry::GetOrEmplace<components::Text>(entity);
     text.content = content;
-    layout::MarkLayoutDirty(entity);
+    utils::MarkLayoutDirty(entity);
 }
 
 void SetTextWordWrap(::entt::entity entity, policies::TextWrap mode)
@@ -50,7 +50,7 @@ void SetTextWordWrap(::entt::entity entity, policies::TextWrap mode)
     if (!Registry::Valid(entity)) return;
     auto& text = Registry::GetOrEmplace<components::Text>(entity);
     text.wordWrap = mode;
-    layout::MarkLayoutDirty(entity);
+    utils::MarkLayoutDirty(entity);
 }
 
 void SetTextAlignment(::entt::entity entity, policies::Alignment alignment)
@@ -58,7 +58,7 @@ void SetTextAlignment(::entt::entity entity, policies::Alignment alignment)
     if (!Registry::Valid(entity)) return;
     auto& text = Registry::GetOrEmplace<components::Text>(entity);
     text.alignment = alignment;
-    layout::MarkLayoutDirty(entity);
+    utils::MarkLayoutDirty(entity);
 }
 
 void SetTextColor(::entt::entity entity, const Color& color)

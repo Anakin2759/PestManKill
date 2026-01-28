@@ -52,7 +52,7 @@ void Show(::entt::entity entity)
         }
     }
     Registry::EmplaceOrReplace<components::VisibleTag>(entity);
-    layout::MarkLayoutDirty(entity);
+    utils::MarkLayoutDirty(entity);
 }
 
 void Hide(::entt::entity entity)

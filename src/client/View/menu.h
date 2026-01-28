@@ -21,7 +21,9 @@ inline void CreateMenuDialog()
     }
     // 创建菜单对话框
     auto menuDialog = ui::factory::CreateDialog("PestManKill Menu", "menuDialog");
-    ui::size::SetFixedSize(menuDialog, 800.0F, 300.0F);
+
+    ui::size::SetSize(menuDialog, 160.0F, 300.0F);
+
     // 位置 (0,0) 会触发自动居中
 
     // 添加窗口背景

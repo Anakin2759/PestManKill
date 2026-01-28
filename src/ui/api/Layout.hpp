@@ -23,7 +23,7 @@
 #include "../common/Policies.hpp"
 namespace ui::layout
 {
-void MarkLayoutDirty(::entt::entity entity);
+
 void SetLayoutDirection(::entt::entity entity, policies::LayoutDirection direction);
 void SetLayoutSpacing(::entt::entity entity, float spacing);
 void SetPadding(::entt::entity entity, float left, float top, float right, float bottom);
