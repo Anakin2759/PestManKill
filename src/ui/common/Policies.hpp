@@ -94,7 +94,6 @@ enum class Interaction : uint8_t
 enum class ButtonVisual : uint8_t
 {
     Idle,    // 默认状态
-    Hover,   // 鼠标悬停
     Pressed, // 鼠标按下 (通常等于 Active 状态)
     Disabled // 不可用状态
 };

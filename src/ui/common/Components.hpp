@@ -33,6 +33,7 @@ using on_event = std::move_only_function<void(Args...)>;
 // ===================== 基本信息组件 =====================
 struct BaseInfo
 {
+    using is_component_tag = void;
     std::string alias; // 组件别名，便于调试和识别
 };
 // ===================== 基础尺寸与位置 =====================
@@ -42,6 +43,7 @@ struct BaseInfo
  */
 struct Size
 {
+    using is_component_tag = void;
     Vec2 size{0.0F, 0.0F};
     Vec2 minSize{0.0F, 0.0F};
     Vec2 maxSize{FLT_MAX, FLT_MAX};
@@ -55,6 +57,7 @@ struct Size
  */
 struct Position
 {
+    using is_component_tag = void;
     Vec2 value{0.0F, 0.0F};
     policies::Position positionPolicy = policies::Position::Fixed;
 };
@@ -66,6 +69,7 @@ struct Position
  */
 struct CanvasSize
 {
+    using is_component_tag = void;
     Vec2 value{0.0F, 0.0F};
 };
 
@@ -74,6 +78,7 @@ struct CanvasSize
  */
 struct Margin
 {
+    using is_component_tag = void;
     Vec4 values{0.0F, 0.0F, 0.0F, 0.0F}; // Top, Right, Bottom, Left
 };
 
@@ -83,6 +88,7 @@ struct Margin
  */
 struct Padding
 {
+    using is_component_tag = void;
     Vec4 values{0.0F, 0.0F, 0.0F, 0.0F}; // Top, Right, Bottom, Left
 };
 
@@ -91,6 +97,7 @@ struct Padding
  */
 struct Background
 {
+    using is_component_tag = void;
     Color color{0.0F, 0.0F, 0.0F, 0.0F};
     Vec4 borderRadius{0.0F, 0.0F, 0.0F, 0.0F}; // 圆角半径 (x:TopLeft, y:TopRight, z:BottomRight, w:BottomLeft)
     policies::Feature enabled = policies::Feature::Disabled; // 是否启用背景绘制
@@ -101,6 +108,7 @@ struct Background
  */
 struct Border
 {
+    using is_component_tag = void;
     Color color{1.0F, 1.0F, 1.0F, 1.0F};
     float thickness = 1.0F;
     Vec4 borderRadius{0.0F, 0.0F, 0.0F, 0.0F}; // 圆角半径
@@ -112,6 +120,7 @@ struct Border
  */
 struct Shadow
 {
+    using is_component_tag = void;
     float softness{};                    // 阴影柔和度
     Vec2 offset{0.0F, 0.0F};             // 阴影偏移 (x, y)
     Color color{0.0F, 0.0F, 0.0F, 1.0F}; // 阴影颜色
@@ -123,6 +132,7 @@ struct Shadow
  */
 struct Alpha
 {
+    using is_component_tag = void;
     float value = 1.0F;
 };
 
@@ -133,6 +143,7 @@ struct Alpha
  */
 struct Hierarchy
 {
+    using is_component_tag = void;
     entt::entity parent = entt::null;
     std::vector<entt::entity> children; // 存储所有子节点
 };
@@ -141,6 +152,7 @@ struct Hierarchy
  */
 struct ZIndex
 {
+    using is_component_tag = void;
     int value = 0; // Z 顺序值，值越大越靠前
 };
 
@@ -149,6 +161,7 @@ struct ZIndex
  */
 struct ScrollArea
 {
+    using is_component_tag = void;
     static constexpr float DEFAULT_SCROLL_SPEED = 10.0F;
     Vec2 scrollOffset{0.0F, 0.0F};                        // 当前滚动位置
     Vec2 contentSize{0.0F, 0.0F};                         // 内容区域大小
@@ -165,6 +178,7 @@ struct ScrollArea
  */
 struct LayoutInfo
 {
+    using is_component_tag = void;
     static constexpr float DEFAULT_SPACING = 5.0F;
     policies::LayoutDirection direction = policies::LayoutDirection::HORIZONTAL; // 布局方向
     policies::Alignment alignment = policies::Alignment::CENTER;                 // 元素对齐方式
@@ -176,6 +190,7 @@ struct LayoutInfo
  */
 struct Spacer
 {
+    using is_component_tag = void;
     uint8_t stretchFactor = 1; // 默认拉伸因子
 };
 
@@ -186,6 +201,7 @@ struct Spacer
  */
 struct Text
 {
+    using is_component_tag = void;
     std::string content; // 文本内容
     Color color{1.0F, 1.0F, 1.0F, 1.0F};
     float fontSize = 0.0F; // 0 表示使用默认字体大小
@@ -201,6 +217,7 @@ struct Text
  */
 struct TextEdit
 {
+    using is_component_tag = void;
     static constexpr size_t MAX_LENGTH = 1024;
     std::string buffer;      // 存储输入文本的缓冲区
     std::string placeholder; // 占位符文本
@@ -216,6 +233,7 @@ struct TextEdit
  */
 struct Image
 {
+    using is_component_tag = void;
     void* textureId = nullptr;                 // 纹理句柄 (例如 SDL_Texture* 或 OpenGL ID)
     Vec2 uvMin{0.0F, 0.0F};                    // UV 最小坐标
     Vec2 uvMax{1.0F, 1.0F};                    // UV 最大坐标
@@ -231,6 +249,7 @@ struct Image
  */
 struct Clickable
 {
+    using is_component_tag = void;
     on_event<> onClick;
     policies::Feature enabled = policies::Feature::Enabled;
 };
@@ -240,6 +259,7 @@ struct Clickable
  */
 struct Hoverable
 {
+    using is_component_tag = void;
     on_event<> onHover;
     on_event<> onUnhover;
     policies::Feature enabled = policies::Feature::Enabled;
@@ -250,6 +270,7 @@ struct Hoverable
  */
 struct Pressable
 {
+    using is_component_tag = void;
     on_event<> onPress;   // 鼠标按下时触发
     on_event<> onRelease; // 鼠标松开时触发
     policies::Feature enabled = policies::Feature::Enabled;
@@ -260,6 +281,7 @@ struct Pressable
  */
 struct Checkable
 {
+    using is_component_tag = void;
     policies::CheckState checked = policies::CheckState::Unchecked;
 };
 
@@ -268,6 +290,7 @@ struct Checkable
  */
 struct ButtonState
 {
+    using is_component_tag = void;
     policies::ButtonVisual visual = policies::ButtonVisual::Idle;
     bool triggered = false; // 本帧是否触发过动作
 };
@@ -279,6 +302,7 @@ struct ButtonState
  */
 struct AnimationTime
 {
+    using is_component_tag = void;
     float duration = 1.0F;
     float elapsed = 0.0F;
     policies::Easing easing = policies::Easing::Linear;
@@ -290,6 +314,7 @@ struct AnimationTime
  */
 struct AnimationPosition
 {
+    using is_component_tag = void;
     Vec2 from;
     Vec2 to;
 };
@@ -299,12 +324,14 @@ struct AnimationPosition
  */
 struct AnimationAlpha
 {
+    using is_component_tag = void;
     float from = 1.0F;
     float to = 0.0F;
 };
 
 struct Tween
 {
+    using is_component_tag = void;
 };
 
 // ===================== 复杂组件数据 =====================
@@ -314,6 +341,7 @@ struct Tween
  */
 struct Window
 {
+    using is_component_tag = void;
     static constexpr float MIN_WID = 300.0F;
     static constexpr float MIN_HIG = 200.0F;
     std::string title;
@@ -328,6 +356,7 @@ struct Window
  */
 struct Arrow
 {
+    using is_component_tag = void;
     static constexpr float DEFAULT_THICKNESS = 2.0F;
     static constexpr float DEFAULT_ARROW_SIZE = 10.0F;
     Vec2 startPoint{0.0F, 0.0F};
@@ -342,6 +371,7 @@ struct Arrow
  */
 struct ListArea
 {
+    using is_component_tag = void;
     static constexpr float DEFAULT_ITEM_HEIGHT = 30.0F;
     std::vector<entt::entity> items;
     std::vector<int> selectedIndices;
@@ -355,6 +385,7 @@ struct ListArea
  */
 struct TableInfo
 {
+    using is_component_tag = void;
     std::vector<std::string> headers;
     std::vector<std::vector<std::string>> rows;
     std::vector<float> columnWidths;
@@ -369,6 +400,7 @@ struct TableInfo
  */
 struct LineInfo
 {
+    using is_component_tag = void;
     static constexpr float DEFAULT_THICKNESS = 2.0F;
     Vec2 startPoint{0.0F, 0.0F};
     Vec2 endPoint{100.0F, 0.0F};
@@ -383,6 +415,7 @@ struct LineInfo
  */
 struct Title
 {
+    using is_component_tag = void;
     std::string text;
 };
 
@@ -391,6 +424,7 @@ struct Title
  */
 struct Targetable
 {
+    using is_component_tag = void;
     int priority = 0;
     policies::Feature selectable = policies::Feature::Disabled;
 };
@@ -400,6 +434,7 @@ struct Targetable
  */
 struct SliderInfo
 {
+    using is_component_tag = void;
     float minValue = 0.0F; // 最小值
     float maxValue = 1.0F; // 最大值
     float currentValue = 0.0F;
@@ -416,6 +451,7 @@ struct SliderInfo
  */
 struct ScrollBar
 {
+    using is_component_tag = void;
     static constexpr float MIN_THUMB_SIZE = 20.0F;
     static constexpr float DEFAULT_WIDTH = 12.0F;
     float scrollPosition = 0.0F;                                      // 当前滚动位置 (0.0 - 1.0)
@@ -435,6 +471,7 @@ struct ScrollBar
  */
 struct ProgressBar
 {
+    using is_component_tag = void;
     float progress = 0.0F;                                                    // 进度值 (0.0 - 1.0)
     Color fillColor{0.2F, 0.6F, 1.0F, 1.0F};                                  // 填充颜色
     Color backgroundColor{0.3F, 0.3F, 0.3F, 1.0F};                            // 背景颜色

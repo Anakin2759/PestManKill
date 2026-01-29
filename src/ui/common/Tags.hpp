@@ -33,12 +33,9 @@ namespace ui::components
 
 // ===================== I. UI 类型标记 (用于 RenderSystem 视图查询) =====================
 
-
-/**
- * @brief 标记该实体属于 UI 模块
- */
-struct UiTag
+struct RootTag
 {
+    using is_tags_tag = void;
 };
 
 /**
@@ -46,6 +43,7 @@ struct UiTag
  */
 struct ButtonTag
 {
+    using is_tags_tag = void;
 };
 
 /**
@@ -53,6 +51,7 @@ struct ButtonTag
  */
 struct LabelTag
 {
+    using is_tags_tag = void;
 };
 
 /**
@@ -60,6 +59,7 @@ struct LabelTag
  */
 struct TextTag
 {
+    using is_tags_tag = void;
 };
 
 /**
@@ -67,6 +67,7 @@ struct TextTag
  */
 struct TextEditTag
 {
+    using is_tags_tag = void;
 };
 
 /**
@@ -74,6 +75,7 @@ struct TextEditTag
  */
 struct ImageTag
 {
+    using is_tags_tag = void;
 };
 
 /**
@@ -81,6 +83,7 @@ struct ImageTag
  */
 struct WindowTag
 {
+    using is_tags_tag = void;
 };
 
 /**
@@ -88,6 +91,7 @@ struct WindowTag
  */
 struct DialogTag
 {
+    using is_tags_tag = void;
 };
 
 /**
@@ -95,6 +99,7 @@ struct DialogTag
  */
 struct SpacerTag
 {
+    using is_tags_tag = void;
 };
 
 /**
@@ -102,6 +107,7 @@ struct SpacerTag
  */
 struct ArrowTag
 {
+    using is_tags_tag = void;
 };
 
 /**
@@ -109,6 +115,7 @@ struct ArrowTag
  */
 struct LineTag
 {
+    using is_tags_tag = void;
 };
 
 /**
@@ -116,6 +123,7 @@ struct LineTag
  */
 struct ListAreaTag
 {
+    using is_tags_tag = void;
 };
 
 /**
@@ -123,6 +131,7 @@ struct ListAreaTag
  */
 struct TableTag
 {
+    using is_tags_tag = void;
 };
 
 // ===================== II. 行为与状态标记 (用于 Interaction/Animation/Layout System) =====================
@@ -132,6 +141,7 @@ struct TableTag
  */
 struct ClickableTag
 {
+    using is_tags_tag = void;
 };
 
 /**
@@ -139,6 +149,7 @@ struct ClickableTag
  */
 struct DraggableTag
 {
+    using is_tags_tag = void;
 };
 
 /**
@@ -147,6 +158,7 @@ struct DraggableTag
  */
 struct HoveredTag
 {
+    using is_tags_tag = void;
 };
 
 /**
@@ -154,6 +166,7 @@ struct HoveredTag
  */
 struct ActiveTag
 {
+    using is_tags_tag = void;
 };
 
 /**
@@ -161,6 +174,7 @@ struct ActiveTag
  */
 struct DisabledTag
 {
+    using is_tags_tag = void;
 };
 
 /**
@@ -168,6 +182,7 @@ struct DisabledTag
  */
 struct FocusedTag
 {
+    using is_tags_tag = void;
 };
 
 /**
@@ -176,6 +191,7 @@ struct FocusedTag
  */
 struct VisibleTag
 {
+    using is_tags_tag = void;
 };
 
 /**
@@ -184,18 +200,17 @@ struct VisibleTag
  */
 struct LayoutDirtyTag
 {
+    using is_tags_tag = void;
 };
 
 struct RenderDirtyTag
 {
+    using is_tags_tag = void;
 };
 
-/**
- * @brief 动画进行中标记
- * AnimationSystem 添加此 Tag，用于过滤和处理正在动画的实体
- */
 struct AnimatingTag
 {
+    using is_tags_tag = void;
 };
 
 } // namespace ui::components

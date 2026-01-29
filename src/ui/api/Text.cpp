@@ -6,10 +6,10 @@
 #include "Layout.hpp"
 namespace ui::text
 {
-void SetButtonText(::entt::entity entity, const std::string& content)
+void SetText(::entt::entity entity, const std::string& content)
 {
     if (!Registry::Valid(entity)) return;
-    if (Registry::AnyOf<components::ButtonTag>(entity))
+    if (Registry::AnyOf<components::Text>(entity))
     {
         auto& text = Registry::GetOrEmplace<components::Text>(entity);
         text.content = content;
@@ -24,17 +24,6 @@ void SetButtonEnabled(::entt::entity entity, bool enabled)
         Registry::Remove<components::DisabledTag>(entity);
     else
         Registry::EmplaceOrReplace<components::DisabledTag>(entity);
-}
-
-void SetLabelText(::entt::entity entity, const std::string& content)
-{
-    if (!Registry::Valid(entity)) return;
-    if (Registry::AnyOf<components::LabelTag>(entity))
-    {
-        auto& text = Registry::GetOrEmplace<components::Text>(entity);
-        text.content = content;
-        utils::MarkLayoutDirty(entity);
-    }
 }
 
 void SetTextContent(::entt::entity entity, const std::string& content)

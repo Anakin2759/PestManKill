@@ -108,23 +108,19 @@ public:
 
     static void Destroy(::entt::entity entity) { getInstance().m_registry.destroy(entity); }
 
-    template <typename It>
-    static void Destroy(It first, It last)
-    {
-        getInstance().m_registry.destroy(first, last);
-    }
-
     template <ComponentOrUiTag Type>
     static auto OnUpdate()
     {
         return getInstance().m_registry.on_update<Type>();
     }
 
-    template <ComponentOrUiTag Type>
+    template <ComponentOrUiTag... Type>
     static auto Clear()
     {
-        return getInstance().m_registry.clear<Type>();
+        return getInstance().m_registry.clear<Type...>();
     }
+
+    static void Clear() { return getInstance().m_registry.clear(); }
 
 private:
     Registry() = default;

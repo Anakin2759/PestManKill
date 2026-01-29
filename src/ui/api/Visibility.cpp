@@ -20,6 +20,8 @@ void SetVisible(::entt::entity entity, bool visible)
 void Show(::entt::entity entity)
 {
     if (!Registry::Valid(entity)) return;
+    // 先标记可见，避免窗口事件同步时被误判为隐藏
+    Registry::EmplaceOrReplace<components::VisibleTag>(entity);
     auto* windowComp = Registry::TryGet<components::Window>(entity);
     if (windowComp != nullptr && windowComp->windowID != 0)
     {
@@ -51,13 +53,13 @@ void Show(::entt::entity entity)
             }
         }
     }
-    Registry::EmplaceOrReplace<components::VisibleTag>(entity);
     utils::MarkLayoutDirty(entity);
 }
 
 void Hide(::entt::entity entity)
 {
     if (!Registry::Valid(entity)) return;
+    Registry::Remove<components::VisibleTag>(entity);
     auto* windowComp = Registry::TryGet<components::Window>(entity);
     if (windowComp != nullptr && windowComp->windowID != 0)
     {
@@ -67,7 +69,6 @@ void Hide(::entt::entity entity)
             SDL_HideWindow(sdlWindow);
         }
     }
-    Registry::Remove<components::VisibleTag>(entity);
 }
 
 void SetAlpha(::entt::entity entity, float alpha)

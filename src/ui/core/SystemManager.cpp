@@ -9,8 +9,9 @@
 #include "../systems/RenderSystem.hpp"
 #include "../systems/TweenSystem.hpp"
 #include "../systems/InteractionSystem.hpp"
+#include "../systems/HitTestSystem.hpp"
 #include "../systems/LayoutSystem.hpp"
-#include "../systems/WidgetSystem.hpp" // 保持与 Application.h 中的一致
+#include "../systems/StateSystem.hpp" // 保持与 Application.h 中的一致
 #include "../systems/ActionSystem.hpp"
 namespace ui
 {
@@ -18,10 +19,11 @@ SystemManager::SystemManager()
 {
     m_systems.reserve(SYSTEM_COUNT);
     m_systems.emplace_back(systems::InteractionSystem{});
+    m_systems.emplace_back(systems::HitTestSystem{});
     m_systems.emplace_back(systems::TweenSystem{});
     m_systems.emplace_back(systems::LayoutSystem{});
     m_systems.emplace_back(systems::RenderSystem{});
-    m_systems.emplace_back(systems::WidgetSystem{});
+    m_systems.emplace_back(systems::StateSystem{});
     m_systems.emplace_back(systems::ActionSystem{});
 }
 
@@ -56,8 +58,7 @@ void SystemManager::removeSystem(uint8_t index)
 
 void SystemManager::clear()
 {
-    auto view = Registry::View<components::UiTag>();
-    Registry::Destroy(view.begin(), view.end());
+    Registry::Clear();
 }
 
 } // namespace ui

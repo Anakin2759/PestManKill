@@ -1,0 +1,763 @@
+/**
+ * ************************************************************************
+ *
+ * @file StateSystem.h
+ * @author AnakinLiu (azrael2759@qq.com)
+ * @date 2025-12-11 (Updated)
+ * @version 0.2
+ * @brief 状态系统 - 处理UI状态生命周期和窗口状态同步
+ *
+ * 职责：
+ * 1. 管理全局UI状态（焦点/激活/悬停实体）
+ * 2. 同步窗口状态到ECS组件（如Resizable、Frameless等）
+ * 3. 处理状态变更事件（Hover / Active / Focus）
+ * 4. 处理窗口生命周期事件（关闭/移动/大小变化）
+ *
+ * 注意：Focus 和 Active 同时只有一个组件被操作，Hover 需要考虑父组件
+ *
+ * ************************************************************************
+ * @copyright Copyright (c) 2025 AnakinLiu
+ * For study and research only, no reprinting.
+ * ************************************************************************
+ */
+
+#pragma once
+#include <entt/entt.hpp>
+#include <cmath>
+#include <cfloat>
+#include <algorithm>
+#include <string>
+#include <SDL3/SDL.h>
+#include "api/Utils.hpp"
+#include "../singleton/Registry.hpp"
+#include "../singleton/Dispatcher.hpp"
+#include "../common/Components.hpp"
+#include "../common/Tags.hpp"
+#include "../common/Policies.hpp"
+#include "../interface/Isystem.hpp"
+#include "../common/Events.hpp"
+#include "HitTestSystem.hpp"
+
+namespace ui::systems
+{
+
+/**
+ * @brief 全局UI状态管理
+ */
+struct GlobalState
+{
+    Vec2 latestMousePosition{0.0F, 0.0F};   // 全局最新鼠标位置
+    Vec2 latestMouseDelta{0.0F, 0.0F};      // 全局最新鼠标移动增量
+    Vec2 latestScrollDelta{0.0F, 0.0F};     // 全局最新滚轮滚动增量
+    entt::entity focusedEntity{entt::null}; // 当前获得焦点的实体
+    entt::entity activeEntity{entt::null};  // 当前处于活动状态的实体（鼠标按下）
+    entt::entity hoveredEntity{entt::null}; // 当前悬停的实体
+
+    /**
+     * @brief 重置所有状态
+     */
+    void reset()
+    {
+        latestMousePosition = Vec2{0.0F, 0.0F};
+        latestMouseDelta = Vec2{0.0F, 0.0F};
+        latestScrollDelta = Vec2{0.0F, 0.0F};
+        focusedEntity = entt::null;
+        activeEntity = entt::null;
+        hoveredEntity = entt::null;
+    }
+};
+
+class StateSystem : public ui::interface::EnableRegister<StateSystem>
+{
+public:
+    void registerHandlersImpl()
+    {
+        // 窗口事件
+        Dispatcher::Sink<events::CloseWindow>().connect<&StateSystem::onCloseWindow>(*this);
+        Dispatcher::Sink<events::WindowPixelSizeChanged>().connect<&StateSystem::onWindowPixelSizeChanged>(*this);
+        Dispatcher::Sink<events::WindowMoved>().connect<&StateSystem::onWindowMoved>(*this);
+
+        // 交互事件
+        Dispatcher::Sink<events::HoverEvent>().connect<&StateSystem::onHoverEvent>(*this);
+        Dispatcher::Sink<events::UnhoverEvent>().connect<&StateSystem::onUnhoverEvent>(*this);
+        Dispatcher::Sink<events::MousePressEvent>().connect<&StateSystem::onMousePressEvent>(*this);
+        Dispatcher::Sink<events::MouseReleaseEvent>().connect<&StateSystem::onMouseReleaseEvent>(*this);
+
+        // 命中测试后的输入事件（由 HitTestSystem 发送）
+        Dispatcher::Sink<events::HitPointerMove>().connect<&StateSystem::onHitPointerMove>(*this);
+        Dispatcher::Sink<events::HitPointerButton>().connect<&StateSystem::onHitPointerButton>(*this);
+        Dispatcher::Sink<events::HitPointerWheel>().connect<&StateSystem::onHitPointerWheel>(*this);
+    }
+
+    void unregisterHandlersImpl()
+    {
+        Dispatcher::Sink<events::CloseWindow>().disconnect<&StateSystem::onCloseWindow>(*this);
+        Dispatcher::Sink<events::WindowPixelSizeChanged>().disconnect<&StateSystem::onWindowPixelSizeChanged>(*this);
+        Dispatcher::Sink<events::WindowMoved>().disconnect<&StateSystem::onWindowMoved>(*this);
+        Dispatcher::Sink<events::HoverEvent>().disconnect<&StateSystem::onHoverEvent>(*this);
+        Dispatcher::Sink<events::UnhoverEvent>().disconnect<&StateSystem::onUnhoverEvent>(*this);
+        Dispatcher::Sink<events::MousePressEvent>().disconnect<&StateSystem::onMousePressEvent>(*this);
+        Dispatcher::Sink<events::MouseReleaseEvent>().disconnect<&StateSystem::onMouseReleaseEvent>(*this);
+
+        Dispatcher::Sink<events::HitPointerMove>().disconnect<&StateSystem::onHitPointerMove>(*this);
+        Dispatcher::Sink<events::HitPointerButton>().disconnect<&StateSystem::onHitPointerButton>(*this);
+        Dispatcher::Sink<events::HitPointerWheel>().disconnect<&StateSystem::onHitPointerWheel>(*this);
+    }
+
+    /**
+     * @brief 获取全局状态（单例）
+     */
+    static GlobalState& getGlobalState()
+    {
+        static GlobalState state;
+        return state;
+    }
+
+    // ===================================================================
+    // 状态管理事件处理
+    // ===================================================================
+
+    /**
+     * @brief 处理悬停事件 - 更新悬停状态
+     */
+    void onHoverEvent(const events::HoverEvent& event)
+    {
+        auto& state = getGlobalState();
+
+        // 移除旧悬停实体的标签
+        if (state.hoveredEntity != entt::null && Registry::Valid(state.hoveredEntity))
+        {
+            Registry::Remove<components::HoveredTag>(state.hoveredEntity);
+        }
+
+        // 设置新悬停实体
+        state.hoveredEntity = event.entity;
+        if (Registry::Valid(event.entity))
+        {
+            Registry::EmplaceOrReplace<components::HoveredTag>(event.entity);
+        }
+    }
+
+    /**
+     * @brief 处理取消悬停事件
+     */
+    void onUnhoverEvent(const events::UnhoverEvent& event)
+    {
+        auto& state = getGlobalState();
+
+        if (Registry::Valid(event.entity))
+        {
+            Registry::Remove<components::HoveredTag>(event.entity);
+        }
+
+        // 如果取消悬停的实体是当前悬停实体，清空全局状态
+        if (state.hoveredEntity == event.entity)
+        {
+            state.hoveredEntity = entt::null;
+        }
+    }
+
+    /**
+     * @brief 处理鼠标按下事件 - 设置激活状态
+     */
+    void onMousePressEvent(const events::MousePressEvent& event)
+    {
+        auto& state = getGlobalState();
+
+        // 移除旧激活实体的标签
+        if (state.activeEntity != entt::null && Registry::Valid(state.activeEntity))
+        {
+            Registry::Remove<components::ActiveTag>(state.activeEntity);
+        }
+
+        // 设置新激活实体
+        state.activeEntity = event.entity;
+        if (Registry::Valid(event.entity))
+        {
+            Registry::EmplaceOrReplace<components::ActiveTag>(event.entity);
+        }
+    }
+
+    /**
+     * @brief 处理鼠标释放事件 - 清除激活状态
+     */
+    void onMouseReleaseEvent(const events::MouseReleaseEvent& event)
+    {
+        auto& state = getGlobalState();
+
+        if (Registry::Valid(event.entity))
+        {
+            Registry::Remove<components::ActiveTag>(event.entity);
+        }
+
+        // 清空全局激活状态
+        if (state.activeEntity == event.entity)
+        {
+            state.activeEntity = entt::null;
+        }
+    }
+
+    // ===================================================================
+    // 命中测试后的输入事件处理 - 打包抽象交互事件
+    // ===================================================================
+
+    void onHitPointerMove(const events::HitPointerMove& event)
+    {
+        auto& state = getGlobalState();
+        state.latestMousePosition = event.raw.position;
+        state.latestMouseDelta = event.raw.delta;
+
+        if (event.hitEntity != state.hoveredEntity)
+        {
+            if (state.hoveredEntity != entt::null && Registry::Valid(state.hoveredEntity))
+            {
+                Dispatcher::Enqueue<events::UnhoverEvent>(events::UnhoverEvent{state.hoveredEntity});
+            }
+            if (event.hitEntity != entt::null)
+            {
+                Dispatcher::Enqueue<events::HoverEvent>(events::HoverEvent{event.hitEntity});
+            }
+        }
+    }
+
+    void onHitPointerButton(const events::HitPointerButton& event)
+    {
+        auto& state = getGlobalState();
+        state.latestMousePosition = event.raw.position;
+        Logger::debug("StateSystem: Hit Pointer Button Event at ({}, {}), hit entity {}",
+                      event.raw.position.x(),
+                      event.raw.position.y(),
+                      static_cast<uint32_t>(event.hitEntity));
+
+        if (event.raw.pressed)
+        {
+            if (event.hitEntity != entt::null)
+            {
+                if (Registry::AnyOf<components::TextEditTag>(event.hitEntity))
+                {
+                    const auto* edit = Registry::TryGet<components::TextEdit>(event.hitEntity);
+                    if (edit == nullptr || !policies::HasFlag(edit->inputMode, policies::TextFlag::ReadOnly))
+                    {
+                        if (SDL_Window* sdlWindow = SDL_GetWindowFromID(event.raw.windowID))
+                        {
+                            setFocus(event.hitEntity, sdlWindow);
+                        }
+                    }
+                }
+
+                if (Registry::AnyOf<components::Pressable>(event.hitEntity) ||
+                    Registry::AnyOf<components::Clickable>(event.hitEntity) ||
+                    Registry::AnyOf<components::TextEditTag>(event.hitEntity))
+                {
+                    Dispatcher::Trigger<events::MousePressEvent>(events::MousePressEvent{event.hitEntity});
+                }
+            }
+            return;
+        }
+
+        // 先保存当前激活实体，点击逻辑需要在释放清理之前完成
+        const entt::entity releasedEntity = state.activeEntity;
+
+        if (releasedEntity != entt::null && releasedEntity == event.hitEntity)
+        {
+            if (Registry::TryGet<components::Clickable>(releasedEntity) != nullptr)
+            {
+                Logger::debug("StateSystem: Click Event on entity {}", static_cast<uint32_t>(releasedEntity));
+                Dispatcher::Trigger<events::ClickEvent>(events::ClickEvent{releasedEntity});
+            }
+
+            if (SDL_Window* sdlWindow = SDL_GetWindowFromID(event.raw.windowID))
+            {
+                if (Registry::AnyOf<components::TextEditTag>(releasedEntity))
+                {
+                    const auto* edit = Registry::TryGet<components::TextEdit>(releasedEntity);
+                    if (edit == nullptr || !policies::HasFlag(edit->inputMode, policies::TextFlag::ReadOnly))
+                    {
+                        setFocus(releasedEntity, sdlWindow);
+                        return;
+                    }
+                }
+                clearFocus(sdlWindow);
+            }
+        }
+        else
+        {
+            // 兜底：如果没有 activeEntity 但命中了可点击实体，也触发点击
+            if (event.hitEntity != entt::null && Registry::TryGet<components::Clickable>(event.hitEntity) != nullptr)
+            {
+                Logger::debug("StateSystem: Click Event (fallback) on entity {}",
+                              static_cast<uint32_t>(event.hitEntity));
+                Dispatcher::Trigger<events::ClickEvent>(events::ClickEvent{event.hitEntity});
+            }
+
+            if (SDL_Window* sdlWindow = SDL_GetWindowFromID(event.raw.windowID))
+            {
+                clearFocus(sdlWindow);
+            }
+        }
+
+        // 最后再触发释放，避免提前清空 activeEntity 影响点击逻辑
+        if (releasedEntity != entt::null)
+        {
+            Dispatcher::Trigger<events::MouseReleaseEvent>(events::MouseReleaseEvent{releasedEntity});
+        }
+    }
+
+    void onHitPointerWheel(const events::HitPointerWheel& event)
+    {
+        auto& state = getGlobalState();
+        state.latestScrollDelta = event.raw.delta;
+
+        entt::entity target = entt::null;
+        entt::entity current = event.hitEntity;
+        while (current != entt::null && Registry::Valid(current))
+        {
+            if (Registry::AnyOf<components::ScrollArea>(current))
+            {
+                target = current;
+                break;
+            }
+            if (const auto* hierarchy = Registry::TryGet<components::Hierarchy>(current))
+            {
+                current = hierarchy->parent;
+            }
+            else
+            {
+                current = entt::null;
+            }
+        }
+
+        if (target == entt::null)
+        {
+            auto view = Registry::
+                View<components::ScrollArea, components::Size, components::VisibleTag, components::Position>();
+            for (auto entity : view)
+            {
+                const auto& size = view.get<components::Size>(entity);
+                Vec2 absPos = HitTestSystem::getAbsolutePosition(entity);
+                if (HitTestSystem::isPointInRect(event.raw.position, absPos, size.size))
+                {
+                    target = entity;
+                    break;
+                }
+            }
+        }
+
+        if (target != entt::null)
+        {
+            auto& scroll = Registry::Get<components::ScrollArea>(target);
+            const auto& size = Registry::Get<components::Size>(target);
+
+            float step = 30.0f;
+            float delta = -event.raw.delta.y() * step;
+            scroll.scrollOffset.y() += delta;
+
+            float maxScroll = std::max(0.0f, scroll.contentSize.y() - size.size.y());
+            scroll.scrollOffset.y() = std::clamp(scroll.scrollOffset.y(), 0.0f, maxScroll);
+
+            Registry::EmplaceOrReplace<components::LayoutDirtyTag>(target);
+        }
+    }
+
+    /**
+     * @brief 设置焦点到指定实体（用于输入框等需要焦点的组件）
+     */
+    static void setFocus(entt::entity entity, SDL_Window* sdlWindow = nullptr)
+    {
+        auto& state = getGlobalState();
+
+        // 移除旧焦点实体的标签
+        if (state.focusedEntity != entt::null && Registry::Valid(state.focusedEntity))
+        {
+            ui::utils::MarkRenderDirty(state.focusedEntity);
+            Registry::Remove<components::FocusedTag>(state.focusedEntity);
+        }
+
+        // 设置新焦点实体
+        state.focusedEntity = entity;
+        if (entity != entt::null && Registry::Valid(entity))
+        {
+            Registry::EmplaceOrReplace<components::FocusedTag>(entity);
+            ui::utils::MarkRenderDirty(entity);
+
+            // 如果是输入框，启动文本输入
+            if (Registry::AnyOf<components::TextEditTag>(entity) && sdlWindow != nullptr)
+            {
+                SDL_StartTextInput(sdlWindow);
+
+                // 设置输入法位置
+                // 注意：需要从 HitTestSystem 获取绝对位置
+                // 这里暂时省略，由调用者负责
+            }
+        }
+    }
+
+    /**
+     * @brief 清除当前焦点
+     */
+    static void clearFocus(SDL_Window* sdlWindow = nullptr)
+    {
+        auto& state = getGlobalState();
+
+        if (state.focusedEntity != entt::null && Registry::Valid(state.focusedEntity))
+        {
+            ui::utils::MarkRenderDirty(state.focusedEntity);
+            Registry::Remove<components::FocusedTag>(state.focusedEntity);
+            state.focusedEntity = entt::null;
+        }
+
+        if (sdlWindow != nullptr)
+        {
+            SDL_StopTextInput(sdlWindow);
+        }
+    }
+
+    // ===================================================================
+    // 窗口事件处理
+    // ===================================================================
+
+    void onCloseWindow(const events::CloseWindow& event)
+    {
+        // 调用递归销毁
+        if (Registry::Valid(event.entity))
+        {
+            destroyWidget(event.entity);
+        }
+
+        if (Registry::View<components::Window>().empty())
+        {
+            // 没有窗口实体了，发出退出请求
+            Dispatcher::Trigger<events::QuitRequested>();
+        }
+    }
+
+    /**
+     * @brief 处理窗口尺寸变化事件
+     */
+    void onWindowPixelSizeChanged(const events::WindowPixelSizeChanged& event)
+    {
+        auto& registry = Registry::getInstance();
+        auto view = Registry::View<components::Window, components::Size>();
+
+        for (auto entity : view)
+        {
+            if (view.get<components::Window>(entity).windowID == event.windowID)
+            {
+                auto& size = view.get<components::Size>(entity);
+                size.size.x() = static_cast<float>(event.width);
+                size.size.y() = static_cast<float>(event.height);
+                Registry::EmplaceOrReplace<components::LayoutDirtyTag>(entity);
+                break;
+            }
+        }
+    }
+
+    /**
+     * @brief 处理窗口位置变化事件
+     */
+    void onWindowMoved(const events::WindowMoved& event)
+    {
+        auto& registry = Registry::getInstance();
+        auto view = Registry::View<components::Window, components::Position>();
+
+        for (auto entity : view)
+        {
+            if (view.get<components::Window>(entity).windowID == event.windowID)
+            {
+                auto& pos = view.get<components::Position>(entity);
+                pos.value.x() = static_cast<float>(event.x);
+                pos.value.y() = static_cast<float>(event.y);
+                break;
+            }
+        }
+    }
+
+    /**
+     * @brief 根据实体组件同步调整 SDL 窗口属性
+     *
+     * 支持同步的属性：
+     * - 窗口标题 (Title 组件或 Window::title)
+     * - 窗口位置 (Position 组件，支持自动居中)
+     * - 窗口大小 (Size 组件)
+     * - 窗口大小约束 (Window::minSize/maxSize)
+     * - 窗口可调整大小 (WindowFlag::NoResize)
+     * - 窗口透明度 (Alpha 组件)
+     * - 窗口可见性 (VisibleTag)
+     * - 模态属性 (WindowFlag::Modal) - 用于 Dialog
+     */
+    static void syncSDLWindowProperties(entt::entity entity, components::Window& windowComp, SDL_Window* sdlWindow)
+    {
+        if (sdlWindow == nullptr) return;
+
+        // 1. 同步窗口标题
+        syncWindowTitle(entity, windowComp, sdlWindow);
+
+        // 2. 同步窗口位置
+        syncWindowPosition(entity, sdlWindow);
+
+        // 3. 同步窗口大小约束
+        syncWindowSizeConstraints(windowComp, sdlWindow);
+
+        // 4. 同步窗口可调整大小属性
+        syncWindowResizable(windowComp, sdlWindow);
+
+        // 4.1 同步窗口无边框属性
+        syncWindowFrameless(windowComp, sdlWindow);
+
+        // 5. 同步窗口透明度
+        syncWindowOpacity(entity, sdlWindow);
+
+        // 6. 同步窗口可见性
+        syncWindowVisibility(entity, sdlWindow);
+
+        // 7. 同步模态属性 (Dialog)
+        syncWindowModal(entity, windowComp, sdlWindow);
+    }
+
+    /**
+     * @brief 同步窗口大小（保留但不再自动调用，供外部需要时使用）
+     */
+    static void syncWindowSize(entt::entity entity, SDL_Window* sdlWindow)
+    {
+        const auto* sizeComp = Registry::TryGet<components::Size>(entity);
+        if (sizeComp == nullptr) return;
+
+        // 只在非自动大小模式下同步
+        if (policies::HasFlag(sizeComp->sizePolicy, policies::Size::HAuto) ||
+            policies::HasFlag(sizeComp->sizePolicy, policies::Size::VAuto))
+            return;
+
+        int currentW = 0;
+        int currentH = 0;
+        SDL_GetWindowSize(sdlWindow, &currentW, &currentH);
+
+        int targetW = static_cast<int>(sizeComp->size.x());
+        int targetH = static_cast<int>(sizeComp->size.y());
+
+        // 只在大小不同时才设置，避免不必要的窗口操作
+        if (currentW != targetW || currentH != targetH)
+        {
+            SDL_SetWindowSize(sdlWindow, targetW, targetH);
+        }
+    }
+
+    /**
+     * @brief 同步窗口位置
+     *
+     * 逻辑：
+     * - 首次渲染时，从 SDL 窗口读取实际位置并更新 Position 组件
+     * - 之后只在 Position 组件被代码修改时才更新窗口位置
+     */
+    static void syncWindowPosition(entt::entity entity, SDL_Window* sdlWindow)
+    {
+        auto* posComp = Registry::TryGet<components::Position>(entity);
+        if (posComp == nullptr) return;
+
+        // 获取当前窗口实际位置
+        int currentX = 0;
+        int currentY = 0;
+        SDL_GetWindowPosition(sdlWindow, &currentX, &currentY);
+
+        // 如果 Position 组件是默认值 (0, 0)，说明是首次渲染，从窗口同步位置
+        constexpr float EPSILON = 0.01F;
+        if (std::abs(posComp->value.x()) < EPSILON && std::abs(posComp->value.y()) < EPSILON)
+        {
+            // 更新 Position 组件为窗口实际位置
+            posComp->value = Eigen::Vector2f{static_cast<float>(currentX), static_cast<float>(currentY)};
+            return;
+        }
+
+        // 后续帧：只在 Position 组件与实际窗口位置不同时才设置
+        int targetX = static_cast<int>(posComp->value.x());
+        int targetY = static_cast<int>(posComp->value.y());
+
+        // 只在位置明显不同时才设置（避免浮点误差导致的抖动）
+        if (std::abs(currentX - targetX) > 1 || std::abs(currentY - targetY) > 1)
+        {
+            SDL_SetWindowPosition(sdlWindow, targetX, targetY);
+        }
+    }
+
+    /**
+     * @brief 同步窗口标题
+     */
+    static void syncWindowTitle(entt::entity entity, const components::Window& windowComp, SDL_Window* sdlWindow)
+    {
+        std::string newTitle;
+
+        // 优先使用 Title 组件
+        const auto* titleComp = Registry::TryGet<components::Title>(entity);
+        if (titleComp != nullptr && !titleComp->text.empty())
+        {
+            newTitle = titleComp->text;
+        }
+        else if (!windowComp.title.empty())
+        {
+            newTitle = windowComp.title;
+        }
+
+        if (!newTitle.empty())
+        {
+            const char* currentTitle = SDL_GetWindowTitle(sdlWindow);
+            if (currentTitle == nullptr || newTitle != currentTitle)
+            {
+                SDL_SetWindowTitle(sdlWindow, newTitle.c_str());
+            }
+        }
+    }
+
+    /**
+     * @brief 同步窗口大小约束
+     */
+    static void syncWindowSizeConstraints(const components::Window& windowComp, SDL_Window* sdlWindow)
+    {
+        int currentMinW = 0;
+        int currentMinH = 0;
+        int currentMaxW = 0;
+        int currentMaxH = 0;
+        SDL_GetWindowMinimumSize(sdlWindow, &currentMinW, &currentMinH);
+        SDL_GetWindowMaximumSize(sdlWindow, &currentMaxW, &currentMaxH);
+
+        int newMinW = static_cast<int>(windowComp.minSize.x());
+        int newMinH = static_cast<int>(windowComp.minSize.y());
+        int newMaxW = (windowComp.maxSize.x() < FLT_MAX) ? static_cast<int>(windowComp.maxSize.x()) : 0;
+        int newMaxH = (windowComp.maxSize.y() < FLT_MAX) ? static_cast<int>(windowComp.maxSize.y()) : 0;
+
+        if (newMinW != currentMinW || newMinH != currentMinH)
+        {
+            SDL_SetWindowMinimumSize(sdlWindow, newMinW, newMinH);
+        }
+
+        if (newMaxW != currentMaxW || newMaxH != currentMaxH)
+        {
+            SDL_SetWindowMaximumSize(sdlWindow, newMaxW, newMaxH);
+        }
+    }
+
+    /**
+     * @brief 同步窗口无边框属性 (NoTitleBar)
+     */
+    static void syncWindowFrameless(const components::Window& windowComp, SDL_Window* sdlWindow)
+    {
+        SDL_WindowFlags flags = SDL_GetWindowFlags(sdlWindow);
+        bool currentlyBordered = (flags & SDL_WINDOW_BORDERLESS) == 0;
+        bool shouldBeBordered = !policies::HasFlag(windowComp.flags, policies::WindowFlag::NoTitleBar);
+
+        if (currentlyBordered != shouldBeBordered)
+        {
+            SDL_SetWindowBordered(sdlWindow, shouldBeBordered);
+        }
+    }
+
+    /**
+     * @brief 同步窗口可调整大小属性
+     */
+    static void syncWindowResizable(const components::Window& windowComp, SDL_Window* sdlWindow)
+    {
+        SDL_WindowFlags flags = SDL_GetWindowFlags(sdlWindow);
+        bool currentlyResizable = (flags & SDL_WINDOW_RESIZABLE) != 0;
+        bool shouldBeResizable = !policies::HasFlag(windowComp.flags, policies::WindowFlag::NoResize);
+
+        if (currentlyResizable != shouldBeResizable)
+        {
+            SDL_SetWindowResizable(sdlWindow, shouldBeResizable);
+        }
+    }
+
+    /**
+     * @brief 同步窗口透明度
+     */
+    static void syncWindowOpacity(entt::entity entity, SDL_Window* sdlWindow)
+    {
+        const auto* alphaComp = Registry::TryGet<components::Alpha>(entity);
+        if (alphaComp != nullptr)
+        {
+            float currentOpacity = SDL_GetWindowOpacity(sdlWindow);
+            // 只在透明度差异超过阈值时更新，避免频繁调用
+            constexpr float OPACITY_THRESHOLD = 0.01F;
+            if (std::abs(currentOpacity - alphaComp->value) > OPACITY_THRESHOLD)
+            {
+                SDL_SetWindowOpacity(sdlWindow, alphaComp->value);
+            }
+        }
+    }
+
+    /**
+     * @brief 同步窗口可见性
+     */
+    static void syncWindowVisibility(entt::entity entity, SDL_Window* sdlWindow)
+    {
+        bool shouldBeVisible = Registry::AnyOf<components::VisibleTag>(entity);
+        SDL_WindowFlags flags = SDL_GetWindowFlags(sdlWindow);
+        bool currentlyVisible = (flags & SDL_WINDOW_HIDDEN) == 0;
+
+        if (shouldBeVisible && !currentlyVisible)
+        {
+            SDL_ShowWindow(sdlWindow);
+        }
+        else if (!shouldBeVisible && currentlyVisible)
+        {
+            SDL_HideWindow(sdlWindow);
+        }
+    }
+
+    /**
+     * @brief 同步模态属性 (用于 Dialog)
+     */
+    static void syncWindowModal(entt::entity entity, const components::Window& windowComp, SDL_Window* sdlWindow)
+    {
+        // 检查是否是 Dialog 实体
+        bool isDialog = Registry::AnyOf<components::DialogTag>(entity);
+        if (!isDialog) return;
+
+        SDL_WindowFlags flags = SDL_GetWindowFlags(sdlWindow);
+        bool currentlyModal = (flags & SDL_WINDOW_MODAL) != 0;
+
+        bool isModal = policies::HasFlag(windowComp.flags, policies::WindowFlag::Modal);
+
+        if (isModal && !currentlyModal)
+        {
+            // 设置为模态窗口
+            SDL_SetWindowModal(sdlWindow, true);
+        }
+        else if (!isModal && currentlyModal)
+        {
+            SDL_SetWindowModal(sdlWindow, false);
+        }
+    }
+    static void destroyWidget(entt::entity entity)
+    {
+        auto& registry = Registry::getInstance();
+        if (!Registry::Valid(entity)) return;
+
+        // 1. 递归销毁子节点
+        if (auto* hierarchy = Registry::TryGet<components::Hierarchy>(entity))
+        {
+            // 复制一份子节点列表，防止在销毁过程中因引用失效导致崩溃
+            auto children = hierarchy->children;
+            for (auto child : children)
+            {
+                destroyWidget(child);
+            }
+        }
+
+        // 2. 如果是窗口，查找并销毁关联的 SDL_Window 资源
+        if (auto* windowComp = Registry::TryGet<components::Window>(entity))
+        {
+            // 通过 WindowID 找回 SDL_Window 指针
+            if (SDL_Window* sdlWindow = SDL_GetWindowFromID(windowComp->windowID))
+            {
+                // 通知 RenderSystem 解绑上下文（尽管 RenderSystem 可能目前未执行动作，保留逻辑完整性）
+                Dispatcher::Trigger<events::WindowGraphicsContextUnsetEvent>(
+                    events::WindowGraphicsContextUnsetEvent{entity});
+
+                SDL_DestroyWindow(sdlWindow);
+            }
+        }
+
+        // 3. 最后销毁实体本身
+        Registry::Destroy(entity);
+    }
+};
+
+} // namespace ui::systems

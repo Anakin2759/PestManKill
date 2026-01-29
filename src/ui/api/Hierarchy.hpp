@@ -21,7 +21,8 @@
 #include <entt/entt.hpp>
 #include <functional>
 #include "Utils.hpp"
-
+#include "../singleton/Registry.hpp"
+#include "../common/Components.hpp"
 namespace ui::hierarchy
 {
 void RemoveChild(::entt::entity parent, ::entt::entity child);

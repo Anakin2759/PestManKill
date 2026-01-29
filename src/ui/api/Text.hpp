@@ -4,11 +4,17 @@
 #include <string>
 #include "Utils.hpp"
 #include "../common/Policies.hpp"
+#include "../common/Components.hpp"
 namespace ui::text
 {
-void SetButtonText(::entt::entity entity, const std::string& content);
+/**
+ * @brief 设置按钮文本内容
+ * @param entity {comment}
+ * @param content {comment}
+ */
+void SetText(::entt::entity entity, const std::string& content);
 void SetButtonEnabled(::entt::entity entity, bool enabled);
-void SetLabelText(::entt::entity entity, const std::string& content);
+
 void SetTextContent(::entt::entity entity, const std::string& content);
 void SetTextWordWrap(::entt::entity entity, policies::TextWrap mode);
 void SetTextAlignment(::entt::entity entity, policies::Alignment alignment);

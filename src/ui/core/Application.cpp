@@ -6,6 +6,7 @@
 #include "singleton/Dispatcher.hpp"
 #include "singleton/Logger.hpp"
 #include <SDL3/SDL.h>
+#include "TaskChain.hpp"
 static constexpr int DEFAULT_WIDTH = 800;
 static constexpr int DEFAULT_HEIGHT = 600;
 static constexpr int FRAME_DELAY_MS = 16;     // ~60 FPS

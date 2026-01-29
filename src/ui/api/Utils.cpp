@@ -1,6 +1,7 @@
 #include "Utils.hpp"
 #include <cstdint>
-
+#include "../singleton/Registry.hpp"
+#include "../singleton/Dispatcher.hpp"
 namespace ui::utils
 {
 void MarkLayoutDirty(::entt::entity entity)
@@ -9,13 +10,46 @@ void MarkLayoutDirty(::entt::entity entity)
     while (current != ::entt::null && Registry::Valid(current))
     {
         Registry::EmplaceOrReplace<components::LayoutDirtyTag>(current);
+
+        // 如果当前节点尺寸策略是 Fixed（水平和垂直都固定），则停止向上传播
+        if (const auto* sizeComp = Registry::TryGet<components::Size>(current))
+        {
+            const auto policy = sizeComp->sizePolicy;
+            const auto fixed = policies::Size::Fixed;
+            if (policies::HasFlag(policy, fixed))
+            {
+                break;
+            }
+        }
+
         const auto* hierarchy = Registry::TryGet<components::Hierarchy>(current);
-        current = hierarchy != nullptr ? hierarchy->parent : ::entt::null;
+        current = hierarchy != nullptr ? hierarchy->parent : entt::null;
     }
 }
 void MarkRenderDirty(::entt::entity entity)
 {
+    if (!Registry::Valid(entity)) return;
+
     Registry::EmplaceOrReplace<components::RenderDirtyTag>(entity);
+
+    // 向上查找所属根窗口/对话框，确保 RenderSystem 能捕获渲染脏标记
+    entt::entity current = entity;
+    entt::entity rootWindow = entt::null;
+
+    while (current != entt::null && Registry::Valid(current))
+    {
+        if (Registry::AnyOf<components::WindowTag, components::DialogTag>(current))
+        {
+            rootWindow = current;
+        }
+        const auto* hierarchy = Registry::TryGet<components::Hierarchy>(current);
+        current = hierarchy != nullptr ? hierarchy->parent : entt::null;
+    }
+
+    if (rootWindow != entt::null && rootWindow != entity)
+    {
+        Registry::EmplaceOrReplace<components::RenderDirtyTag>(rootWindow);
+    }
 }
 
 bool HasAlignment(policies::Alignment value, policies::Alignment flag)
@@ -31,4 +65,15 @@ void SetWindowFlag(::entt::entity entity, policies::WindowFlag flag)
     windowComp.flags |= flag;
 }
 
+void CloseWindow(::entt::entity entity)
+{
+    if (!Registry::Valid(entity)) return;
+    Dispatcher::Enqueue<events::CloseWindow>(events::CloseWindow{entity});
+
+} // namespace ui::utils
+
+void QuitUiEventLoop()
+{
+    Dispatcher::Trigger<ui::events::QuitRequested>(ui::events::QuitRequested{});
+};
 } // namespace ui::utils

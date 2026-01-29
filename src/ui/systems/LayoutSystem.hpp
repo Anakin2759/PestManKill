@@ -100,18 +100,9 @@ public:
         return *this;
     }
 
-    void registerHandlersImpl()
-    {
-        Dispatcher::Sink<events::UpdateLayout>().connect<&LayoutSystem::update>(*this);
+    void registerHandlersImpl() { Dispatcher::Sink<events::UpdateLayout>().connect<&LayoutSystem::update>(*this); }
 
-        
-    }
-
-    void unregisterHandlersImpl()
-    {
-        Dispatcher::Sink<events::UpdateLayout>().disconnect<&LayoutSystem::update>(*this);
-
-    }
+    void unregisterHandlersImpl() { Dispatcher::Sink<events::UpdateLayout>().disconnect<&LayoutSystem::update>(*this); }
 
     /**
      * @brief 每帧更新布局
@@ -124,7 +115,8 @@ public:
 
         // 查找所有顶层容器
 
-        auto view = Registry::View<components::Hierarchy, components::Position, components::Size>();
+        auto view =
+            Registry::View<components::Hierarchy, components::Position, components::Size, components::LayoutDirtyTag>();
 
         // 清理上一帧的 Yoga 节点
         clearYogaNodes();
@@ -665,19 +657,6 @@ private:
         if (centerV)
         {
             pos->value.y() = (screenHeight - size->size.y()) / 2.0F;
-        }
-    }
-
-
-
-    void markEntityAndParentsDirty(entt::entity entity)
-    {
-        entt::entity current = entity;
-        while (current != entt::null && Registry::Valid(current))
-        {
-            Registry::EmplaceOrReplace<components::LayoutDirtyTag>(current);
-            const auto* hierarchy = Registry::TryGet<components::Hierarchy>(current);
-            current = hierarchy != nullptr ? hierarchy->parent : entt::null;
         }
     }
 };

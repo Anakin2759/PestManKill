@@ -22,6 +22,7 @@
 #include <entt/entt.hpp>
 #include <string>
 #include <vector>
+#include "Types.hpp"
 #ifdef CreateWindow
 #undef CreateWindow
 #endif
@@ -38,6 +39,7 @@ namespace ui::events
  */
 struct ApplicationReadyEvent
 {
+    using is_event_tag = void;
     entt::entity rootEntity;
 };
 
@@ -47,11 +49,13 @@ struct ApplicationReadyEvent
  */
 struct WindowGraphicsContextSetEvent
 {
+    using is_event_tag = void;
     entt::entity entity;
 };
 
 struct WindowGraphicsContextUnsetEvent
 {
+    using is_event_tag = void;
     entt::entity entity;
 };
 
@@ -61,19 +65,12 @@ struct WindowGraphicsContextUnsetEvent
 // =====================================================================
 
 /**
- * @brief SDL 原始事件
- * [BUFFERED] 使用 enqueue - 由任务调度器周期性触发
- */
-struct SDLEvent
-{
-};
-
-/**
  * @brief 请求退出事件
  * [IMMEDIATE] 使用 trigger - 需立即停止事件循环
  */
 struct QuitRequested
 {
+    using is_event_tag = void;
 };
 
 /**
@@ -82,6 +79,8 @@ struct QuitRequested
  */
 struct WindowResized
 {
+    using UIFlag = void;
+    using is_event_tag = void;
     int width;
     int height;
 };
@@ -92,6 +91,7 @@ struct WindowResized
  */
 struct WindowPixelSizeChanged
 {
+    using is_event_tag = void;
     uint32_t windowID;
     int width;
     int height;
@@ -103,6 +103,7 @@ struct WindowPixelSizeChanged
  */
 struct WindowMoved
 {
+    using is_event_tag = void;
     uint32_t windowID;
     int x;
     int y;
@@ -114,6 +115,7 @@ struct WindowMoved
  */
 struct ClickEvent
 {
+    using is_event_tag = void;
     entt::entity entity;
 };
 
@@ -123,6 +125,7 @@ struct ClickEvent
  */
 struct UnhoverEvent
 {
+    using is_event_tag = void;
     entt::entity entity;
 };
 
@@ -132,6 +135,7 @@ struct UnhoverEvent
  */
 struct HoverEvent
 {
+    using is_event_tag = void;
     entt::entity entity;
 };
 
@@ -141,6 +145,7 @@ struct HoverEvent
  */
 struct MousePressEvent
 {
+    using is_event_tag = void;
     entt::entity entity;
 };
 
@@ -150,6 +155,7 @@ struct MousePressEvent
  */
 struct MouseReleaseEvent
 {
+    using is_event_tag = void;
     entt::entity entity;
 };
 /**
@@ -158,6 +164,7 @@ struct MouseReleaseEvent
  */
 struct ValueChangedText
 {
+    using is_event_tag = void;
     entt::entity entity;
     std::string newText;
 };
@@ -168,6 +175,7 @@ struct ValueChangedText
  */
 struct ValueChangedSelection
 {
+    using is_event_tag = void;
     entt::entity entity;
     int selectedIndex;
 };
@@ -178,6 +186,7 @@ struct ValueChangedSelection
  */
 struct SendHandlerToEventLoop
 {
+    using is_event_tag = void;
     std::move_only_function<void()> handler;
 };
 
@@ -187,10 +196,12 @@ struct SendHandlerToEventLoop
  */
 struct UpdateEvent
 {
+    using is_event_tag = void;
 };
 
 struct CreateWindow
 {
+    using is_event_tag = void;
     std::string title;
     std::string alias;
 };
@@ -200,6 +211,7 @@ struct CreateWindow
  */
 struct CloseWindow
 {
+    using is_event_tag = void;
     entt::entity entity;
 };
 
@@ -209,6 +221,7 @@ struct CloseWindow
  */
 struct UpdateRendering
 {
+    using is_event_tag = void;
 };
 
 /**
@@ -217,11 +230,77 @@ struct UpdateRendering
  */
 struct UpdateLayout
 {
+    using is_event_tag = void;
 };
 
 struct QueuedTask
 {
+    using is_event_tag = void;
     std::move_only_function<void()> func;
+};
+
+// =====================================================================
+
+// 原始指针移动事件（由底层输入系统转发）
+// [BUFFERED] 使用 enqueue — 由输入系统记录原始位置/相对位移并转发
+struct RawPointerMove
+{
+    using is_event_tag = void;
+    Vec2 position;
+    Vec2 delta; // 相对位移
+    uint32_t windowID;
+};
+
+// 原始指针按键事件（按下/抬起）
+// [BUFFERED] 使用 enqueue
+struct RawPointerButton
+{
+    using is_event_tag = void;
+    Vec2 position;
+    uint32_t windowID;
+    bool pressed; // true = down, false = up
+};
+
+// 原始滚轮事件
+// [BUFFERED] 使用 enqueue
+struct RawPointerWheel
+{
+    using is_event_tag = void;
+    Vec2 position;     // 鼠标位置（采样时）
+    Vec2 delta;        // 滚轮增量 (x, y)
+    uint32_t windowID; // Added windowID to match definition in InteractionSystem usage
+};
+
+// =====================================================================
+// D. 命中测试后的中间事件 (由 HitTestSystem 触发)
+//    包含原始数据 + 命中的实体信息，供StateSystem消费
+// =====================================================================
+
+// 命中测试后的指针移动
+// [BUFFERED] 使用 enqueue
+struct HitPointerMove
+{
+    using is_event_tag = void;
+    RawPointerMove raw;
+    entt::entity hitEntity; // 鼠标当前悬停的实体 (可能为 null)
+};
+
+// 命中测试后的按键事件
+// [BUFFERED] 使用 enqueue
+struct HitPointerButton
+{
+    using is_event_tag = void;
+    RawPointerButton raw;
+    entt::entity hitEntity; // 按键发生位置的实体 (可能为 null)
+};
+
+// 命中测试后的滚轮事件
+// [BUFFERED] 使用 enqueue
+struct HitPointerWheel
+{
+    using is_event_tag = void;
+    RawPointerWheel raw;
+    entt::entity hitEntity; // 滚轮发生位置的实体 (可能为 null)
 };
 
 } // namespace ui::events

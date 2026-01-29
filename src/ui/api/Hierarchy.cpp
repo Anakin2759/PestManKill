@@ -1,5 +1,5 @@
 #include "Hierarchy.hpp"
-#include "../singleton/Registry.hpp"
+
 #include "../common/Components.hpp"
 #include "Layout.hpp"
 namespace ui::hierarchy

@@ -33,7 +33,6 @@ entt::entity CreateBaseWidget(std::string_view alias)
     Registry::Emplace<components::Alpha>(entity);
     Registry::Emplace<components::VisibleTag>(entity);
     Registry::Emplace<components::Hierarchy>(entity);
-    Registry::Emplace<components::UiTag>(entity);
 
     Registry::EmplaceOrReplace<components::LayoutDirtyTag>(entity);
 
@@ -81,15 +80,16 @@ entt::entity CreateLabel(const std::string& content, std::string_view alias)
 entt::entity CreateTextEdit(const std::string& placeholder, bool multiline, std::string_view alias)
 {
     auto entity = CreateBaseWidget(alias);
-    Registry::Emplace<components::TextEditTag>(entity);
+
     auto& textEdit = Registry::Emplace<components::TextEdit>(entity);
     textEdit.placeholder = placeholder;
-    textEdit.inputMode = (multiline ? ui::policies::TextFlag::Multiline : ~ui::policies::TextFlag::Multiline) |
-                         ui::policies::TextFlag::Default;
+    textEdit.inputMode = multiline ? (ui::policies::TextFlag::Default | ui::policies::TextFlag::Multiline)
+                                   : ui::policies::TextFlag::Default;
     auto& text = Registry::Emplace<components::Text>(entity);
     text.content = "";
     Registry::Emplace<components::Clickable>(entity);
     Registry::Get<components::Size>(entity).minSize = {100.0F, multiline ? 80.0F : 30.0F};
+    Registry::Emplace<components::TextEditTag>(entity);
     return entity;
 }
 
@@ -123,7 +123,6 @@ entt::entity CreateSpacer(int stretchFactor, std::string_view alias)
     baseInfo.alias = alias;
     Registry::Emplace<components::SpacerTag>(entity);
     Registry::Emplace<components::Hierarchy>(entity);
-    Registry::Emplace<components::UiTag>(entity);
     Registry::Emplace<components::Position>(entity);
     auto& spacer = Registry::Emplace<components::Spacer>(entity);
     spacer.stretchFactor = static_cast<uint8_t>(std::max(1, stretchFactor));

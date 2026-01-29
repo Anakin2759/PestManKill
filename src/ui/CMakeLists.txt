@@ -29,7 +29,7 @@ set(UI_HEADERS
     systems/TweenSystem.hpp
     systems/LayoutSystem.hpp
     systems/RenderSystem.hpp
-    systems/WidgetSystem.hpp
+    systems/StateSystem.hpp
     
     # UI Core
     core/Application.hpp

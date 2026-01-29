@@ -24,6 +24,7 @@
 #include "../common/Events.hpp"
 #include "../singleton/Dispatcher.hpp"
 #include "../singleton/Logger.hpp"
+#include "../systems/InteractionSystem.hpp"
 namespace ui::tasks
 {
 
@@ -139,7 +140,7 @@ struct InputTask
             return;
         }
         m_remainingTime = m_delayTime;
-        Dispatcher::Trigger<ui::events::SDLEvent>();
+        ui::systems::InteractionSystem::SDLEvent();
     }
 };
 

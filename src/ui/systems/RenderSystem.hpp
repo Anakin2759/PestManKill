@@ -48,6 +48,7 @@
 #include <entt/entt.hpp>
 #include <Eigen/Dense>
 #include <cmrc/cmrc.hpp>
+#include <entt/entt.hpp>
 #include "../singleton/Logger.hpp"
 #include "../singleton/Registry.hpp"
 #include "../singleton/Dispatcher.hpp"
@@ -58,8 +59,6 @@
 #include "../interface/Isystem.hpp"
 #include "../api/Utils.hpp"
 #include "../api/Layout.hpp"
-
-#include "WidgetSystem.hpp" // 需要调用 WidgetSystem::syncSDLWindowProperties
 
 CMRC_DECLARE(ui_fonts); // NOLINT
 
@@ -729,6 +728,12 @@ public:
     void update() noexcept
     {
         static bool firstUpdate = true;
+        auto windowView = Registry::View<components::Window, components::RenderDirtyTag>();
+        // 检查是否有窗口
+        if (windowView.begin() == windowView.end())
+        {
+            return;
+        }
         if (firstUpdate)
         {
             Logger::info("RenderSystem::update first call");
@@ -747,15 +752,6 @@ public:
             createWhiteTexture();
         }
 
-        auto windowView = Registry::View<components::Window>();
-
-        // 检查是否有窗口
-        if (windowView.begin() == windowView.end())
-        {
-            Logger::warn("没有找到任何窗口实体");
-            return;
-        }
-
         // 遍历每个窗口进行渲染
         for (auto windowEntity : windowView)
         {
@@ -766,9 +762,6 @@ public:
                 Logger::warn("窗口实体的 sdlWindow 为空");
                 continue;
             }
-
-            // 根据实体组件同步调整 SDL 窗口属性（使用 WidgetSystem）
-            WidgetSystem::syncSDLWindowProperties(windowEntity, windowComp, sdlWindow);
 
             // 获取当前窗口大小
             int width = 0;
@@ -810,7 +803,7 @@ public:
         }
     }
 
-    // 窗口属性同步函数已迁移至 WidgetSystem
+    // 窗口属性同步函数已迁移至 StateSystem
 
 private:
     void ensureInitialized()

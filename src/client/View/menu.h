@@ -24,8 +24,6 @@ inline void CreateMenuDialog()
 
     ui::size::SetSize(menuDialog, 160.0F, 300.0F);
 
-    // 位置 (0,0) 会触发自动居中
-
     // 添加窗口背景
     ui::visibility::SetBackgroundColor(menuDialog, {0.15F, 0.15F, 0.15F, 0.95F});
     ui::visibility::SetBorderRadius(menuDialog, 8.0F);
@@ -63,8 +61,7 @@ inline void CreateMenuDialog()
                                    CreateMainWindow();
                                    // 销毁菜单对话框
 
-                                   ui::Dispatcher::Trigger<ui::events::CloseWindow>(
-                                       ui::events::CloseWindow{menuDialog});
+                                   ui::utils::CloseWindow(menuDialog);
                                });
     ui::hierarchy::AddChild(menuDialog, startBtn);
 
@@ -86,8 +83,12 @@ inline void CreateMenuDialog()
     ui::visibility::SetBorderRadius(exitBtn, 5.0F);
     ui::visibility::SetBorderColor(exitBtn, {0.8F, 0.3F, 0.3F, 1.0F});
     ui::visibility::SetBorderThickness(exitBtn, 2.0F);
-    ui::text::SetClickCallback(
-        exitBtn, []() { ui::Dispatcher::Trigger<ui::events::QuitRequested>(ui::events::QuitRequested{}); });
+    ui::text::SetClickCallback(exitBtn,
+                               []()
+                               {
+                                   LOG_INFO("退出menu.");
+                                   ui::utils::QuitUiEventLoop();
+                               });
     ui::hierarchy::AddChild(menuDialog, exitBtn);
 
     // 创建底部间距

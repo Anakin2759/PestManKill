@@ -23,8 +23,6 @@
 // 引入系统接口
 #include "../interface/Isystem.hpp"
 
-
-
 namespace ui
 {
 
@@ -42,13 +40,14 @@ private:
     enum SystemIndex : uint8_t
     {
         INTERACTION = 0, // 鼠标交互系统
-        ANIMATION = 1,   // 动画系统
-        LAYOUT = 2,      // 布局系统
-        RENDER = 3,      // 渲染系统
-        WINDOW = 4,      // 窗口同步系统
-        ACTION = 5
+        HITTEST = 1,     // 命中测试系统
+        ANIMATION = 2,   // 动画系统
+        LAYOUT = 3,      // 布局系统
+        RENDER = 4,      // 渲染系统
+        WINDOW = 5,      // 窗口同步系统
+        ACTION = 6
     };
-    static constexpr size_t SYSTEM_COUNT = 6;
+    static constexpr size_t SYSTEM_COUNT = 7;
 
 public:
     // 构造函数：初始化所有子系统
