@@ -26,6 +26,7 @@
 #include <entt/entt.hpp>
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
 #include <cmath>
 
 // Yoga 布局引擎
@@ -71,8 +72,7 @@ public:
 
     // 自定义移动构造：转移资源所有权
     LayoutSystem(LayoutSystem&& other) noexcept
-        : m_yogaConfig(other.m_yogaConfig), m_entityToNode(std::move(other.m_entityToNode)),
-          m_rootNodes(std::move(other.m_rootNodes))
+        : m_yogaConfig(other.m_yogaConfig), m_entityToNode(std::move(other.m_entityToNode))
     {
         other.m_yogaConfig = nullptr; // 防止源对象析构时释放资源
     }
@@ -92,7 +92,6 @@ public:
             // 转移资源
             m_yogaConfig = other.m_yogaConfig;
             m_entityToNode = std::move(other.m_entityToNode);
-            m_rootNodes = std::move(other.m_rootNodes);
 
             // 清空源对象
             other.m_yogaConfig = nullptr;
@@ -109,100 +108,192 @@ public:
      */
     void update() noexcept
     {
-        // 检查是否有脏节点
+        // 1. 清理无效实体的节点
+        cleanupInvalidNodes();
+
+        std::unordered_set<entt::entity> dirtyRoots;
+
+        // 2. 处理脏节点：同步 ECS 数据到 Yoga 节点
+        // 只重建标记为 LayoutDirty 的子树
         auto dirtyView = Registry::View<components::LayoutDirtyTag>();
-        if (dirtyView.empty()) return;
+        if (!dirtyView.empty())
+        {
+            for (auto entity : dirtyView)
+            {
+                // 确保实体有效
+                if (Registry::Valid(entity))
+                {
+                    syncNodeRecursive(entity);
 
-        // 查找所有顶层容器
+                    // 追踪受影响的根节点
+                    if (entt::entity root = findRoot(entity); Registry::Valid(root))
+                    {
+                        dirtyRoots.insert(root);
+                    }
+                }
+            }
+            // 清除脏标记
+            Registry::Clear<components::LayoutDirtyTag>();
+        }
 
-        auto view =
-            Registry::View<components::Hierarchy, components::Position, components::Size, components::RootTag>();
-
-        // 清理上一帧的 Yoga 节点
-        clearYogaNodes();
+        // 3. 布局计算 (仅针对包含脏节点的根节点)
+        // 只有当根节点本身或其子节点发生变化时才重新计算
+        if (dirtyRoots.empty()) return;
 
         bool needRetryForCentering = false;
 
-        // 对每个根节点构建 Yoga 树并计算布局
-        for (auto root : view)
+        for (auto root : dirtyRoots)
         {
-            // 构建 Yoga 节点树
-            YGNodeRef rootNode = buildYogaTree(root);
-            if (rootNode == nullptr) continue;
-            m_rootNodes.push_back(rootNode); // 保存根节点以便后续释放
+            // 必须是有效的根节点组件组合
+            if (!Registry::AllOf<components::Hierarchy, components::Position, components::Size, components::RootTag>(
+                    root))
+            {
+                continue;
+            }
 
-            // 3. 获取根容器尺寸（用于布局计算）
+            // 获取或创建根节点 (使用缓存)
+            YGNodeRef rootNode = getOrCreateNode(root);
+            if (rootNode == nullptr) continue;
+
+            // 4. 获取根容器尺寸（用于布局计算）
             float rootWidth = YGUndefined;
             float rootHeight = YGUndefined;
             auto sizeComp = Registry::TryGet<components::Size>(root);
-            rootWidth = sizeComp->size.x();
-            rootHeight = sizeComp->size.y();
-            // 4. 计算布局
+            if (sizeComp)
+            {
+                rootWidth = sizeComp->size.x();
+                rootHeight = sizeComp->size.y();
+            }
+
+            // 5. 计算布局
             YGNodeCalculateLayout(rootNode, rootWidth, rootHeight, YGDirectionLTR);
 
-            // 5. 回写布局结果到 ECS
+            // 6. 回写布局结果到 ECS
             applyYogaLayout(root, rootNode, 0.0F, 0.0F);
 
             applyWindowCentering(root, rootWidth, rootHeight);
         }
-
-        // 清除所有脏标记。
-        // 若画布尺寸尚未准备好且存在需要居中的根节点，则保留脏标记以便下一帧重算。
-        if (!needRetryForCentering)
-        {
-            Registry::Clear<components::LayoutDirtyTag>();
-        }
-    }
-    /**
-     * @brief 获取窗口尺寸
-     */
-    Vec2 getWindowSize(entt::entity entity) const // NOLINT(readability-convert-member-functions-to-static)
-    {
-        const auto& size = Registry::Get<components::Size>(entity);
-        return size.size;
-
-        return {0.0F, 0.0F};
     }
 
 private:
     YGConfigRef m_yogaConfig = nullptr;
     std::unordered_map<entt::entity, YGNodeRef> m_entityToNode;
-    std::vector<YGNodeRef> m_rootNodes; // 保存所有根节点以便正确释放
+
+    /**
+     * @brief 查找实体所属的 UI 树根节点 (带有 RootTag)
+     */
+    entt::entity findRoot(entt::entity entity) const
+    {
+        entt::entity current = entity;
+        // 防止无限循环 (虽然 tree 结构不应该有环)
+        int safetyCounter = 0;
+        const int MAX_DEPTH = 1000;
+
+        while (Registry::Valid(current) && safetyCounter++ < MAX_DEPTH)
+        {
+            if (Registry::AnyOf<components::RootTag>(current))
+            {
+                return current;
+            }
+
+            const auto* hierarchy = Registry::TryGet<components::Hierarchy>(current);
+            if (hierarchy != nullptr && hierarchy->parent != entt::null)
+            {
+                current = hierarchy->parent;
+            }
+            else
+            {
+                break;
+            }
+        }
+        return entt::null;
+    }
 
     // ===================== Yoga 节点管理 =====================
 
     void clearYogaNodes()
     {
-        // 释放所有根节点，Yoga 会自动递归释放其子节点
-        for (YGNodeRef rootNode : m_rootNodes)
+        // 释放所有节点
+        for (auto& [entity, node] : m_entityToNode)
         {
-            if (rootNode != nullptr)
+            if (node != nullptr)
             {
-                YGNodeFreeRecursive(rootNode);
+                YGNodeFree(node);
             }
         }
-        m_rootNodes.clear();
         m_entityToNode.clear();
+    }
+
+    void cleanupInvalidNodes()
+    {
+        auto it = m_entityToNode.begin();
+        while (it != m_entityToNode.end())
+        {
+            if (!Registry::Valid(it->first))
+            {
+                if (it->second)
+                {
+                    YGNodeFree(it->second);
+                }
+                it = m_entityToNode.erase(it);
+            }
+            else
+            {
+                ++it;
+            }
+        }
     }
 
     YGNodeRef createYogaNode() { return YGNodeNewWithConfig(m_yogaConfig); }
 
-    /**
-     * @brief 递归构建 Yoga 节点树
-     */
-    YGNodeRef buildYogaTree(entt::entity entity)
+    YGNodeRef getOrCreateNode(entt::entity entity)
     {
+        auto it = m_entityToNode.find(entity);
+        if (it != m_entityToNode.end())
+        {
+            return it->second;
+        }
+
         YGNodeRef node = createYogaNode();
         m_entityToNode[entity] = node;
 
-        // 配置节点样式
+        // 新节点初始化配置
         configureYogaNode(entity, node);
 
-        // 递归处理子节点
+        // 为安全起见，新节点我们默认其子结构需要同步
+        syncChildren(entity, node);
+
+        return node;
+    }
+
+    /**
+     * @brief 同步节点及其子树配置
+     * 对应 rebuild marked dirty subtree
+     */
+    void syncNodeRecursive(entt::entity entity)
+    {
+        YGNodeRef node = getOrCreateNode(entity);
+
+        // 更新样式配置
+        configureYogaNode(entity, node);
+
+        // 同步子节点结构
+        syncChildren(entity, node);
+    }
+
+    /**
+     * @brief 同步子节点列表
+     */
+    void syncChildren(entt::entity entity, YGNodeRef node)
+    {
         const auto* hierarchy = Registry::TryGet<components::Hierarchy>(entity);
+
+        // 1. 收集预期的有序子节点列表
+        std::vector<YGNodeRef> expectedChildren;
         if (hierarchy != nullptr && !hierarchy->children.empty())
         {
-            uint32_t childIndex = 0;
+            expectedChildren.reserve(hierarchy->children.size());
+
             for (entt::entity child : hierarchy->children)
             {
                 // Spacer 没有 Size 组件，但仍需参与布局
@@ -211,16 +302,60 @@ private:
 
                 if (!isSpacer && !hasLayoutComponents) continue;
 
-                YGNodeRef childNode = buildYogaTree(child);
+                // 获取或创建子节点
+                YGNodeRef childNode = getOrCreateNode(child);
+
                 if (childNode != nullptr)
                 {
-                    YGNodeInsertChild(node, childNode, childIndex++);
+                    expectedChildren.push_back(childNode);
                 }
             }
         }
 
-        return node;
+        // 2. 差量检测：对比现有 Yoga 子节点与预期是否一致
+        const uint32_t currentCount = YGNodeGetChildCount(node);
+        bool isStructureMatch = (currentCount == expectedChildren.size());
+
+        if (isStructureMatch)
+        {
+            for (uint32_t i = 0; i < currentCount; ++i)
+            {
+                if (YGNodeGetChild(node, i) != expectedChildren[i])
+                {
+                    isStructureMatch = false;
+                    break;
+                }
+            }
+        }
+
+        // 3. 如果结构一致，直接跳过 (优化点)
+        if (isStructureMatch) return;
+
+        // 4. 重建子节点关联
+        // 简单处理：全部移除再重新添加，确保顺序正确
+        // 由于节点是缓存的，YGNodeRemoveAllChildren 只是断开连接，不会释放子节点内存
+        YGNodeRemoveAllChildren(node);
+
+        for (uint32_t i = 0; i < expectedChildren.size(); ++i)
+        {
+            YGNodeRef childNode = expectedChildren[i];
+
+            // 确保子节点没有挂在其他父节点下 (处理 Reparent 情况)
+            YGNodeRef oldParent = YGNodeGetOwner(childNode);
+            if (oldParent != nullptr && oldParent != node)
+            {
+                YGNodeRemoveChild(oldParent, childNode);
+            }
+
+            YGNodeInsertChild(node, childNode, i);
+        }
     }
+
+    /**
+     * @brief 递归构建 Yoga 节点树 (已废弃，由 getOrCreateNode 和 syncNodeRecursive 替代)
+     * 保留此函数名只是为了兼容旧代码引用（如果还有），但实际上用不上
+     */
+    YGNodeRef buildYogaTree(entt::entity entity) { return getOrCreateNode(entity); }
 
     /**
      * @brief 配置单个 Yoga 节点的样式
@@ -230,26 +365,38 @@ private:
         // 1. 布局方向 (Flex Direction)
         if (const auto* layoutInfo = Registry::TryGet<components::LayoutInfo>(entity))
         {
-            if (layoutInfo->direction == policies::LayoutDirection::VERTICAL)
+            YGFlexDirection targetDir = (layoutInfo->direction == policies::LayoutDirection::VERTICAL)
+                                            ? YGFlexDirectionColumn
+                                            : YGFlexDirectionRow;
+            if (YGNodeStyleGetFlexDirection(node) != targetDir)
             {
-                YGNodeStyleSetFlexDirection(node, YGFlexDirectionColumn);
-            }
-            else
-            {
-                YGNodeStyleSetFlexDirection(node, YGFlexDirectionRow);
+                YGNodeStyleSetFlexDirection(node, targetDir);
             }
 
             // 间距通过 gap 实现
-            YGNodeStyleSetGap(node, YGGutterAll, layoutInfo->spacing);
+            YGValue currentGap = YGNodeStyleGetGap(node, YGGutterAll);
+            if (currentGap.unit != YGUnitPoint || currentGap.value != layoutInfo->spacing)
+            {
+                YGNodeStyleSetGap(node, YGGutterAll, layoutInfo->spacing);
+            }
         }
 
         // 2. 内边距 (Padding)
         if (const auto* padding = Registry::TryGet<components::Padding>(entity))
         {
-            YGNodeStyleSetPadding(node, YGEdgeTop, padding->values.x());
-            YGNodeStyleSetPadding(node, YGEdgeRight, padding->values.y());
-            YGNodeStyleSetPadding(node, YGEdgeBottom, padding->values.w());
-            YGNodeStyleSetPadding(node, YGEdgeLeft, padding->values.z());
+            auto setPaddingIfChanged = [node](YGEdge edge, float val)
+            {
+                YGValue current = YGNodeStyleGetPadding(node, edge);
+                if (current.unit != YGUnitPoint || current.value != val)
+                {
+                    YGNodeStyleSetPadding(node, edge, val);
+                }
+            };
+
+            setPaddingIfChanged(YGEdgeTop, padding->values.x());
+            setPaddingIfChanged(YGEdgeRight, padding->values.y());
+            setPaddingIfChanged(YGEdgeBottom, padding->values.w());
+            setPaddingIfChanged(YGEdgeLeft, padding->values.z());
         }
 
         // 3. Spacer 处理 (优先级最高，跳过后续 Size 配置)
@@ -259,14 +406,22 @@ private:
             const auto* spacer = Registry::TryGet<components::Spacer>(entity);
             const float stretchFactor = spacer != nullptr ? static_cast<float>(spacer->stretchFactor) : 1.0F;
 
-            YGNodeStyleSetFlexGrow(node, stretchFactor);
+            if (YGNodeStyleGetFlexGrow(node) != stretchFactor) YGNodeStyleSetFlexGrow(node, stretchFactor);
+
             // 允许收缩，防止在空间不足时撑开容器
-            YGNodeStyleSetFlexShrink(node, 1.0F);
+            if (YGNodeStyleGetFlexShrink(node) != 1.0F) YGNodeStyleSetFlexShrink(node, 1.0F);
+
             // flexBasis 为 0，确保 Spacer 初始大小为 0，完全依赖 flexGrow 分配空间
-            YGNodeStyleSetFlexBasis(node, 0.0F);
+            YGValue basis = YGNodeStyleGetFlexBasis(node);
+            if (basis.unit != YGUnitPoint || basis.value != 0.0F) YGNodeStyleSetFlexBasis(node, 0.0F);
+
             // 最小尺寸为 0，不占用任何固定空间
-            YGNodeStyleSetMinWidth(node, 0.0F);
-            YGNodeStyleSetMinHeight(node, 0.0F);
+            YGValue minW = YGNodeStyleGetMinWidth(node);
+            if (minW.unit != YGUnitPoint || minW.value != 0.0F) YGNodeStyleSetMinWidth(node, 0.0F);
+
+            YGValue minH = YGNodeStyleGetMinHeight(node);
+            if (minH.unit != YGUnitPoint || minH.value != 0.0F) YGNodeStyleSetMinHeight(node, 0.0F);
+
             // Spacer 不设置固定宽高，跳过后续 Size 配置
             return;
         }
@@ -306,16 +461,20 @@ private:
 
             if (mainAxisFill)
             {
-                YGNodeStyleSetFlexGrow(node, 1.0F);
-                YGNodeStyleSetFlexShrink(node, 1.0F);
-                YGNodeStyleSetFlexBasis(node, 0.0F); // 推荐设置：让 flexGrow 完全接管空间分配
+                if (YGNodeStyleGetFlexGrow(node) != 1.0F) YGNodeStyleSetFlexGrow(node, 1.0F);
+                if (YGNodeStyleGetFlexShrink(node) != 1.0F) YGNodeStyleSetFlexShrink(node, 1.0F);
+
+                YGValue basis = YGNodeStyleGetFlexBasis(node);
+                if (basis.unit != YGUnitPoint || basis.value != 0.0F) YGNodeStyleSetFlexBasis(node, 0.0F);
             }
             else
             {
-                YGNodeStyleSetFlexGrow(node, 0.0F);
+                if (YGNodeStyleGetFlexGrow(node) != 0.0F) YGNodeStyleSetFlexGrow(node, 0.0F);
+
                 // 如果主轴是 Fixed，则不收缩(Shrink=0)；否则默认允许收缩(Shrink=1)
                 const bool mainAxisFixed = (isRow && wFixed) || (!isRow && hFixed);
-                YGNodeStyleSetFlexShrink(node, mainAxisFixed ? 0.0F : 1.0F);
+                float shrinkVal = mainAxisFixed ? 0.0F : 1.0F;
+                if (YGNodeStyleGetFlexShrink(node) != shrinkVal) YGNodeStyleSetFlexShrink(node, shrinkVal);
             }
 
             // 3. 交叉轴行为 (Cross Axis) -> AlignSelf: Stretch
@@ -324,51 +483,80 @@ private:
 
             if (crossAxisFill)
             {
-                YGNodeStyleSetAlignSelf(node, YGAlignStretch);
+                if (YGNodeStyleGetAlignSelf(node) != YGAlignStretch) YGNodeStyleSetAlignSelf(node, YGAlignStretch);
             }
 
             // 4. 设置显式尺寸 (Width)
+            YGValue currentW = YGNodeStyleGetWidth(node);
             if (wFixed && sizeComp->size.x() > 0)
             {
-                YGNodeStyleSetWidth(node, sizeComp->size.x());
+                if (currentW.unit != YGUnitPoint || currentW.value != sizeComp->size.x())
+                    YGNodeStyleSetWidth(node, sizeComp->size.x());
             }
             else if (wPct)
             {
-                YGNodeStyleSetWidthPercent(node, sizeComp->percentage * 100.0F);
+                float pctVal = sizeComp->percentage * 100.0F;
+                if (currentW.unit != YGUnitPercent || currentW.value != pctVal)
+                    YGNodeStyleSetWidthPercent(node, pctVal);
             }
             else if (wAuto)
             {
-                YGNodeStyleSetWidthAuto(node);
+                if (currentW.unit != YGUnitAuto) YGNodeStyleSetWidthAuto(node);
             }
 
             // 5. 设置显式尺寸 (Height)
+            YGValue currentH = YGNodeStyleGetHeight(node);
             if (hFixed && sizeComp->size.y() > 0)
             {
-                YGNodeStyleSetHeight(node, sizeComp->size.y());
+                if (currentH.unit != YGUnitPoint || currentH.value != sizeComp->size.y())
+                    YGNodeStyleSetHeight(node, sizeComp->size.y());
             }
             else if (hPct)
             {
-                YGNodeStyleSetHeightPercent(node, sizeComp->percentage * 100.0F);
+                float pctVal = sizeComp->percentage * 100.0F;
+                if (currentH.unit != YGUnitPercent || currentH.value != pctVal)
+                    YGNodeStyleSetHeightPercent(node, pctVal);
             }
             else if (hAuto)
             {
                 // [Fix] 若 Auto 策略下已有由 RenderSystem 计算出的有效高度，则作为参考值设置
-                // 这允许 "Iterative Layout"：Layout(0) -> Render(Calc Height) -> Layout(Height)
                 if (sizeComp->size.y() > 0.0F)
                 {
-                    YGNodeStyleSetHeight(node, sizeComp->size.y());
+                    if (currentH.unit != YGUnitPoint || currentH.value != sizeComp->size.y())
+                        YGNodeStyleSetHeight(node, sizeComp->size.y());
                 }
                 else
                 {
-                    YGNodeStyleSetHeightAuto(node);
+                    if (currentH.unit != YGUnitAuto) YGNodeStyleSetHeightAuto(node);
                 }
             }
 
             // 最小/最大尺寸约束
-            if (sizeComp->minSize.x() > 0) YGNodeStyleSetMinWidth(node, sizeComp->minSize.x());
-            if (sizeComp->minSize.y() > 0) YGNodeStyleSetMinHeight(node, sizeComp->minSize.y());
-            if (sizeComp->maxSize.x() < FLT_MAX) YGNodeStyleSetMaxWidth(node, sizeComp->maxSize.x());
-            if (sizeComp->maxSize.y() < FLT_MAX) YGNodeStyleSetMaxHeight(node, sizeComp->maxSize.y());
+            auto setMinMax = [node](auto getter, auto setter, float val, float defaultVal, bool isMax = false)
+            {
+                YGValue cur = getter(node);
+                // 对于 Max，默认是 Undefined (NaN?) 需要检查 FLT_MAX
+                // 这里保持原有逻辑：如果有效值则设置
+                if (isMax)
+                {
+                    if (val < FLT_MAX)
+                    {
+                        if (cur.unit != YGUnitPoint || cur.value != val) setter(node, val);
+                    }
+                }
+                else
+                { // Min
+                    if (val > 0)
+                    {
+                        if (cur.unit != YGUnitPoint || cur.value != val) setter(node, val);
+                    }
+                }
+            };
+
+            setMinMax(YGNodeStyleGetMinWidth, YGNodeStyleSetMinWidth, sizeComp->minSize.x(), 0, false);
+            setMinMax(YGNodeStyleGetMinHeight, YGNodeStyleSetMinHeight, sizeComp->minSize.y(), 0, false);
+            setMinMax(YGNodeStyleGetMaxWidth, YGNodeStyleSetMaxWidth, sizeComp->maxSize.x(), FLT_MAX, true);
+            setMinMax(YGNodeStyleGetMaxHeight, YGNodeStyleSetMaxHeight, sizeComp->maxSize.y(), FLT_MAX, true);
         }
 
         // 5. 绝对定位处理
@@ -379,13 +567,24 @@ private:
 
             if (hAbs || vAbs)
             {
-                YGNodeStyleSetPositionType(node, YGPositionTypeAbsolute);
+                if (YGNodeStyleGetPositionType(node) != YGPositionTypeAbsolute)
+                    YGNodeStyleSetPositionType(node, YGPositionTypeAbsolute);
 
                 // 如果设置了绝对定位，并且有 Position 组件，将其值作为 Left/Top
                 if (const auto* pos = Registry::TryGet<components::Position>(entity))
                 {
-                    if (hAbs) YGNodeStyleSetPosition(node, YGEdgeLeft, pos->value.x());
-                    if (vAbs) YGNodeStyleSetPosition(node, YGEdgeTop, pos->value.y());
+                    if (hAbs)
+                    {
+                        YGValue curL = YGNodeStyleGetPosition(node, YGEdgeLeft);
+                        if (curL.unit != YGUnitPoint || curL.value != pos->value.x())
+                            YGNodeStyleSetPosition(node, YGEdgeLeft, pos->value.x());
+                    }
+                    if (vAbs)
+                    {
+                        YGValue curT = YGNodeStyleGetPosition(node, YGEdgeTop);
+                        if (curT.unit != YGUnitPoint || curT.value != pos->value.y())
+                            YGNodeStyleSetPosition(node, YGEdgeTop, pos->value.y());
+                    }
                 }
             }
         }
@@ -440,21 +639,22 @@ private:
                     alignItems = YGAlignFlexStart;
             }
 
-            YGNodeStyleSetJustifyContent(node, justify);
-            YGNodeStyleSetAlignItems(node, alignItems);
+            if (YGNodeStyleGetJustifyContent(node) != justify) YGNodeStyleSetJustifyContent(node, justify);
+
+            if (YGNodeStyleGetAlignItems(node) != alignItems) YGNodeStyleSetAlignItems(node, alignItems);
 
             // 容器默认隐藏溢出内容，防止子元素超出边界
             // 如果是 ScrollArea 则在后面设置为 Scroll
             if (!Registry::AnyOf<components::ScrollArea>(entity))
             {
-                YGNodeStyleSetOverflow(node, YGOverflowHidden);
+                if (YGNodeStyleGetOverflow(node) != YGOverflowHidden) YGNodeStyleSetOverflow(node, YGOverflowHidden);
             }
         }
 
         // 处理 ScrollArea
         if (Registry::AnyOf<components::ScrollArea>(entity))
         {
-            YGNodeStyleSetOverflow(node, YGOverflowScroll);
+            if (YGNodeStyleGetOverflow(node) != YGOverflowScroll) YGNodeStyleSetOverflow(node, YGOverflowScroll);
         }
 
         // 8. 文本/按钮等叶子节点：使用 Size 组件中已有的尺寸
@@ -478,12 +678,16 @@ private:
 
                 if (policies::HasFlag(sizeComp->sizePolicy, policies::Size::HAuto))
                 {
-                    YGNodeStyleSetMinWidth(node, defaultWidth);
+                    YGValue curMinW = YGNodeStyleGetMinWidth(node);
+                    if (curMinW.unit != YGUnitPoint || curMinW.value != defaultWidth)
+                        YGNodeStyleSetMinWidth(node, defaultWidth);
                 }
 
                 if (policies::HasFlag(sizeComp->sizePolicy, policies::Size::VAuto))
                 {
-                    YGNodeStyleSetMinHeight(node, defaultHeight);
+                    YGValue curMinH = YGNodeStyleGetMinHeight(node);
+                    if (curMinH.unit != YGUnitPoint || curMinH.value != defaultHeight)
+                        YGNodeStyleSetMinHeight(node, defaultHeight);
                 }
             }
         }

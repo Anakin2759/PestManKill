@@ -104,7 +104,6 @@ public:
                         uint32_t winId = event.motion.windowID;
                         Dispatcher::Enqueue<ui::events::RawPointerMove>(
                             ui::events::RawPointerMove{Vec2(mx, my), Vec2(dx, dy), winId});
-                        Dispatcher::Trigger<ui::events::UpdateRendering>();
                     }
                     break;
                 }
@@ -116,7 +115,7 @@ public:
                     uint32_t winId = event.button.windowID;
                     Dispatcher::Enqueue<ui::events::RawPointerButton>(
                         ui::events::RawPointerButton{Vec2(mx, my), winId, true});
-                    Dispatcher::Trigger<ui::events::UpdateRendering>();
+
                     break;
                 }
                 case SDL_EVENT_MOUSE_BUTTON_UP:
@@ -126,12 +125,12 @@ public:
                     uint32_t winId = event.button.windowID;
                     Dispatcher::Enqueue<ui::events::RawPointerButton>(
                         ui::events::RawPointerButton{Vec2(mx, my), winId, false});
-                    Dispatcher::Trigger<ui::events::UpdateRendering>();
+
                     break;
                 }
                 case SDL_EVENT_TEXT_INPUT:
                     handleTextInput(event.text.text);
-                    Dispatcher::Trigger<ui::events::UpdateRendering>();
+
                     break;
                 case SDL_EVENT_KEY_DOWN:
                     if (!event.key.repeat) // 只处理真实按下，忽略系统重复
@@ -141,7 +140,7 @@ public:
                         m_lastRepeatTime = m_keyPressTime;
                         handleKeyDown(event.key.key);
                     }
-                    Dispatcher::Trigger<ui::events::UpdateRendering>();
+
                     break;
                 case SDL_EVENT_KEY_UP:
                     // 重置长按状态
@@ -161,7 +160,7 @@ public:
                         Vec2(mx, my),
                         Vec2(static_cast<float>(event.wheel.x), static_cast<float>(event.wheel.y)),
                         event.wheel.windowID});
-                    Dispatcher::Trigger<ui::events::UpdateRendering>();
+
                     break;
                 }
                 default:

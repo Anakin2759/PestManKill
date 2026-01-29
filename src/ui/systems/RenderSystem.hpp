@@ -913,15 +913,22 @@ private:
     {
         if (scrollArea.showScrollbars == policies::ScrollBarVisibility::AlwaysOff) return;
 
+        // 计算可视区域高度（减去垂直内边距）
+        float viewportHeight = size.y();
+        if (const auto* padding = Registry::TryGet<components::Padding>(entity))
+        {
+            viewportHeight = std::max(0.0F, size.y() - padding->values.x() - padding->values.z());
+        }
+
         // 简单绘制一个垂直滚动条
         bool hasVerticalScroll =
             (scrollArea.scroll == policies::Scroll::Vertical || scrollArea.scroll == policies::Scroll::Both);
-        if (hasVerticalScroll && scrollArea.contentSize.y() > size.y())
+        if (hasVerticalScroll && scrollArea.contentSize.y() > viewportHeight)
         {
             float trackSize = size.y();
-            float visibleRatio = size.y() / scrollArea.contentSize.y();
+            float visibleRatio = viewportHeight / scrollArea.contentSize.y();
             float thumbSize = std::max(20.0f, trackSize * visibleRatio);
-            float maxScroll = std::max(0.0f, scrollArea.contentSize.y() - size.y());
+            float maxScroll = std::max(0.0f, scrollArea.contentSize.y() - viewportHeight);
             float scrollRatio =
                 maxScroll > 0.0f ? std::clamp(scrollArea.scrollOffset.y() / maxScroll, 0.0f, 1.0f) : 0.0f;
             float thumbPos = (trackSize - thumbSize) * scrollRatio;
@@ -1064,6 +1071,15 @@ private:
                     addText(textComp->content, pos, size, color, textComp->alignment, alpha);
                 }
             }
+
+            // Icon 渲染逻辑 - 如果控件有 Icon 组件，则渲染图标
+            if (const auto* iconComp = Registry::TryGet<components::Icon>(entity))
+            {
+                if (iconComp->textureId)
+                {
+                    renderIcon(entity, iconComp, pos, size, alpha);
+                }
+            }
         }
 
         // 文本输入框渲染
@@ -1078,10 +1094,10 @@ private:
                 Eigen::Vector2f textSize = size;
                 if (const auto* padding = Registry::TryGet<components::Padding>(entity))
                 {
-                    textPos.x() += padding->values.z();
+                    textPos.x() += padding->values.w();
                     textPos.y() += padding->values.x();
-                    textSize.x() = std::max(0.0F, textSize.x() - padding->values.y() - padding->values.z());
-                    textSize.y() = std::max(0.0F, textSize.y() - padding->values.x() - padding->values.w());
+                    textSize.x() = std::max(0.0F, textSize.x() - padding->values.y() - padding->values.w());
+                    textSize.y() = std::max(0.0F, textSize.y() - padding->values.x() - padding->values.z());
                 }
 
                 // 在输入框内部裁剪，避免文本溢出
@@ -1158,62 +1174,156 @@ private:
                 }
                 else
                 {
-                    // 多行：自动换行 + 纵向滚动显示末尾
+                    // 多行：自动换行 + 支持滚动
                     policies::TextWrap wrapMode =
                         textComp->wordWrap != policies::TextWrap::None ? textComp->wordWrap : policies::TextWrap::Word;
                     std::vector<std::string> lines =
                         wrapTextLines(displayText, static_cast<int>(textSize.x()), wrapMode);
 
-                    const int maxLines = lineHeight > 0.0F ? static_cast<int>(textSize.y() / lineHeight) : 0;
-                    const size_t startIndex = (maxLines > 0 && lines.size() > static_cast<size_t>(maxLines))
-                                                  ? (lines.size() - static_cast<size_t>(maxLines))
-                                                  : 0;
-
-                    float y = textPos.y();
-                    for (size_t i = startIndex; i < lines.size(); ++i)
+                    // 计算文本总高度并更新 ScrollArea contentSize
+                    float totalTextHeight = lines.size() * lineHeight;
+                    if (auto* scrollArea = Registry::TryGet<components::ScrollArea>(entity))
                     {
-                        const std::string& line = lines[i];
-                        if (!line.empty())
+                        if (scrollArea->contentSize.y() != totalTextHeight)
                         {
-                            addText(line,
-                                    {textPos.x(), y},
-                                    {textSize.x(), lineHeight},
-                                    color,
-                                    policies::Alignment::LEFT,
-                                    alpha);
+                            scrollArea->contentSize.x() = textSize.x();
+                            scrollArea->contentSize.y() = totalTextHeight;
                         }
-                        y += lineHeight;
+
+                        // 使用滚动偏移来确定起始行
+                        const int maxVisibleLines = lineHeight > 0.0F ? static_cast<int>(textSize.y() / lineHeight) : 0;
+                        const int scrollOffsetLines =
+                            lineHeight > 0.0F ? static_cast<int>(scrollArea->scrollOffset.y() / lineHeight) : 0;
+                        const size_t startIndex =
+                            std::min(static_cast<size_t>(scrollOffsetLines), lines.size() > 0 ? lines.size() - 1 : 0);
+                        const size_t endIndex =
+                            std::min(startIndex + static_cast<size_t>(maxVisibleLines) + 1, lines.size());
+
+                        float y = textPos.y() - (scrollArea->scrollOffset.y() - scrollOffsetLines * lineHeight);
+                        for (size_t i = startIndex; i < endIndex; ++i)
+                        {
+                            const std::string& line = lines[i];
+                            if (!line.empty())
+                            {
+                                addText(line,
+                                        {textPos.x(), y},
+                                        {textSize.x(), lineHeight},
+                                        color,
+                                        policies::Alignment::LEFT,
+                                        alpha);
+                            }
+                            y += lineHeight;
+                        }
+
+                        // 绘制光标 (仅当获焦时) - ScrollArea 分支
+                        if (Registry::AnyOf<components::FocusedTag>(entity))
+                        {
+                            float cursorX = textPos.x();
+                            float cursorY = textPos.y();
+
+                            if (!lines.empty())
+                            {
+                                // 光标在最后一行末尾
+                                const std::string& lastLine = lines.back();
+                                float lastWidth = measureTextWidth(lastLine);
+
+                                // 计算光标在可见区域中的位置
+                                const int lastLineIndex = static_cast<int>(lines.size()) - 1;
+
+                                // 如果最后一行在可见区域内
+                                if (lastLineIndex >= scrollOffsetLines &&
+                                    lastLineIndex < scrollOffsetLines + maxVisibleLines)
+                                {
+                                    const int visibleLineIndex = lastLineIndex - scrollOffsetLines;
+                                    cursorY = textPos.y() + visibleLineIndex * lineHeight -
+                                              (scrollArea->scrollOffset.y() - scrollOffsetLines * lineHeight);
+                                    cursorX = textPos.x() + lastWidth;
+                                }
+                                else
+                                {
+                                    // 光标不在可见区域，不显示
+                                    cursorX = -1000.0F;
+                                    cursorY = -1000.0F;
+                                }
+                            }
+
+                            if (cursorX >= 0.0F && cursorY >= 0.0F && (SDL_GetTicks() / 500) % 2 == 0)
+                            {
+                                addRectFilledWithRounding({cursorX, cursorY},
+                                                          {2.0F, lineHeight},
+                                                          {1.0F, 1.0F, 1.0F, 1.0F},
+                                                          {0, 0, 0, 0},
+                                                          alpha);
+                            }
+
+                            if (sdlWindow && cursorX >= 0.0F && cursorY >= 0.0F)
+                            {
+                                SDL_Rect rect;
+                                rect.x = static_cast<int>(cursorX);
+                                rect.y = static_cast<int>(cursorY);
+                                rect.w = 2;
+                                rect.h = static_cast<int>(lineHeight);
+                                SDL_SetTextInputArea(sdlWindow, &rect, 0);
+                            }
+                        }
                     }
-
-                    // 绘制光标 (仅当获焦时)
-                    if (Registry::AnyOf<components::FocusedTag>(entity))
+                    else
                     {
-                        float cursorX = textPos.x();
-                        float cursorY = textPos.y();
-                        if (!lines.empty())
+                        // 没有 ScrollArea 的情况：显示末尾内容（保持原有行为）
+                        const int maxLines = lineHeight > 0.0F ? static_cast<int>(textSize.y() / lineHeight) : 0;
+                        const size_t startIndex = (maxLines > 0 && lines.size() > static_cast<size_t>(maxLines))
+                                                      ? (lines.size() - static_cast<size_t>(maxLines))
+                                                      : 0;
+
+                        float y = textPos.y();
+                        for (size_t i = startIndex; i < lines.size(); ++i)
                         {
-                            const std::string& lastLine = lines.back();
-                            float lastWidth = measureTextWidth(lastLine);
-                            const int visibleLineCount =
-                                maxLines > 0 ? std::min(maxLines, static_cast<int>(lines.size())) : 1;
-                            cursorY = textPos.y() + (visibleLineCount - 1) * lineHeight;
-                            cursorX = textPos.x() + lastWidth;
+                            const std::string& line = lines[i];
+                            if (!line.empty())
+                            {
+                                addText(line,
+                                        {textPos.x(), y},
+                                        {textSize.x(), lineHeight},
+                                        color,
+                                        policies::Alignment::LEFT,
+                                        alpha);
+                            }
+                            y += lineHeight;
                         }
 
-                        if ((SDL_GetTicks() / 500) % 2 == 0)
+                        // 绘制光标 (仅当获焦时) - 无 ScrollArea 分支
+                        if (Registry::AnyOf<components::FocusedTag>(entity))
                         {
-                            addRectFilledWithRounding(
-                                {cursorX, cursorY}, {2.0F, lineHeight}, {1.0F, 1.0F, 1.0F, 1.0F}, {0, 0, 0, 0}, alpha);
-                        }
+                            float cursorX = textPos.x();
+                            float cursorY = textPos.y();
+                            if (!lines.empty())
+                            {
+                                const std::string& lastLine = lines.back();
+                                float lastWidth = measureTextWidth(lastLine);
+                                const int visibleLineCount =
+                                    maxLines > 0 ? std::min(maxLines, static_cast<int>(lines.size())) : 1;
+                                cursorY = textPos.y() + (visibleLineCount - 1) * lineHeight;
+                                cursorX = textPos.x() + lastWidth;
+                            }
 
-                        if (sdlWindow)
-                        {
-                            SDL_Rect rect;
-                            rect.x = static_cast<int>(cursorX);
-                            rect.y = static_cast<int>(cursorY);
-                            rect.w = 2;
-                            rect.h = static_cast<int>(lineHeight);
-                            SDL_SetTextInputArea(sdlWindow, &rect, 0);
+                            if ((SDL_GetTicks() / 500) % 2 == 0)
+                            {
+                                addRectFilledWithRounding({cursorX, cursorY},
+                                                          {2.0F, lineHeight},
+                                                          {1.0F, 1.0F, 1.0F, 1.0F},
+                                                          {0, 0, 0, 0},
+                                                          alpha);
+                            }
+
+                            if (sdlWindow)
+                            {
+                                SDL_Rect rect;
+                                rect.x = static_cast<int>(cursorX);
+                                rect.y = static_cast<int>(cursorY);
+                                rect.w = 2;
+                                rect.h = static_cast<int>(lineHeight);
+                                SDL_SetTextInputArea(sdlWindow, &rect, 0);
+                            }
                         }
                     }
                 }
@@ -1403,6 +1513,146 @@ private:
         batch.indices = {0, 1, 2, 0, 2, 3};
 
         m_batches.push_back(std::move(batch));
+    }
+
+    /**
+     * @brief 渲染图标
+     * @param entity 实体
+     * @param iconComp Icon组件指针
+     * @param widgetPos 控件位置
+     * @param widgetSize 控件尺寸
+     * @param alpha 透明度
+     */
+    void renderIcon(entt::entity entity,
+                    const components::Icon* iconComp,
+                    const Eigen::Vector2f& widgetPos,
+                    const Eigen::Vector2f& widgetSize,
+                    float alpha)
+    {
+        if (!iconComp) return;
+
+        // 根据类型判断是否有有效数据
+        if (iconComp->type == policies::IconType::Texture && !iconComp->textureId) return;
+        if (iconComp->type == policies::IconType::Font && (!iconComp->fontHandle || iconComp->codepoint == 0)) return;
+
+        // 获取文本组件以计算文本尺寸
+        const auto* textComp = Registry::TryGet<components::Text>(entity);
+
+        // 计算文本实际尺寸
+        Eigen::Vector2f textSize{0.0F, 0.0F};
+        if (textComp && !textComp->content.empty())
+        {
+            float textWidth = measureTextWidth(textComp->content);
+            float textHeight = m_defaultFont ? static_cast<float>(TTF_GetFontHeight(m_defaultFont)) : 16.0F;
+            textSize = {textWidth, textHeight};
+        }
+
+        // 图标位置计算
+        Eigen::Vector2f iconPos;
+        Eigen::Vector2f iconSize{iconComp->size.x(), iconComp->size.y()};
+
+        switch (iconComp->position)
+        {
+            case policies::IconPosition::Left:
+                // 图标在文本左侧
+                iconPos.x() = widgetPos.x() + (widgetSize.x() - textSize.x() - iconSize.x() - iconComp->spacing) * 0.5F;
+                iconPos.y() = widgetPos.y() + (widgetSize.y() - iconSize.y()) * 0.5F;
+                break;
+
+            case policies::IconPosition::Right:
+                // 图标在文本右侧
+                iconPos.x() = widgetPos.x() + (widgetSize.x() + textSize.x() + iconComp->spacing - iconSize.x()) * 0.5F;
+                iconPos.y() = widgetPos.y() + (widgetSize.y() - iconSize.y()) * 0.5F;
+                break;
+
+            case policies::IconPosition::Top:
+                // 图标在文本上方
+                iconPos.x() = widgetPos.x() + (widgetSize.x() - iconSize.x()) * 0.5F;
+                iconPos.y() = widgetPos.y() + (widgetSize.y() - textSize.y() - iconSize.y() - iconComp->spacing) * 0.5F;
+                break;
+
+            case policies::IconPosition::Bottom:
+                // 图标在文本下方
+                iconPos.x() = widgetPos.x() + (widgetSize.x() - iconSize.x()) * 0.5F;
+                iconPos.y() = widgetPos.y() + (widgetSize.y() + textSize.y() + iconComp->spacing - iconSize.y()) * 0.5F;
+                break;
+        }
+
+        // 根据类型渲染图标
+        if (iconComp->type == policies::IconType::Texture)
+        {
+            // 渲染纹理图标
+            Eigen::Vector4f tint(iconComp->tintColor.red,
+                                 iconComp->tintColor.green,
+                                 iconComp->tintColor.blue,
+                                 iconComp->tintColor.alpha);
+
+            addImageBatch(static_cast<SDL_GPUTexture*>(iconComp->textureId),
+                          iconPos,
+                          iconSize,
+                          {iconComp->uvMin.x(), iconComp->uvMin.y()},
+                          {iconComp->uvMax.x(), iconComp->uvMax.y()},
+                          tint,
+                          alpha);
+        }
+        else if (iconComp->type == policies::IconType::Font)
+        {
+            // 渲染字体图标
+            renderFontIcon(iconComp, iconPos, iconSize, alpha);
+        }
+    }
+
+    /**
+     * @brief 渲染字体图标（IconFont）
+     */
+    void renderFontIcon(const components::Icon* iconComp,
+                        const Eigen::Vector2f& pos,
+                        const Eigen::Vector2f& size,
+                        float alpha)
+    {
+        if (!iconComp || !iconComp->fontHandle || iconComp->codepoint == 0) return;
+
+        // 将 codepoint 转换为 UTF-8 字符串
+        std::string iconChar;
+        uint32_t cp = iconComp->codepoint;
+        if (cp < 0x80)
+        {
+            iconChar.push_back(static_cast<char>(cp));
+        }
+        else if (cp < 0x800)
+        {
+            iconChar.push_back(static_cast<char>(0xC0 | (cp >> 6)));
+            iconChar.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+        }
+        else if (cp < 0x10000)
+        {
+            iconChar.push_back(static_cast<char>(0xE0 | (cp >> 12)));
+            iconChar.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+            iconChar.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+        }
+        else
+        {
+            iconChar.push_back(static_cast<char>(0xF0 | (cp >> 18)));
+            iconChar.push_back(static_cast<char>(0x80 | ((cp >> 12) & 0x3F)));
+            iconChar.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+            iconChar.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+        }
+
+        // 使用 IconFont 渲染文本
+        TTF_Font* iconFont = static_cast<TTF_Font*>(iconComp->fontHandle);
+
+        // 临时保存当前字体
+        TTF_Font* prevFont = m_defaultFont;
+        m_defaultFont = iconFont;
+
+        // 渲染图标字符
+        Eigen::Vector4f color(
+            iconComp->tintColor.red, iconComp->tintColor.green, iconComp->tintColor.blue, iconComp->tintColor.alpha);
+
+        addText(iconChar, pos, size, color, policies::Alignment::CENTER, alpha);
+
+        // 恢复原字体
+        m_defaultFont = prevFont;
     }
 
     static size_t nextUtf8CharLen(unsigned char c)
@@ -1751,7 +2001,6 @@ private:
 
         if (firstRender)
         {
-            Logger::info("RenderSystem::renderToGPU - Swapchain texture acquired");
             firstRender = false;
         }
 

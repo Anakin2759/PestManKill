@@ -275,4 +275,29 @@ enum class WindowFlag : uint16_t
     Dialog = Modal | NoCollapse
 };
 
+/**
+ * @brief 图标位置枚举 - 图标相对于文本的位置
+ */
+enum class IconPosition : uint8_t
+{
+    Left,  // 图标在文本左侧
+    Right, // 图标在文本右侧
+    Top,   // 图标在文本上方
+    Bottom // 图标在文本下方
+};
+/**
+ * @brief 图标类型枚举 - 区分纹理图标和字体图标
+ */
+enum class IconType : uint8_t
+{
+    Texture, // 纹理图标（PNG、JPG等图像文件）
+    Font     // 字体图标（IconFont.ttf，使用字符编码渲染）
+};
+
+enum class Log : uint16_t
+{
+    SingleFileR = 1 << 0,  // 只写单个日志文件（覆盖模式）
+    SingleFileRW = 1 << 1, // 读写单个日志文件（追加模式）
+    Terminal = 1 << 1,
+};
 } // namespace ui::policies

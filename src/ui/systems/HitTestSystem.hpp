@@ -23,6 +23,7 @@
 #include <entt/entt.hpp>
 #include <vector>
 #include <algorithm>
+#include <unordered_map>
 #include "../common/Types.hpp"
 #include "../common/Components.hpp"
 #include "../common/Tags.hpp"
@@ -36,6 +37,7 @@ namespace ui::systems
 
 /**
  * @brief 碰撞检测系统 - 负责鼠标位置到UI实体的映射
+ * @note 使用 Z-Order 缓存机制优化性能，按窗口维护排序后的可交互实体列表
  */
 class HitTestSystem : public ui::interface::EnableRegister<HitTestSystem>
 {
@@ -45,6 +47,18 @@ public:
         Dispatcher::Sink<events::RawPointerMove>().connect<&HitTestSystem::onRawPointerMove>(*this);
         Dispatcher::Sink<events::RawPointerButton>().connect<&HitTestSystem::onRawPointerButton>(*this);
         Dispatcher::Sink<events::RawPointerWheel>().connect<&HitTestSystem::onRawPointerWheel>(*this);
+
+        // 监听可能导致缓存失效的事件
+        Registry::OnConstruct<components::ZOrderIndex>().connect<&HitTestSystem::onZOrderChanged>(*this);
+        Registry::OnUpdate<components::ZOrderIndex>().connect<&HitTestSystem::onZOrderChanged>(*this);
+        Registry::OnDestroy<components::ZOrderIndex>().connect<&HitTestSystem::onZOrderChanged>(*this);
+
+        Registry::OnConstruct<components::Hierarchy>().connect<&HitTestSystem::onHierarchyChanged>(*this);
+        Registry::OnUpdate<components::Hierarchy>().connect<&HitTestSystem::onHierarchyChanged>(*this);
+        Registry::OnDestroy<components::Hierarchy>().connect<&HitTestSystem::onHierarchyChanged>(*this);
+
+        Registry::OnConstruct<components::VisibleTag>().connect<&HitTestSystem::onVisibilityChanged>(*this);
+        Registry::OnDestroy<components::VisibleTag>().connect<&HitTestSystem::onVisibilityChanged>(*this);
     }
 
     void unregisterHandlersImpl()
@@ -52,6 +66,22 @@ public:
         Dispatcher::Sink<events::RawPointerMove>().disconnect<&HitTestSystem::onRawPointerMove>(*this);
         Dispatcher::Sink<events::RawPointerButton>().disconnect<&HitTestSystem::onRawPointerButton>(*this);
         Dispatcher::Sink<events::RawPointerWheel>().disconnect<&HitTestSystem::onRawPointerWheel>(*this);
+
+        // 断开缓存失效的信号
+        Registry::OnConstruct<components::ZOrderIndex>().disconnect<&HitTestSystem::onZOrderChanged>(
+            *this);
+        Registry::OnUpdate<components::ZOrderIndex>().disconnect<&HitTestSystem::onZOrderChanged>(*this);
+        Registry::OnDestroy<components::ZOrderIndex>().disconnect<&HitTestSystem::onZOrderChanged>(*this);
+
+        Registry::OnConstruct<components::Hierarchy>().disconnect<&HitTestSystem::onHierarchyChanged>(
+            *this);
+        Registry::OnUpdate<components::Hierarchy>().disconnect<&HitTestSystem::onHierarchyChanged>(
+            *this);
+        Registry::OnDestroy<components::Hierarchy>().disconnect<&HitTestSystem::onHierarchyChanged>(*this);
+
+        Registry::OnConstruct<components::VisibleTag>().disconnect<&HitTestSystem::onVisibilityChanged>(
+            *this);
+        Registry::OnDestroy<components::VisibleTag>().disconnect<&HitTestSystem::onVisibilityChanged>(*this);
     }
 
     /**
@@ -125,13 +155,21 @@ public:
     }
 
     /**
-     * @brief 获取按 Z-Order 从前到后排序的可交互实体列表
+     * @brief 获取按 Z-Order 从前到后排序的可交互实体列表（带缓存）
      * @param topWindow 当前鼠标所在的顶层窗口（entt::null 表示不在任何窗口内）
-     * @return 排序后的可交互实体列表（深度优先，子元素在前）
-     * @note 只返回属于 topWindow 的可交互实体
+     * @return 排序后的可交互实体列表（Z-Order 高的在前）
+     * @note 使用缓存机制，只在缓存失效时重新计算
      */
-    static std::vector<entt::entity> getZOrderedInteractables(entt::entity topWindow)
+    std::vector<entt::entity> getZOrderedInteractables(entt::entity topWindow)
     {
+        // 检查缓存是否有效
+        auto it = m_zOrderCache.find(topWindow);
+        if (it != m_zOrderCache.end() && !it->second.dirty)
+        {
+            return it->second.entities;
+        }
+
+        // 重建缓存
         std::vector<std::pair<int, entt::entity>> interactables;
 
         // 遍历所有具有 Position 和 Size 的实体
@@ -161,27 +199,43 @@ public:
             entt::entity rootWindow = findRootWindow(entity);
             if (rootWindow != topWindow) continue;
 
-            // 简单深度排序：层级越深（子元素），Z-Order 越高
-            int depth = 0;
-            entt::entity current = entity;
-            while (current != entt::null)
+            // 计算 Z-Order：优先使用 ZOrderIndex 组件，其次是层级深度
+            int zOrder = 0;
+            const auto* zOrderComp = Registry::TryGet<components::ZOrderIndex>(entity);
+            if (zOrderComp)
             {
-                const auto* hierarchy = Registry::TryGet<components::Hierarchy>(current);
-                current = hierarchy ? hierarchy->parent : entt::null;
-                depth++;
+                zOrder = zOrderComp->value;
             }
-            interactables.emplace_back(depth, entity);
+            else
+            {
+                // 回退到深度排序：层级越深（子元素），Z-Order 越高
+                int depth = 0;
+                entt::entity current = entity;
+                while (current != entt::null)
+                {
+                    const auto* hierarchy = Registry::TryGet<components::Hierarchy>(current);
+                    current = hierarchy ? hierarchy->parent : entt::null;
+                    depth++;
+                }
+                zOrder = depth;
+            }
+            interactables.emplace_back(zOrder, entity);
         }
 
-        // 排序：深度越大（越靠近前端）的排在前面
+        // 排序：Z-Order 值越大（越靠近前端）的排在前面
         std::sort(
             interactables.begin(), interactables.end(), [](const auto& a, const auto& b) { return a.first > b.first; });
 
         std::vector<entt::entity> result;
+        result.reserve(interactables.size());
         for (const auto& pair : interactables)
         {
             result.push_back(pair.second);
         }
+
+        // 更新缓存
+        m_zOrderCache[topWindow] = {result, false};
+
         return result;
     }
 
@@ -191,7 +245,7 @@ public:
      * @param topWindow 当前窗口实体
      * @return 命中的实体，如果未命中返回 entt::null
      */
-    static entt::entity findHitEntity(const Vec2& mousePos, entt::entity topWindow)
+    entt::entity findHitEntity(const Vec2& mousePos, entt::entity topWindow)
     {
         auto interactables = getZOrderedInteractables(topWindow);
 
@@ -211,7 +265,69 @@ public:
     }
 
 private:
-    static entt::entity resolveHitEntity(const Vec2& pos, uint32_t windowID)
+    /**
+     * @brief Z-Order 缓存结构
+     */
+    struct ZOrderCache
+    {
+        std::vector<entt::entity> entities; // 排序后的实体列表
+        bool dirty = true;                  // 缓存是否失效
+    };
+
+    // 按窗口维护的 Z-Order 缓存
+    std::unordered_map<entt::entity, ZOrderCache> m_zOrderCache;
+
+    /**
+     * @brief 使所有窗口的缓存失效
+     */
+    void invalidateAllCaches()
+    {
+        for (auto& [window, cache] : m_zOrderCache)
+        {
+            cache.dirty = true;
+        }
+    }
+
+    /**
+     * @brief 使指定窗口的缓存失效
+     */
+    void invalidateWindowCache(entt::entity window)
+    {
+        auto it = m_zOrderCache.find(window);
+        if (it != m_zOrderCache.end())
+        {
+            it->second.dirty = true;
+        }
+    }
+
+    /**
+     * @brief ZOrderIndex 组件变化回调
+     */
+    void onZOrderChanged(entt::registry& reg, entt::entity entity)
+    {
+        entt::entity window = findRootWindow(entity);
+        invalidateWindowCache(window);
+    }
+
+    /**
+     * @brief 层级关系变化回调
+     */
+    void onHierarchyChanged(entt::registry& reg, entt::entity entity)
+    {
+        // 层级变化可能影响多个窗口，为简化处理，使所有缓存失效
+        invalidateAllCaches();
+    }
+
+    /**
+     * @brief 可见性变化回调
+     */
+    void onVisibilityChanged(entt::registry& reg, entt::entity entity)
+    {
+        entt::entity window = findRootWindow(entity);
+        invalidateWindowCache(window);
+    }
+
+    entt::entity resolveHitEntity(const Vec2& pos, uint32_t windowID)
     {
         entt::entity topWindow = entt::null;
         auto viewWin = Registry::View<components::Window>();

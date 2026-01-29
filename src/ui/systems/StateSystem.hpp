@@ -27,6 +27,7 @@
 #include <cfloat>
 #include <algorithm>
 #include <string>
+#include <unordered_set>
 #include <SDL3/SDL.h>
 #include "api/Utils.hpp"
 #include "../singleton/Registry.hpp"
@@ -87,6 +88,9 @@ public:
         Dispatcher::Sink<events::HitPointerMove>().connect<&StateSystem::onHitPointerMove>(*this);
         Dispatcher::Sink<events::HitPointerButton>().connect<&StateSystem::onHitPointerButton>(*this);
         Dispatcher::Sink<events::HitPointerWheel>().connect<&StateSystem::onHitPointerWheel>(*this);
+
+        // 帧结束时应用状态更新
+        Dispatcher::Sink<events::EndFrame>().connect<&StateSystem::onEndFrame>(*this);
     }
 
     void unregisterHandlersImpl()
@@ -102,6 +106,7 @@ public:
         Dispatcher::Sink<events::HitPointerMove>().disconnect<&StateSystem::onHitPointerMove>(*this);
         Dispatcher::Sink<events::HitPointerButton>().disconnect<&StateSystem::onHitPointerButton>(*this);
         Dispatcher::Sink<events::HitPointerWheel>().disconnect<&StateSystem::onHitPointerWheel>(*this);
+        Dispatcher::Sink<events::EndFrame>().disconnect<&StateSystem::onEndFrame>(*this);
     }
 
     /**
@@ -118,28 +123,30 @@ public:
     // ===================================================================
 
     /**
-     * @brief 处理悬停事件 - 更新悬停状态
+     * @brief 处理悬停事件 - 更新悬停状态（延迟应用）
      */
     void onHoverEvent(const events::HoverEvent& event)
     {
         auto& state = getGlobalState();
 
-        // 移除旧悬停实体的标签
+        // 标记旧悬停实体需要移除 Hover 标签
         if (state.hoveredEntity != entt::null && Registry::Valid(state.hoveredEntity))
         {
-            Registry::Remove<components::HoveredTag>(state.hoveredEntity);
+            m_pendingHoverRemove.insert(state.hoveredEntity);
         }
 
         // 设置新悬停实体
         state.hoveredEntity = event.entity;
         if (Registry::Valid(event.entity))
         {
-            Registry::EmplaceOrReplace<components::HoveredTag>(event.entity);
+            m_pendingHoverAdd.insert(event.entity);
+            // 如果同一实体既要添加又要移除，取消移除操作
+            m_pendingHoverRemove.erase(event.entity);
         }
     }
 
     /**
-     * @brief 处理取消悬停事件
+     * @brief 处理取消悬停事件（延迟应用）
      */
     void onUnhoverEvent(const events::UnhoverEvent& event)
     {
@@ -147,7 +154,9 @@ public:
 
         if (Registry::Valid(event.entity))
         {
-            Registry::Remove<components::HoveredTag>(event.entity);
+            m_pendingHoverRemove.insert(event.entity);
+            // 取消可能的添加操作
+            m_pendingHoverAdd.erase(event.entity);
         }
 
         // 如果取消悬停的实体是当前悬停实体，清空全局状态
@@ -158,28 +167,30 @@ public:
     }
 
     /**
-     * @brief 处理鼠标按下事件 - 设置激活状态
+     * @brief 处理鼠标按下事件 - 设置激活状态（延迟应用）
      */
     void onMousePressEvent(const events::MousePressEvent& event)
     {
         auto& state = getGlobalState();
 
-        // 移除旧激活实体的标签
+        // 标记旧激活实体需要移除 Active 标签
         if (state.activeEntity != entt::null && Registry::Valid(state.activeEntity))
         {
-            Registry::Remove<components::ActiveTag>(state.activeEntity);
+            m_pendingActiveRemove.insert(state.activeEntity);
         }
 
         // 设置新激活实体
         state.activeEntity = event.entity;
         if (Registry::Valid(event.entity))
         {
-            Registry::EmplaceOrReplace<components::ActiveTag>(event.entity);
+            m_pendingActiveAdd.insert(event.entity);
+            // 如果同一实体既要添加又要移除，取消移除操作
+            m_pendingActiveRemove.erase(event.entity);
         }
     }
 
     /**
-     * @brief 处理鼠标释放事件 - 清除激活状态
+     * @brief 处理鼠标释放事件 - 清除激活状态（延迟应用）
      */
     void onMouseReleaseEvent(const events::MouseReleaseEvent& event)
     {
@@ -187,7 +198,9 @@ public:
 
         if (Registry::Valid(event.entity))
         {
-            Registry::Remove<components::ActiveTag>(event.entity);
+            m_pendingActiveRemove.insert(event.entity);
+            // 取消可能的添加操作
+            m_pendingActiveAdd.erase(event.entity);
         }
 
         // 清空全局激活状态
@@ -262,7 +275,8 @@ public:
         {
             if (Registry::TryGet<components::Clickable>(releasedEntity) != nullptr)
             {
-                Logger::debug("StateSystem: Click Event on entity {}", static_cast<uint32_t>(releasedEntity));
+                auto& baseInfo = Registry::Get<components::BaseInfo>(releasedEntity); // 确保实体有效
+                Logger::debug("StateSystem: Click Event on entity {}", baseInfo.alias);
                 Dispatcher::Trigger<events::ClickEvent>(events::ClickEvent{releasedEntity});
             }
 
@@ -361,12 +375,13 @@ public:
 
     /**
      * @brief 设置焦点到指定实体（用于输入框等需要焦点的组件）
+     * @note Focus 状态立即应用，因为涉及 SDL 输入法状态同步
      */
     static void setFocus(entt::entity entity, SDL_Window* sdlWindow = nullptr)
     {
         auto& state = getGlobalState();
 
-        // 移除旧焦点实体的标签
+        // 移除旧焦点实体的标签（Focus 需要立即应用）
         if (state.focusedEntity != entt::null && Registry::Valid(state.focusedEntity))
         {
             ui::utils::MarkRenderDirty(state.focusedEntity);
@@ -725,6 +740,70 @@ public:
             SDL_SetWindowModal(sdlWindow, false);
         }
     }
+
+private:
+    // ===================================================================
+    // 状态更新合并机制
+    // ===================================================================
+
+    /**
+     * @brief 待处理的状态标签更新集合
+     * @note 使用 unordered_set 自动去重，避免同一实体多次操作
+     */
+    std::unordered_set<entt::entity> m_pendingHoverAdd;
+    std::unordered_set<entt::entity> m_pendingHoverRemove;
+    std::unordered_set<entt::entity> m_pendingActiveAdd;
+    std::unordered_set<entt::entity> m_pendingActiveRemove;
+
+    /**
+     * @brief 帧结束时批量应用状态更新
+     * @note 通过合并同帧内的多次状态变化，减少无效的 Registry 操作
+     */
+    void onEndFrame()
+    {
+        // 1. 应用 Hover 状态更新
+        for (entt::entity entity : m_pendingHoverRemove)
+        {
+            if (Registry::Valid(entity))
+            {
+                Registry::Remove<components::HoveredTag>(entity);
+            }
+        }
+        for (entt::entity entity : m_pendingHoverAdd)
+        {
+            if (Registry::Valid(entity))
+            {
+                Registry::EmplaceOrReplace<components::HoveredTag>(entity);
+            }
+        }
+
+        // 2. 应用 Active 状态更新
+        for (entt::entity entity : m_pendingActiveRemove)
+        {
+            if (Registry::Valid(entity))
+            {
+                Registry::Remove<components::ActiveTag>(entity);
+            }
+        }
+        for (entt::entity entity : m_pendingActiveAdd)
+        {
+            if (Registry::Valid(entity))
+            {
+                Registry::EmplaceOrReplace<components::ActiveTag>(entity);
+            }
+        }
+
+        // 3. 清空待处理队列
+        m_pendingHoverAdd.clear();
+        m_pendingHoverRemove.clear();
+        m_pendingActiveAdd.clear();
+        m_pendingActiveRemove.clear();
+    }
+
+    // ===================================================================
+    // 工具方法
+    // ===================================================================
+
     static void destroyWidget(entt::entity entity)
     {
         auto& registry = Registry::getInstance();

@@ -36,7 +36,7 @@ inline void CreateMenuDialog()
     ui::layout::SetPadding(menuDialog, 20.0F);
 
     // 创建标题标签
-    auto titleLabel = ui::factory::CreateLabel("欢迎来到 PestManKill", "titleLabel");
+    auto titleLabel = ui::factory::CreateLabel("欢迎来到 害虫杀", "titleLabel");
     ui::text::SetTextAlignment(titleLabel, ui::policies::Alignment::CENTER);
     ui::text::SetTextColor(titleLabel, {1.0F, 0.9F, 0.3F, 1.0F}); // 金黄色
     ui::hierarchy::AddChild(menuDialog, titleLabel);

@@ -123,6 +123,7 @@ struct RenderTask
         m_remainingTime = m_delayTime;
         Dispatcher::Trigger<ui::events::UpdateLayout>();
         Dispatcher::Trigger<ui::events::UpdateRendering>();
+        Dispatcher::Trigger<ui::events::EndFrame>(); // 帧结束时批量应用状态更新
     }
 };
 

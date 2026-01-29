@@ -150,7 +150,7 @@ struct Hierarchy
 /**
  * @brief Z轴顺序组件 - 控制元素的前后显示顺序
  */
-struct ZIndex
+struct ZOrderIndex
 {
     using is_component_tag = void;
     int value = 0; // Z 顺序值，值越大越靠前
@@ -477,6 +477,35 @@ struct ProgressBar
     Color backgroundColor{0.3F, 0.3F, 0.3F, 1.0F};                            // 背景颜色
     policies::LabelVisibility showLabel = policies::LabelVisibility::Visible; // 是否显示百分比标签
     policies::AnimationState animated = policies::AnimationState::Stopped;    // 是否启用动画效果
+};
+
+/**
+ * @brief 图标组件 - 用于为控件添加图标装饰
+ * 通常附加到 Button、Label 等控件上
+ * 支持两种类型：纹理图标（Image）和字体图标（IconFont）
+ */
+struct Icon
+{
+    using is_component_tag = void;
+    static constexpr float DEFAULT_SIZE = 16.0F;
+    static constexpr float DEFAULT_SPACING = 4.0F;
+
+    policies::IconType type = policies::IconType::Texture; // 图标类型
+
+    // 纹理图标相关字段（type == Texture 时使用）
+    void* textureId = nullptr; // 图标纹理句柄
+    Vec2 uvMin{0.0F, 0.0F};    // UV 最小坐标
+    Vec2 uvMax{1.0F, 1.0F};    // UV 最大坐标
+
+    // 字体图标相关字段（type == Font 时使用）
+    void* fontHandle = nullptr; // IconFont 字体句柄
+    uint32_t codepoint = 0;     // Unicode 码点（如 0xF015 表示 home 图标）
+
+    // 通用字段
+    Vec2 size{DEFAULT_SIZE, DEFAULT_SIZE};                          // 图标尺寸
+    policies::IconPosition position = policies::IconPosition::Left; // 相对于文本的位置
+    float spacing = DEFAULT_SPACING;                                // 与文本的间距
+    Color tintColor{1.0F, 1.0F, 1.0F, 1.0F};                        // 图标颜色
 };
 
 } // namespace ui::components

@@ -108,12 +108,6 @@ public:
 
     static void Destroy(::entt::entity entity) { getInstance().m_registry.destroy(entity); }
 
-    template <ComponentOrUiTag Type>
-    static auto OnUpdate()
-    {
-        return getInstance().m_registry.on_update<Type>();
-    }
-
     template <ComponentOrUiTag... Type>
     static auto Clear()
     {
@@ -121,6 +115,26 @@ public:
     }
 
     static void Clear() { return getInstance().m_registry.clear(); }
+
+    template <ComponentOrUiTag Type>
+    static auto OnUpdate()
+    {
+        return getInstance().m_registry.on_update<Type>();
+    }
+    template <ComponentOrUiTag Type>
+    static auto OnDestroy()
+    {
+        return getInstance().m_registry.on_destroy<Type>();
+    }
+    /**
+     * @brief 组件构造事件回调连接器
+     * @return entt::sink<ComponentConstructedSignature>
+     */
+    template <ComponentOrUiTag Type>
+    static auto OnConstruct()
+    {
+        return getInstance().m_registry.on_construct<Type>();
+    }
 
 private:
     Registry() = default;

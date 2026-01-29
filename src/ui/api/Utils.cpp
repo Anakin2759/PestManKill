@@ -10,18 +10,6 @@ void MarkLayoutDirty(::entt::entity entity)
     while (current != ::entt::null && Registry::Valid(current))
     {
         Registry::EmplaceOrReplace<components::LayoutDirtyTag>(current);
-
-        // 如果当前节点尺寸策略是 Fixed（水平和垂直都固定），则停止向上传播
-        if (const auto* sizeComp = Registry::TryGet<components::Size>(current))
-        {
-            const auto policy = sizeComp->sizePolicy;
-            const auto fixed = policies::Size::Fixed;
-            if (policies::HasFlag(policy, fixed))
-            {
-                break;
-            }
-        }
-
         const auto* hierarchy = Registry::TryGet<components::Hierarchy>(current);
         current = hierarchy != nullptr ? hierarchy->parent : entt::null;
     }
@@ -69,11 +57,17 @@ void CloseWindow(::entt::entity entity)
 {
     if (!Registry::Valid(entity)) return;
     Dispatcher::Enqueue<events::CloseWindow>(events::CloseWindow{entity});
-
-} // namespace ui::utils
+}
 
 void QuitUiEventLoop()
 {
     Dispatcher::Trigger<ui::events::QuitRequested>(ui::events::QuitRequested{});
 };
+
+void InvokeTask(std::move_only_function<void()> func)
+{
+    events::QueuedTask task{std::move(func)};
+    Dispatcher::Enqueue<events::QueuedTask>(std::move(task));
+}
+
 } // namespace ui::utils

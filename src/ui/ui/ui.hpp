@@ -30,5 +30,6 @@
 #include "../api/Hierarchy.hpp"
 #include "../api/Animation.hpp"
 #include "../api/Factory.hpp"
+#include "../api/Icon.hpp"
 
 // NOLINTEND(unused-included)

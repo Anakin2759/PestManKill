@@ -239,6 +239,35 @@ entt::entity CreateTextBrowser(std::string_view initialText, std::string_view pl
     auto& edit = Registry::Get<components::TextEdit>(entity);
     edit.buffer = std::string(initialText);
     edit.inputMode = policies::TextFlag::ReadOnly | policies::TextFlag::Multiline;
+
+    // 添加 ScrollArea 组件以支持滚动
+    auto& scrollArea = Registry::Emplace<components::ScrollArea>(entity);
+    scrollArea.scroll = policies::Scroll::Vertical;
+    scrollArea.showScrollbars = policies::ScrollBarVisibility::Auto;
+
+    // 设置文本默认对齐方式：左上对齐
+    auto& text = Registry::Get<components::Text>(entity);
+    text.alignment = policies::Alignment::TOP | policies::Alignment::LEFT;
+    text.wordWrap = policies::TextWrap::Word; // 自动换行
+
+    // 确保尺寸策略允许填充父容器
+    auto& size = Registry::Get<components::Size>(entity);
+    size.sizePolicy = policies::Size::FillParent;
+
+    return entity;
+}
+
+entt::entity CreateCheckBox(const std::string& label, bool checked, std::string_view alias)
+{
+    auto entity = CreateBaseWidget(alias);
+    // TODO: 实现 CheckBoxTag 和 CheckBox 组件
+    // Registry::Emplace<components::CheckBoxTag>(entity);
+    // auto& checkBox = Registry::Emplace<components::CheckBox>(entity);
+    // checkBox.checked = checked;
+    auto& text = Registry::Emplace<components::Text>(entity);
+    text.content = label;
+    text.alignment = ui::policies::Alignment::LEFT | ui::policies::Alignment::VCENTER;
+    Registry::Get<components::Size>(entity).sizePolicy = ui::policies::Size::Auto;
     return entity;
 }
 

@@ -12,4 +12,6 @@ void MarkLayoutDirty(::entt::entity entity);
 void MarkRenderDirty(::entt::entity entity);
 void CloseWindow(::entt::entity entity);
 void QuitUiEventLoop();
+
+void InvokeTask(std::move_only_function<void()> func);
 } // namespace ui::utils

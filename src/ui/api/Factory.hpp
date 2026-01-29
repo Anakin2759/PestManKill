@@ -46,5 +46,8 @@ entt::entity
 entt::entity CreateTextBrowser(std::string_view initialText = "",
                                std::string_view placeholder = "",
                                std::string_view alias = "");
+entt::entity CreateCheckBox(const std::string& label, bool checked = false, std::string_view alias = "");
+
+
 
 } // namespace ui::factory

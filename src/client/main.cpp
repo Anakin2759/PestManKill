@@ -33,7 +33,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
         // 创建菜单对话框
         client::view::CreateMenuDialog();
 
-        std::cout << "Starting app.exec()..." << std::endl;
         app.exec();
     }
     catch (const std::exception& e)

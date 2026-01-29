@@ -233,6 +233,15 @@ struct UpdateLayout
     using is_event_tag = void;
 };
 
+/**
+ * @brief 帧结束事件 - 每帧渲染后触发
+ * [IMMEDIATE] 使用 trigger - 用于批量应用状态更新
+ */
+struct EndFrame
+{
+    using is_event_tag = void;
+};
+
 struct QueuedTask
 {
     using is_event_tag = void;
