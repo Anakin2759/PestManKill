@@ -366,7 +366,14 @@ public:
             float delta = -event.raw.delta.y() * step;
             scroll.scrollOffset.y() += delta;
 
-            float maxScroll = std::max(0.0f, scroll.contentSize.y() - size.size.y());
+            float viewportHeight = size.size.y();
+            if (const auto* padding = Registry::TryGet<components::Padding>(target))
+            {
+                viewportHeight -= (padding->values.x() + padding->values.z());
+            }
+            viewportHeight = std::max(0.0f, viewportHeight);
+
+            float maxScroll = std::max(0.0f, scroll.contentSize.y() - viewportHeight);
             scroll.scrollOffset.y() = std::clamp(scroll.scrollOffset.y(), 0.0f, maxScroll);
 
             Registry::EmplaceOrReplace<components::LayoutDirtyTag>(target);

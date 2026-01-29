@@ -168,6 +168,7 @@ struct ScrollArea
     float scrollSpeed{DEFAULT_SCROLL_SPEED};              // 滚动速度
     policies::Scroll scroll = policies::Scroll::Vertical; // 滚动方向
     policies::ScrollBarVisibility showScrollbars = policies::ScrollBarVisibility::Auto;
+    policies::ScrollAnchor anchor = policies::ScrollAnchor::Top; // 滚动锚定策略
     //
 };
 

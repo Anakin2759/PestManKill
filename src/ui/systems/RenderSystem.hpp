@@ -1184,11 +1184,45 @@ private:
                     float totalTextHeight = lines.size() * lineHeight;
                     if (auto* scrollArea = Registry::TryGet<components::ScrollArea>(entity))
                     {
+                        // 视口高度即为当前的 textSize.y() (已去除 Padding)
+                        float viewportHeight = textSize.y();
+
                         if (scrollArea->contentSize.y() != totalTextHeight)
                         {
+                            float oldHeight = scrollArea->contentSize.y();
+                            float newHeight = totalTextHeight;
+
                             scrollArea->contentSize.x() = textSize.x();
                             scrollArea->contentSize.y() = totalTextHeight;
+
+                            // 应用锚定策略
+                            if (scrollArea->anchor == policies::ScrollAnchor::Bottom)
+                            {
+                                // 锚定底部：Offset 随高度差增加，保持距离底部不变
+                                scrollArea->scrollOffset.y() += (newHeight - oldHeight);
+                            }
+                            else if (scrollArea->anchor == policies::ScrollAnchor::Smart)
+                            {
+                                // 智能模式：如果之前在底部，则保持在底部
+                                float oldMaxScroll = std::max(0.0F, oldHeight - viewportHeight);
+                                // 给予 2.0 像素的容差
+                                bool wasAtBottom = (scrollArea->scrollOffset.y() >= oldMaxScroll - 2.0F);
+
+                                if (wasAtBottom)
+                                {
+                                    float newMaxScroll = std::max(0.0F, newHeight - viewportHeight);
+                                    scrollArea->scrollOffset.y() = newMaxScroll;
+                                }
+                            }
                         }
+
+                        // 始终更新宽度记录
+                        scrollArea->contentSize.x() = textSize.x();
+
+                        // 始终执行 Clamping，防止视口变化(Resize)导致的越界
+                        // 注意：这里使用当前的 totalTextHeight 和 viewportHeight 进行计算
+                        float maxScroll = std::max(0.0F, totalTextHeight - viewportHeight);
+                        scrollArea->scrollOffset.y() = std::clamp(scrollArea->scrollOffset.y(), 0.0F, maxScroll);
 
                         // 使用滚动偏移来确定起始行
                         const int maxVisibleLines = lineHeight > 0.0F ? static_cast<int>(textSize.y() / lineHeight) : 0;

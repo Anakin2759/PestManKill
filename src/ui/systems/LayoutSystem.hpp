@@ -782,8 +782,17 @@ private:
         }
 
         // 5. 特殊处理 ScrollArea 内容尺寸
+        // 注意：如果是 TextEdit 组件，其内容尺寸由 RenderSystem 根据文本动态计算（自动换行），
+        // LayoutSystem 此处基于子元素的计算会将其覆盖为 0（因 TextEdit 无子元素），导致 RenderSystem
+        // 每帧检测到尺寸变化引发死循环。 因此排除 TextEditTag。
         if (auto* scrollArea = Registry::TryGet<components::ScrollArea>(entity))
         {
+            if (Registry::AnyOf<components::TextEditTag>(entity))
+            {
+                // 跳过 TextEdit 的 contentSize 计算
+                return;
+            }
+
             float pR = 0.0F, pB = 0.0F;
             if (auto* padding = Registry::TryGet<components::Padding>(entity))
             {

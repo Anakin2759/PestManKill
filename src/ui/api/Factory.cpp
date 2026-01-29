@@ -244,6 +244,7 @@ entt::entity CreateTextBrowser(std::string_view initialText, std::string_view pl
     auto& scrollArea = Registry::Emplace<components::ScrollArea>(entity);
     scrollArea.scroll = policies::Scroll::Vertical;
     scrollArea.showScrollbars = policies::ScrollBarVisibility::Auto;
+    scrollArea.anchor = policies::ScrollAnchor::Smart; // 设置为智能模式
 
     // 设置文本默认对齐方式：左上对齐
     auto& text = Registry::Get<components::Text>(entity);

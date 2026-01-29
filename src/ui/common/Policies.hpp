@@ -256,6 +256,16 @@ enum class ScrollBarVisibility : uint8_t
 };
 
 /**
+ * @brief 滚动内容更新时的锚定策略
+ */
+enum class ScrollAnchor : uint8_t
+{
+    Top,    // 锚定顶部：内容尺寸变化时，保持顶部偏移量不变 (适用于普通文档/输入框，尾部追加内容时视口不动)
+    Bottom, // 锚定底部：内容尺寸变化时，保持底部偏移量不变 (适用于聊天历史加载/日志跟随)
+    Smart   // 智能锚定：如果滚动条在最底部，则锚定底部；否则锚定顶部
+};
+
+/**
  * @brief 窗口标志位 - 类似 Qt 的策略
  */
 enum class WindowFlag : uint16_t
