@@ -116,7 +116,7 @@ public:
         // 查找所有顶层容器
 
         auto view =
-            Registry::View<components::Hierarchy, components::Position, components::Size, components::LayoutDirtyTag>();
+            Registry::View<components::Hierarchy, components::Position, components::Size, components::RootTag>();
 
         // 清理上一帧的 Yoga 节点
         clearYogaNodes();

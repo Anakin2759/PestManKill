@@ -33,6 +33,7 @@ entt::entity CreateBaseWidget(std::string_view alias)
     Registry::Emplace<components::Alpha>(entity);
     Registry::Emplace<components::VisibleTag>(entity);
     Registry::Emplace<components::Hierarchy>(entity);
+    Registry::Emplace<components::RootTag>(entity); // 默认标记为根节点
 
     Registry::EmplaceOrReplace<components::LayoutDirtyTag>(entity);
 
@@ -124,8 +125,16 @@ entt::entity CreateSpacer(int stretchFactor, std::string_view alias)
     Registry::Emplace<components::SpacerTag>(entity);
     Registry::Emplace<components::Hierarchy>(entity);
     Registry::Emplace<components::Position>(entity);
+
+    // 添加 Size 组件，初始值为 0，避免布局不稳定
+    auto& size = Registry::Emplace<components::Size>(entity);
+    size.size = {0.0F, 0.0F};
+    size.sizePolicy = ui::policies::Size::Auto;
+
     auto& spacer = Registry::Emplace<components::Spacer>(entity);
     spacer.stretchFactor = static_cast<uint8_t>(std::max(1, stretchFactor));
+
+    Registry::Emplace<components::RootTag>(entity); // 默认标记为根节点
     Registry::EmplaceOrReplace<components::LayoutDirtyTag>(entity);
     return entity;
 }
