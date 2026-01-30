@@ -173,8 +173,9 @@ public:
 
         for (auto entity : view)
         {
-            // 筛选条件：必须是 Clickable 或可编辑的 TextEdit (输入框)
-            bool isInteractive = Registry::AnyOf<components::Clickable>(entity);
+            // 筛选条件：必须是 Clickable 或可编辑的 TextEdit (输入框) 或 ScrollArea (滚动区域)
+            bool isInteractive =
+                Registry::AnyOf<components::Clickable>(entity) || Registry::AnyOf<components::ScrollArea>(entity);
             if (!isInteractive && Registry::AnyOf<components::TextEditTag>(entity))
             {
                 const auto* edit = Registry::TryGet<components::TextEdit>(entity);

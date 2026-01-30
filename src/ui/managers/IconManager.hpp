@@ -83,7 +83,7 @@ public:
         std::ifstream file(fontPath, std::ios::binary | std::ios::ate);
         if (!file.is_open())
         {
-            ui::Logger::error("Failed to open font file: {}", fontPath);
+            Logger::error("Failed to open font file: {}", fontPath);
             return false;
         }
 
@@ -93,14 +93,14 @@ public:
         std::vector<unsigned char> buffer(size);
         if (!file.read((char*)buffer.data(), size))
         {
-            ui::Logger::error("Failed to read font file: {}", fontPath);
+            Logger::error("Failed to read font file: {}", fontPath);
             return false;
         }
 
         stbtt_fontinfo info;
         if (!stbtt_InitFont(&info, buffer.data(), stbtt_GetFontOffsetForIndex(buffer.data(), 0)))
         {
-            ui::Logger::error("Failed to init font: {}", fontPath);
+            Logger::error("Failed to init font: {}", fontPath);
             return false;
         }
 
@@ -108,14 +108,14 @@ public:
         auto codepoints = ParseCodepoints(codepointsPath);
         if (codepoints.empty())
         {
-            ui::Logger::warn("No codepoints loaded from: {}", codepointsPath);
+            Logger::warn("No codepoints loaded from: {}", codepointsPath);
         }
 
         // 存储字体和映射
         s_fonts[name] = FontData{std::move(buffer), info, fontSize};
         s_codepoints[name] = std::move(codepoints);
 
-        ui::Logger::info("IconFont '{}' loaded: {} icons", name, s_codepoints[name].size());
+        Logger::info("IconFont '{}' loaded: {} icons", name, s_codepoints[name].size());
         return true;
     }
 
@@ -130,14 +130,14 @@ public:
         auto fontIt = s_codepoints.find(fontName);
         if (fontIt == s_codepoints.end())
         {
-            ui::Logger::warn("IconFont '{}' not found", fontName);
+            Logger::warn("IconFont '{}' not found", fontName);
             return 0;
         }
 
         auto iconIt = fontIt->second.find(iconName);
         if (iconIt == fontIt->second.end())
         {
-            ui::Logger::warn("Icon '{}' not found in font '{}'", iconName, fontName);
+            Logger::warn("Icon '{}' not found in font '{}'", iconName, fontName);
             return 0;
         }
 
@@ -154,7 +154,7 @@ public:
         auto it = s_fonts.find(fontName);
         if (it == s_fonts.end())
         {
-            ui::Logger::warn("Font '{}' not found", fontName);
+            Logger::warn("Font '{}' not found", fontName);
             return nullptr;
         }
         return &it->second.info;
@@ -195,7 +195,7 @@ public:
     {
         s_fonts.erase(fontName);
         s_codepoints.erase(fontName);
-        ui::Logger::info("IconFont '{}' unloaded", fontName);
+        Logger::info("IconFont '{}' unloaded", fontName);
     }
 
     /**
@@ -205,7 +205,7 @@ public:
     {
         s_fonts.clear();
         s_codepoints.clear();
-        ui::Logger::info("IconManager shutdown");
+        Logger::info("IconManager shutdown");
     }
 
     // Instance method required by IconRenderer
@@ -233,7 +233,7 @@ private:
 
         if (!file.is_open())
         {
-            ui::Logger::error("Failed to open codepoints file: {}", filePath);
+            Logger::error("Failed to open codepoints file: {}", filePath);
             return result;
         }
 
@@ -277,7 +277,7 @@ private:
                 }
                 catch (...)
                 {
-                    ui::Logger::warn("Invalid codepoint format: {} - {}", iconName, hexCode);
+                    Logger::warn("Invalid codepoint format: {} - {}", iconName, hexCode);
                 }
             }
         }
@@ -323,7 +323,7 @@ private:
             }
             catch (...)
             {
-                ui::Logger::warn("Invalid codepoint in JSON: {} - {}", key, value);
+                Logger::warn("Invalid codepoint in JSON: {} - {}", key, value);
             }
 
             pos = valueEnd + 1;

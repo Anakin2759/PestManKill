@@ -14,7 +14,7 @@
  */
 
 #pragma once
-#include "../core/IRenderer.hpp"
+#include "../interface/IRenderer.hpp"
 #include "../singleton/Registry.hpp"
 #include "../common/Components.hpp"
 #include "../common/Tags.hpp"
@@ -34,7 +34,7 @@ namespace ui::renderers
 class ScrollBarRenderer : public core::IRenderer
 {
 public:
-    ScrollBarRenderer(SDL_GPUTexture* whiteTexture) : m_whiteTexture(whiteTexture) {}
+    ScrollBarRenderer() = default;
 
     bool canHandle(entt::entity entity) const override { return Registry::AnyOf<components::ScrollArea>(entity); }
 
@@ -77,20 +77,43 @@ private:
             (scrollArea.scroll == policies::Scroll::Vertical || scrollArea.scroll == policies::Scroll::Both);
         if (hasVerticalScroll && scrollArea.contentSize.y() > viewportHeight)
         {
-            float trackSize = size.y();
+            float trackHeight = size.y();
             float visibleRatio = viewportHeight / scrollArea.contentSize.y();
-            float thumbSize = std::max(20.0f, trackSize * visibleRatio);
+            float thumbSize = std::max(20.0f, trackHeight * visibleRatio);
             float maxScroll = std::max(0.0f, scrollArea.contentSize.y() - viewportHeight);
             float scrollRatio =
                 maxScroll > 0.0f ? std::clamp(scrollArea.scrollOffset.y() / maxScroll, 0.0f, 1.0f) : 0.0f;
-            float thumbPos = (trackSize - thumbSize) * scrollRatio;
+            float thumbPos = (trackHeight - thumbSize) * scrollRatio;
 
             // 确保滑块位置不超出轨道
-            thumbPos = std::clamp(thumbPos, 0.0f, trackSize - thumbSize);
+            thumbPos = std::clamp(thumbPos, 0.0f, trackHeight - thumbSize);
+
+            // 先绘制轨道背景（可选，增强可见性）
+            float barWidth = 10.0f; // 加宽到 10px，更容易看见和操作
+            float trackWidth = 12.0f;
+            Eigen::Vector2f trackPos(pos.x() + size.x() - trackWidth - 2.0f, pos.y());
+            Eigen::Vector2f trackSize(trackWidth, size.y());
+
+            render::UiPushConstants trackPushConstants{};
+            trackPushConstants.screen_size[0] = context.screenWidth;
+            trackPushConstants.screen_size[1] = context.screenHeight;
+            trackPushConstants.rect_size[0] = trackSize.x();
+            trackPushConstants.rect_size[1] = trackSize.y();
+            trackPushConstants.radius[0] = 0.0f;
+            trackPushConstants.radius[1] = 0.0f;
+            trackPushConstants.radius[2] = 0.0f;
+            trackPushConstants.radius[3] = 0.0f;
+            trackPushConstants.opacity = alpha;
+            trackPushConstants.shadow_soft = 0.0f;
+            trackPushConstants.shadow_offset_x = 0.0f;
+            trackPushConstants.shadow_offset_y = 0.0f;
+
+            // 绘制半透明的深色轨道背景
+            context.batchManager->beginBatch(context.whiteTexture, context.currentScissor, trackPushConstants);
+            context.batchManager->addRect(trackPos, trackSize, {0.2f, 0.2f, 0.2f, 0.5f});
 
             // 绘制滑块
-            float barWidth = 10.0f;
-            Eigen::Vector2f barPos(pos.x() + size.x() - barWidth - 2.0f, pos.y() + thumbPos);
+            Eigen::Vector2f barPos(pos.x() + size.x() - barWidth - 3.0f, pos.y() + thumbPos);
             Eigen::Vector2f barSize(barWidth, thumbSize);
 
             render::UiPushConstants pushConstants{};
@@ -98,19 +121,20 @@ private:
             pushConstants.screen_size[1] = context.screenHeight;
             pushConstants.rect_size[0] = barSize.x();
             pushConstants.rect_size[1] = barSize.y();
-            pushConstants.radius[0] = 5.0f; // 左上
-            pushConstants.radius[1] = 5.0f; // 右上
-            pushConstants.radius[2] = 5.0f; // 右下
-            pushConstants.radius[3] = 5.0f; // 左下
+            pushConstants.radius[0] = 5.0f; // 增大圆角
+            pushConstants.radius[1] = 5.0f;
+            pushConstants.radius[2] = 5.0f;
+            pushConstants.radius[3] = 5.0f;
             pushConstants.opacity = alpha;
+            pushConstants.shadow_soft = 0.0f;
+            pushConstants.shadow_offset_x = 0.0f;
+            pushConstants.shadow_offset_y = 0.0f;
 
-            context.batchManager->beginBatch(m_whiteTexture, context.currentScissor, pushConstants);
-            context.batchManager->addRect(barPos, barSize, {0.6f, 0.6f, 0.6f, 0.8f});
+            context.batchManager->beginBatch(context.whiteTexture, context.currentScissor, pushConstants);
+            // 使用更明亮且不透明的灰色，确保可见性
+            context.batchManager->addRect(barPos, barSize, {0.7f, 0.7f, 0.7f, 0.9f});
         }
     }
-
-private:
-    SDL_GPUTexture* m_whiteTexture = nullptr;
 };
 
 } // namespace ui::renderers

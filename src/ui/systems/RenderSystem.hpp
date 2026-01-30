@@ -41,7 +41,7 @@
 #include "../managers/TextTextureCache.hpp"
 #include "../managers/BatchManager.hpp"
 #include "../managers/CommandBuffer.hpp"
-#include "../core/IRenderer.hpp"
+#include "../interface/IRenderer.hpp"
 #include "../core/RenderContext.hpp"
 
 CMRC_DECLARE(ui_fonts);

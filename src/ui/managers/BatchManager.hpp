@@ -77,12 +77,39 @@ public:
                 }
             }
 
-            // 检查推送常量是否相同（主要是屏幕尺寸）
+            // 检查推送常量是否相同
+            // 注意：PushConstants 控制着 Shader 中的 SDF 计算参数，必须完全一致才能合并
             if (canMerge)
             {
-                canMerge =
-                    (std::abs(m_currentBatch->pushConstants.screen_size[0] - pushConstants.screen_size[0]) < 0.01f) &&
-                    (std::abs(m_currentBatch->pushConstants.screen_size[1] - pushConstants.screen_size[1]) < 0.01f);
+                const auto& curr = m_currentBatch->pushConstants;
+                const auto& next = pushConstants;
+                constexpr float EPSILON = 0.001f;
+
+                bool paramsMatch = true;
+
+                // 屏幕尺寸
+                paramsMatch &= (std::abs(curr.screen_size[0] - next.screen_size[0]) < EPSILON);
+                paramsMatch &= (std::abs(curr.screen_size[1] - next.screen_size[1]) < EPSILON);
+
+                // 矩形尺寸 (关键：不一样会导致 SDF 计算错误)
+                paramsMatch &= (std::abs(curr.rect_size[0] - next.rect_size[0]) < EPSILON);
+                paramsMatch &= (std::abs(curr.rect_size[1] - next.rect_size[1]) < EPSILON);
+
+                // 圆角半径
+                paramsMatch &= (std::abs(curr.radius[0] - next.radius[0]) < EPSILON);
+                paramsMatch &= (std::abs(curr.radius[1] - next.radius[1]) < EPSILON);
+                paramsMatch &= (std::abs(curr.radius[2] - next.radius[2]) < EPSILON);
+                paramsMatch &= (std::abs(curr.radius[3] - next.radius[3]) < EPSILON);
+
+                // 阴影参数
+                paramsMatch &= (std::abs(curr.shadow_offset_x - next.shadow_offset_x) < EPSILON);
+                paramsMatch &= (std::abs(curr.shadow_offset_y - next.shadow_offset_y) < EPSILON);
+                paramsMatch &= (std::abs(curr.shadow_soft - next.shadow_soft) < EPSILON);
+
+                // 透明度
+                paramsMatch &= (std::abs(curr.opacity - next.opacity) < EPSILON);
+
+                canMerge = paramsMatch;
             }
 
             if (!canMerge)

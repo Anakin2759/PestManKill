@@ -14,7 +14,7 @@
  */
 
 #pragma once
-#include "../core/IRenderer.hpp"
+#include "../interface/IRenderer.hpp"
 #include "../singleton/Registry.hpp"
 #include "../common/Components.hpp"
 #include "../common/Tags.hpp"

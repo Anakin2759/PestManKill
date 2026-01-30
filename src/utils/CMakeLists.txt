@@ -27,8 +27,8 @@ target_compile_definitions(
 target_compile_options(utils INTERFACE
     $<$<CXX_COMPILER_ID:GNU>:-std=c++23>
     $<$<AND:$<CXX_COMPILER_ID:Clang>,$<NOT:$<CXX_COMPILER_FRONTEND_VARIANT:MSVC>>>:-std=c++23>
-    $<$<CXX_COMPILER_ID:MSVC>:/std:c++latest>
-    $<$<AND:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_FRONTEND_VARIANT:MSVC>>:/std:c++latest>
+    $<$<CXX_COMPILER_ID:MSVC>:/std:c++23preview>
+    $<$<AND:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_FRONTEND_VARIANT:MSVC>>:/std:c++23preview>
 )
 
 # 导出头文件列表（用于 IDE 项目视图）

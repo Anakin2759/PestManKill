@@ -6,6 +6,10 @@
  * @date 2026-01-30
  * @version 0.1
  * @brief 图标渲染器 - 处理所有图标的渲染
+
+    两种图标：
+    - 一种由png jpg 转换的
+    - 一种由字体图标 ttf文件转换的
  *
  * ************************************************************************
  * @copyright Copyright (c) 2026 AnakinLiu
@@ -14,7 +18,7 @@
  */
 
 #pragma once
-#include "../core/IRenderer.hpp"
+#include "../interface/IRenderer.hpp"
 #include "../singleton/Registry.hpp"
 #include "../common/Components.hpp"
 #include "../common/Tags.hpp"

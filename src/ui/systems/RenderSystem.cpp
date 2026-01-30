@@ -14,10 +14,10 @@
  */
 
 #include "RenderSystem.hpp"
-#include "../core/ShapeRenderer.hpp"
-#include "../core/TextRenderer.hpp"
-#include "../core/IconRenderer.hpp"
-#include "../core/ScrollBarRenderer.hpp"
+#include "../renderers/ShapeRenderer.hpp"
+#include "../renderers/TextRenderer.hpp"
+#include "../renderers/IconRenderer.hpp"
+#include "../renderers/ScrollBarRenderer.hpp"
 #include "../managers/IconManager.hpp"
 
 namespace ui::systems
@@ -370,7 +370,7 @@ void RenderSystem::initializeRenderers()
     // static managers::IconManager iconManager;
     // m_renderers.push_back(std::make_unique<renderers::IconRenderer>(iconManager));
 
-    m_renderers.push_back(std::make_unique<renderers::ScrollBarRenderer>(m_whiteTexture));
+    m_renderers.push_back(std::make_unique<renderers::ScrollBarRenderer>());
 
     // 按优先级排序
     std::sort(m_renderers.begin(),

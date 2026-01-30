@@ -315,8 +315,17 @@ public:
         outHeight = fontHeight + topOverflow + bottomOverflow;
         int finalBaselineY = baselineY + topOverflow;
 
-        // 创建 RGBA 位图 (初始化为0，全透明)
-        result.resize(outWidth * outHeight * 4, 0);
+        // 创建 RGBA 位图 (初始化为颜色值，Alpha 为 0)
+        // 使用直通 Alpha (Straight Alpha) 而非预乘 Alpha，以避免两次混合导致的变暗问题
+        // 同时填充 RGB 通道以避免 bilinear filtering 时的边缘黑边
+        result.resize(outWidth * outHeight * 4);
+        for (int i = 0; i < outWidth * outHeight; ++i)
+        {
+            result[i * 4 + 0] = r;
+            result[i * 4 + 1] = g;
+            result[i * 4 + 2] = b;
+            result[i * 4 + 3] = 0;
+        }
 
         // 第二遍：渲染字形到位图
         for (size_t i = 0; i < glyphs.size(); ++i)
@@ -342,11 +351,7 @@ public:
                     const uint8_t newAlpha = static_cast<uint8_t>(srcAlpha * a / 255);
                     const uint8_t finalAlpha = std::max(curAlpha, newAlpha);
 
-                    // 使用预乘 alpha
-                    const float alphaF = finalAlpha / 255.0f;
-                    result[pixelIndex + 0] = static_cast<uint8_t>(r * alphaF);
-                    result[pixelIndex + 1] = static_cast<uint8_t>(g * alphaF);
-                    result[pixelIndex + 2] = static_cast<uint8_t>(b * alphaF);
+                    // 仅更新 Alpha通道 (Straight Alpha)
                     result[pixelIndex + 3] = finalAlpha;
                 }
             }

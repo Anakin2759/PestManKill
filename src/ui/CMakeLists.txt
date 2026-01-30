@@ -50,13 +50,14 @@ set(UI_HEADERS
     core/SystemManager.hpp
     core/EventLoop.hpp
     core/TaskChain.hpp
-    core/IRenderer.hpp
-    core/RenderContext.hpp
-    core/ShapeRenderer.hpp
-    core/TextRenderer.hpp
-    core/IconRenderer.hpp
-    core/ScrollBarRenderer.hpp
     core/TextUtils.hpp
+    interface/IRenderer.hpp
+    core/RenderContext.hpp
+    renderers/ShapeRenderer.hpp
+    renderers/TextRenderer.hpp
+    renderers/IconRenderer.hpp
+    renderers/ScrollBarRenderer.hpp
+
 
     singleton/Registry.hpp
     singleton/SingletonBase.hpp
@@ -119,12 +120,12 @@ target_compile_options(ui PUBLIC
     $<$<AND:$<CXX_COMPILER_ID:Clang>,$<NOT:$<CXX_COMPILER_FRONTEND_VARIANT:MSVC>>,$<CONFIG:Release>>:-Wall -O3 -DNDEBUG >
 
     # MSVC
-    $<$<AND:$<CXX_COMPILER_ID:MSVC>,$<CONFIG:Debug>>:/W4 /Od /Zi /EHsc /std:c++latest >
-    $<$<AND:$<CXX_COMPILER_ID:MSVC>,$<CONFIG:Release>>:/O2 /DNDEBUG /EHsc /std:c++latest >
+    $<$<AND:$<CXX_COMPILER_ID:MSVC>,$<CONFIG:Debug>>:/W4 /Od /Zi /EHsc /std:c++23preview >
+    $<$<AND:$<CXX_COMPILER_ID:MSVC>,$<CONFIG:Release>>:/O2 /DNDEBUG /EHsc /std:c++23preview >
 
     # Clang-cl (MSVC frontend)
-    $<$<AND:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_FRONTEND_VARIANT:MSVC>,$<CONFIG:Debug>>:/EHsc /Zi /W4 /std:c++latest>
-    $<$<AND:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_FRONTEND_VARIANT:MSVC>,$<CONFIG:Release>>:/EHsc /O2 /DNDEBUG /std:c++latest >
+    $<$<AND:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_FRONTEND_VARIANT:MSVC>,$<CONFIG:Debug>>:/EHsc /Zi /W4 /std:c++23preview>
+    $<$<AND:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_FRONTEND_VARIANT:MSVC>,$<CONFIG:Release>>:/EHsc /O2 /DNDEBUG /std:c++23preview >
 
 )
 
