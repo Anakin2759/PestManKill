@@ -12,6 +12,8 @@
  * - 解析 codepoints 映射文件（JSON 或 TXT 格式）
  * - 通过图标名称获取 Unicode 码点
  * - 管理多个 IconFont 图标库
+    - 默认加载ui/assets/icons/*.ttf和codepoints文件
+    使用stb_truetype进行字体渲染不再引入stbttf库
  *
  * ************************************************************************
  * @copyright Copyright (c) 2026 AnakinLiu
@@ -24,11 +26,30 @@
 #include <string>
 #include <fstream>
 #include <sstream>
-#include <SDL3/SDL_ttf.h>
+#include <vector>
+#include <stb_truetype.h>
+#include <SDL3/SDL.h>
+#include <Eigen/Core>
 #include "../singleton/Logger.hpp"
 
-namespace ui::core
+namespace ui::managers
 {
+
+struct FontData
+{
+    std::vector<unsigned char> buffer;
+    stbtt_fontinfo info;
+    int fontSize;
+};
+
+struct TextureInfo
+{
+    SDL_GPUTexture* texture;
+    Eigen::Vector2f uvMin;
+    Eigen::Vector2f uvMax;
+    float width;
+    float height;
+};
 
 /**
  * @brief IconFont 管理器
@@ -39,7 +60,7 @@ namespace ui::core
  * @code
  * IconManager::LoadIconFont("default", "assets/fonts/iconfont.ttf", "assets/fonts/codepoints.txt", 16);
  * uint32_t homeIcon = IconManager::GetCodepoint("default", "home");
- * TTF_Font* font = IconManager::GetFont("default");
+ * auto* font = IconManager::GetFont("default");
  * @endcode
  */
 class IconManager
@@ -58,11 +79,28 @@ public:
                              const std::string& codepointsPath,
                              int fontSize = 16)
     {
-        // 加载字体
-        TTF_Font* font = TTF_OpenFont(fontPath.c_str(), fontSize);
-        if (!font)
+        // Read file
+        std::ifstream file(fontPath, std::ios::binary | std::ios::ate);
+        if (!file.is_open())
         {
-            ui::Logger::Error("Failed to load IconFont: {} - {}", fontPath, TTF_GetError());
+            ui::Logger::error("Failed to open font file: {}", fontPath);
+            return false;
+        }
+
+        std::streamsize size = file.tellg();
+        file.seekg(0, std::ios::beg);
+
+        std::vector<unsigned char> buffer(size);
+        if (!file.read((char*)buffer.data(), size))
+        {
+            ui::Logger::error("Failed to read font file: {}", fontPath);
+            return false;
+        }
+
+        stbtt_fontinfo info;
+        if (!stbtt_InitFont(&info, buffer.data(), stbtt_GetFontOffsetForIndex(buffer.data(), 0)))
+        {
+            ui::Logger::error("Failed to init font: {}", fontPath);
             return false;
         }
 
@@ -70,14 +108,14 @@ public:
         auto codepoints = ParseCodepoints(codepointsPath);
         if (codepoints.empty())
         {
-            ui::Logger::Warn("No codepoints loaded from: {}", codepointsPath);
+            ui::Logger::warn("No codepoints loaded from: {}", codepointsPath);
         }
 
         // 存储字体和映射
-        s_fonts[name] = font;
+        s_fonts[name] = FontData{std::move(buffer), info, fontSize};
         s_codepoints[name] = std::move(codepoints);
 
-        ui::Logger::Info("IconFont '{}' loaded: {} icons", name, s_codepoints[name].size());
+        ui::Logger::info("IconFont '{}' loaded: {} icons", name, s_codepoints[name].size());
         return true;
     }
 
@@ -92,14 +130,14 @@ public:
         auto fontIt = s_codepoints.find(fontName);
         if (fontIt == s_codepoints.end())
         {
-            ui::Logger::Warn("IconFont '{}' not found", fontName);
+            ui::Logger::warn("IconFont '{}' not found", fontName);
             return 0;
         }
 
         auto iconIt = fontIt->second.find(iconName);
         if (iconIt == fontIt->second.end())
         {
-            ui::Logger::Warn("Icon '{}' not found in font '{}'", iconName, fontName);
+            ui::Logger::warn("Icon '{}' not found in font '{}'", iconName, fontName);
             return 0;
         }
 
@@ -107,23 +145,23 @@ public:
     }
 
     /**
-     * @brief 获取字体句柄
+     * @brief 获取字体信息
      * @param fontName 字体库名称
-     * @return TTF_Font 指针，未找到返回 nullptr
+     * @return stbtt_fontinfo 指针，未找到返回 nullptr
      */
-    static TTF_Font* GetFont(const std::string& fontName)
+    static stbtt_fontinfo* GetFont(const std::string& fontName)
     {
         auto it = s_fonts.find(fontName);
         if (it == s_fonts.end())
         {
-            ui::Logger::Warn("Font '{}' not found", fontName);
+            ui::Logger::warn("Font '{}' not found", fontName);
             return nullptr;
         }
-        return it->second;
+        return &it->second.info;
     }
 
     /**
-     * @brief 检查图标是否存在
+     * @brief Check if icon exists
      */
     static bool HasIcon(const std::string& fontName, const std::string& iconName)
     {
@@ -133,7 +171,7 @@ public:
     }
 
     /**
-     * @brief 获取字体库中的所有图标名称
+     * @brief Get all icon names in a font
      */
     static std::vector<std::string> GetIconNames(const std::string& fontName)
     {
@@ -151,33 +189,29 @@ public:
     }
 
     /**
-     * @brief 卸载字体库
+     * @brief Unload a specific font
      */
     static void UnloadIconFont(const std::string& fontName)
     {
-        auto fontIt = s_fonts.find(fontName);
-        if (fontIt != s_fonts.end())
-        {
-            TTF_CloseFont(fontIt->second);
-            s_fonts.erase(fontIt);
-        }
-
+        s_fonts.erase(fontName);
         s_codepoints.erase(fontName);
-        ui::Logger::Info("IconFont '{}' unloaded", fontName);
+        ui::Logger::info("IconFont '{}' unloaded", fontName);
     }
 
     /**
-     * @brief 清理所有字体资源
+     * @brief Clean up all resources
      */
     static void Shutdown()
     {
-        for (auto& [name, font] : s_fonts)
-        {
-            TTF_CloseFont(font);
-        }
         s_fonts.clear();
         s_codepoints.clear();
-        ui::Logger::Info("IconManager shutdown");
+        ui::Logger::info("IconManager shutdown");
+    }
+
+    // Instance method required by IconRenderer
+    const TextureInfo* getTextureInfo(const std::string& id) const
+    {
+        return nullptr; // Not implemented yet
     }
 
 private:
@@ -199,7 +233,7 @@ private:
 
         if (!file.is_open())
         {
-            ui::Logger::Error("Failed to open codepoints file: {}", filePath);
+            ui::Logger::error("Failed to open codepoints file: {}", filePath);
             return result;
         }
 
@@ -243,7 +277,7 @@ private:
                 }
                 catch (...)
                 {
-                    ui::Logger::Warn("Invalid codepoint format: {} - {}", iconName, hexCode);
+                    ui::Logger::warn("Invalid codepoint format: {} - {}", iconName, hexCode);
                 }
             }
         }
@@ -289,7 +323,7 @@ private:
             }
             catch (...)
             {
-                ui::Logger::Warn("Invalid codepoint in JSON: {} - {}", key, value);
+                ui::Logger::warn("Invalid codepoint in JSON: {} - {}", key, value);
             }
 
             pos = valueEnd + 1;
@@ -298,12 +332,12 @@ private:
         return result;
     }
 
-    static std::unordered_map<std::string, TTF_Font*> s_fonts;
+    static std::unordered_map<std::string, FontData> s_fonts;
     static std::unordered_map<std::string, std::unordered_map<std::string, uint32_t>> s_codepoints;
 };
 
 // 静态成员初始化
-inline std::unordered_map<std::string, TTF_Font*> IconManager::s_fonts;
+inline std::unordered_map<std::string, FontData> IconManager::s_fonts;
 inline std::unordered_map<std::string, std::unordered_map<std::string, uint32_t>> IconManager::s_codepoints;
 
-} // namespace ui::core
+} // namespace ui::managers

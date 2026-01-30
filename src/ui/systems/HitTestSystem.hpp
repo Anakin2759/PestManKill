@@ -68,19 +68,15 @@ public:
         Dispatcher::Sink<events::RawPointerWheel>().disconnect<&HitTestSystem::onRawPointerWheel>(*this);
 
         // 断开缓存失效的信号
-        Registry::OnConstruct<components::ZOrderIndex>().disconnect<&HitTestSystem::onZOrderChanged>(
-            *this);
+        Registry::OnConstruct<components::ZOrderIndex>().disconnect<&HitTestSystem::onZOrderChanged>(*this);
         Registry::OnUpdate<components::ZOrderIndex>().disconnect<&HitTestSystem::onZOrderChanged>(*this);
         Registry::OnDestroy<components::ZOrderIndex>().disconnect<&HitTestSystem::onZOrderChanged>(*this);
 
-        Registry::OnConstruct<components::Hierarchy>().disconnect<&HitTestSystem::onHierarchyChanged>(
-            *this);
-        Registry::OnUpdate<components::Hierarchy>().disconnect<&HitTestSystem::onHierarchyChanged>(
-            *this);
+        Registry::OnConstruct<components::Hierarchy>().disconnect<&HitTestSystem::onHierarchyChanged>(*this);
+        Registry::OnUpdate<components::Hierarchy>().disconnect<&HitTestSystem::onHierarchyChanged>(*this);
         Registry::OnDestroy<components::Hierarchy>().disconnect<&HitTestSystem::onHierarchyChanged>(*this);
 
-        Registry::OnConstruct<components::VisibleTag>().disconnect<&HitTestSystem::onVisibilityChanged>(
-            *this);
+        Registry::OnConstruct<components::VisibleTag>().disconnect<&HitTestSystem::onVisibilityChanged>(*this);
         Registry::OnDestroy<components::VisibleTag>().disconnect<&HitTestSystem::onVisibilityChanged>(*this);
     }
 
@@ -353,10 +349,6 @@ private:
     void onRawPointerButton(const events::RawPointerButton& ev)
     {
         const entt::entity hit = resolveHitEntity(ev.position, ev.windowID);
-        Logger::debug("HitTestSystem: Pointer Button Event at ({}, {}), hit entity {}",
-                      ev.position.x(),
-                      ev.position.y(),
-                      static_cast<uint32_t>(hit));
         Dispatcher::Enqueue<events::HitPointerButton>(events::HitPointerButton{ev, hit});
     }
 

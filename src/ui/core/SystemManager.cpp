@@ -17,14 +17,38 @@ namespace ui
 {
 SystemManager::SystemManager()
 {
+    Logger::info("[SystemManager] 初始化系统管理器");
     m_systems.reserve(SYSTEM_COUNT);
+
+    Logger::info("[SystemManager] 正在注册 InteractionSystem...");
     m_systems.emplace_back(systems::InteractionSystem{});
+    Logger::info("[SystemManager] InteractionSystem 已注册");
+
+    Logger::info("[SystemManager] 正在注册 HitTestSystem...");
     m_systems.emplace_back(systems::HitTestSystem{});
+    Logger::info("[SystemManager] HitTestSystem 已注册");
+
+    Logger::info("[SystemManager] 正在注册 TweenSystem...");
     m_systems.emplace_back(systems::TweenSystem{});
+    Logger::info("[SystemManager] TweenSystem 已注册");
+
+    Logger::info("[SystemManager] 正在注册 LayoutSystem...");
     m_systems.emplace_back(systems::LayoutSystem{});
+    Logger::info("[SystemManager] LayoutSystem 已注册");
+
+    Logger::info("[SystemManager] 正在注册 RenderSystem...");
     m_systems.emplace_back(systems::RenderSystem{});
+    Logger::info("[SystemManager] RenderSystem 已注册");
+
+    Logger::info("[SystemManager] 正在注册 StateSystem...");
     m_systems.emplace_back(systems::StateSystem{});
+    Logger::info("[SystemManager] StateSystem 已注册");
+
+    Logger::info("[SystemManager] 正在注册 ActionSystem...");
     m_systems.emplace_back(systems::ActionSystem{});
+    Logger::info("[SystemManager] ActionSystem 已注册");
+
+    Logger::info("[SystemManager] 系统管理器初始化完成，已注册 {} 个系统", m_systems.size());
 }
 
 SystemManager::~SystemManager()

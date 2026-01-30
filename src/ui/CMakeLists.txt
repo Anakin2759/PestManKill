@@ -7,6 +7,8 @@ set(UI_SOURCES
     core/Application.cpp
     core/EventLoop.cpp
     core/SystemManager.cpp
+    systems/RenderSystem.cpp
+    managers/FontManager.cpp
     api/Size.cpp
     api/Visibility.cpp
     api/Layout.cpp
@@ -23,6 +25,7 @@ set(UI_HEADERS
     common/Tags.hpp
     common/Events.hpp
     common/Types.hpp
+    common/RenderTypes.hpp
     
     # Systems
     systems/InteractionSystem.hpp
@@ -30,22 +33,46 @@ set(UI_HEADERS
     systems/LayoutSystem.hpp
     systems/RenderSystem.hpp
     systems/StateSystem.hpp
+    systems/HitTestSystem.hpp
+    systems/ActionSystem.hpp
     
-    # UI Core
+    # Managers
+    managers/DeviceManager.hpp
+    managers/FontManager.hpp
+    managers/PipelineCache.hpp
+    managers/TextTextureCache.hpp
+    managers/IconManager.hpp
+    managers/BatchManager.hpp
+    managers/CommandBuffer.hpp
+    
+    # Core
     core/Application.hpp
     core/SystemManager.hpp
     core/EventLoop.hpp
     core/TaskChain.hpp
+    core/IRenderer.hpp
+    core/RenderContext.hpp
+    core/ShapeRenderer.hpp
+    core/TextRenderer.hpp
+    core/IconRenderer.hpp
+    core/ScrollBarRenderer.hpp
+    core/TextUtils.hpp
 
     singleton/Registry.hpp
     singleton/SingletonBase.hpp
     singleton/Logger.hpp
+    singleton/Dispatcher.hpp
     
     traits/ComponentsTraits.hpp
     traits/PoliciesTraits.hpp
 
     # Interface
     interface/Isystem.hpp
+    
+    # API
+    api/Utils.hpp
+    api/Layout.hpp
+    
     ui/ui.hpp
 )
 # UI 模块库定义

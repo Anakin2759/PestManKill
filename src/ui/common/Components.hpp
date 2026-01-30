@@ -494,9 +494,9 @@ struct Icon
     policies::IconType type = policies::IconType::Texture; // 图标类型
 
     // 纹理图标相关字段（type == Texture 时使用）
-    void* textureId = nullptr; // 图标纹理句柄
-    Vec2 uvMin{0.0F, 0.0F};    // UV 最小坐标
-    Vec2 uvMax{1.0F, 1.0F};    // UV 最大坐标
+    std::string textureId;  // 图标纹理ID
+    Vec2 uvMin{0.0F, 0.0F}; // UV 最小坐标
+    Vec2 uvMax{1.0F, 1.0F}; // UV 最大坐标
 
     // 字体图标相关字段（type == Font 时使用）
     void* fontHandle = nullptr; // IconFont 字体句柄

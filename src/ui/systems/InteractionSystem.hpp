@@ -109,7 +109,6 @@ public:
                 }
                 case SDL_EVENT_MOUSE_BUTTON_DOWN:
                 {
-                    Logger::debug("Mouse Button Down Event");
                     float mx = static_cast<float>(event.button.x);
                     float my = static_cast<float>(event.button.y);
                     uint32_t winId = event.button.windowID;

@@ -166,6 +166,8 @@ entt::entity CreateDialog(std::string_view title, std::string_view alias)
     Registry::Emplace<components::LayoutInfo>(entity);
     Registry::Emplace<components::Padding>(entity);
     Registry::EmplaceOrReplace<components::LayoutDirtyTag>(entity);
+    Logger::info("[Factory] Enqueuing WindowGraphicsContextSetEvent for dialog entity {}",
+                 static_cast<uint32_t>(entity));
     Dispatcher::Trigger<events::WindowGraphicsContextSetEvent>({entity});
     return entity;
 }
@@ -198,8 +200,10 @@ entt::entity CreateWindow(std::string_view title, std::string_view alias)
     SDL_Window* sdlWindow = SDL_CreateWindow(
         window.title.c_str(), DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT, SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN);
     window.windowID = SDL_GetWindowID(sdlWindow);
-    Registry::Remove<components::VisibleTag>(entity);
+    Logger::info("[Factory] Enqueuing WindowGraphicsContextSetEvent for window entity {}",
+                 static_cast<uint32_t>(entity));
     Dispatcher::Trigger<events::WindowGraphicsContextSetEvent>({entity});
+    Registry::Remove<components::VisibleTag>(entity);
     return entity;
 }
 

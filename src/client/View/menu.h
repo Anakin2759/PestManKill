@@ -69,7 +69,7 @@ inline void CreateMenuDialog()
     auto settingsBtn = ui::factory::CreateButton("设置", "settingsBtn");
     ui::size::SetFixedSize(settingsBtn, 150.0F, 40.0F);
     ui::text::SetTextAlignment(settingsBtn, ui::policies::Alignment::CENTER);
-    ui::text::SetTextColor(settingsBtn, {255.0F, 255.0F, 255.0F, 255.0F});
+    ui::text::SetTextColor(settingsBtn, {1.0F, 1.0F, 1.0F, 1.0F}); // 白色文本
     ui::visibility::SetBackgroundColor(settingsBtn, {0.3F, 0.3F, 0.3F, 1.0F});
     ui::visibility::SetBorderRadius(settingsBtn, 5.0F);
     ui::visibility::SetBorderColor(settingsBtn, {0.5F, 0.5F, 0.5F, 1.0F});

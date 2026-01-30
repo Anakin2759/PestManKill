@@ -8,6 +8,7 @@
  * @brief STB TrueType 字体管理器
  *
  * 使用 stb_truetype 替代 SDL_ttf 进行字体渲染
+    - 默认加载 ui/assets/fonts/ 下的 TTF 字体文件
  *
  * ************************************************************************
  * @copyright Copyright (c) 2026 AnakinLiu
@@ -17,7 +18,6 @@
 
 #pragma once
 
-#define STB_TRUETYPE_IMPLEMENTATION
 #include <stb_truetype.h>
 
 #include <vector>
@@ -227,6 +227,14 @@ public:
      * @param outHeight 输出位图高度
      * @return RGBA 位图数据
      */
+    /**
+     * @brief 渲染整个文本到 RGBA 位图
+     * @param text UTF-8 文本
+     * @param color RGBA 颜色 (0-255)
+     * @param outWidth 输出位图宽度
+     * @param outHeight 输出位图高度
+     * @return RGBA 位图数据
+     */
     std::vector<uint8_t> renderTextBitmap(
         const std::string& text, uint8_t r, uint8_t g, uint8_t b, uint8_t a, int& outWidth, int& outHeight)
     {
@@ -242,10 +250,14 @@ public:
         std::vector<GlyphInfo> glyphs;
         std::vector<int> xPositions;
 
-        int totalWidth = 0;
+        int cursorX = 0;
+        int minX = 0;
+        int maxX = 0;
+        int minY = 0;
+        int maxY = 0;
+        bool first = true;
+
         size_t bytePos = 0;
-        const int baseline = static_cast<int>(std::ceil(m_ascent * m_scale));
-        int maxHeight = static_cast<int>(std::ceil((m_ascent - m_descent + m_lineGap) * m_scale));
 
         while (bytePos < text.size())
         {
@@ -255,30 +267,63 @@ public:
 
             GlyphInfo glyph = renderGlyph(codepoint);
             glyphs.push_back(glyph);
-            xPositions.push_back(totalWidth);
+            xPositions.push_back(cursorX);
 
-            totalWidth += glyph.advanceX;
+            int gMinX = cursorX + glyph.xOffset;
+            int gMaxX = gMinX + glyph.width;
+            int gMinY = glyph.yOffset;
+            int gMaxY = gMinY + glyph.height;
+
+            if (first)
+            {
+                minX = gMinX;
+                maxX = gMaxX;
+                minY = gMinY;
+                maxY = gMaxY;
+                first = false;
+            }
+            else
+            {
+                if (gMinX < minX) minX = gMinX;
+                if (gMaxX > maxX) maxX = gMaxX;
+                if (gMinY < minY) minY = gMinY;
+                if (gMaxY > maxY) maxY = gMaxY;
+            }
+
+            cursorX += glyph.advanceX;
             bytePos += charLen;
         }
 
-        if (totalWidth == 0 || maxHeight == 0)
+        if (glyphs.empty())
         {
             outWidth = outHeight = 0;
             return result;
         }
 
-        outWidth = totalWidth;
-        outHeight = maxHeight;
+        // 计算最终尺寸
+        // 宽度：覆盖所有像素，并且至少包含逻辑宽度(cursorX)，始于0
+        outWidth = std::max(cursorX, maxX);
 
-        // 创建 RGBA 位图
-        result.resize(totalWidth * maxHeight * 4, 0);
+        // 高度：确保容纳所有像素，同时保持基线对其
+        int fontAscentPixels = static_cast<int>(std::ceil(m_ascent * m_scale));
+        int fontHeight = static_cast<int>(std::ceil((m_ascent - m_descent + m_lineGap) * m_scale));
+
+        int baselineY = fontAscentPixels;
+        int topOverflow = (minY + baselineY < 0) ? -(minY + baselineY) : 0;
+        int bottomOverflow = (maxY + baselineY > fontHeight) ? (maxY + baselineY - fontHeight) : 0;
+
+        outHeight = fontHeight + topOverflow + bottomOverflow;
+        int finalBaselineY = baselineY + topOverflow;
+
+        // 创建 RGBA 位图 (初始化为0，全透明)
+        result.resize(outWidth * outHeight * 4, 0);
 
         // 第二遍：渲染字形到位图
         for (size_t i = 0; i < glyphs.size(); ++i)
         {
             const GlyphInfo& glyph = glyphs[i];
             const int xPos = xPositions[i] + glyph.xOffset;
-            const int yPos = baseline + glyph.yOffset;
+            const int yPos = finalBaselineY + glyph.yOffset;
 
             for (int y = 0; y < glyph.height; ++y)
             {
@@ -287,17 +332,22 @@ public:
                     const int bitmapX = xPos + x;
                     const int bitmapY = yPos + y;
 
-                    if (bitmapX < 0 || bitmapX >= totalWidth || bitmapY < 0 || bitmapY >= maxHeight) continue;
+                    if (bitmapX < 0 || bitmapX >= outWidth || bitmapY < 0 || bitmapY >= outHeight) continue;
 
-                    const int pixelIndex = (bitmapY * totalWidth + bitmapX) * 4;
-                    const uint8_t alpha = glyph.bitmap[y * glyph.width + x];
+                    const int pixelIndex = (bitmapY * outWidth + bitmapX) * 4;
+                    const uint8_t srcAlpha = glyph.bitmap[y * glyph.width + x];
+
+                    // 使用 MAX 混合 Alpha，防止重叠字符相互擦除
+                    const uint8_t curAlpha = result[pixelIndex + 3];
+                    const uint8_t newAlpha = static_cast<uint8_t>(srcAlpha * a / 255);
+                    const uint8_t finalAlpha = std::max(curAlpha, newAlpha);
 
                     // 使用预乘 alpha
-                    const float alphaF = (alpha / 255.0f) * (a / 255.0f);
+                    const float alphaF = finalAlpha / 255.0f;
                     result[pixelIndex + 0] = static_cast<uint8_t>(r * alphaF);
                     result[pixelIndex + 1] = static_cast<uint8_t>(g * alphaF);
                     result[pixelIndex + 2] = static_cast<uint8_t>(b * alphaF);
-                    result[pixelIndex + 3] = static_cast<uint8_t>(alpha * a / 255);
+                    result[pixelIndex + 3] = finalAlpha;
                 }
             }
         }
