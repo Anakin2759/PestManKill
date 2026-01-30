@@ -27,7 +27,7 @@
 #include <cstdint>
 #include <cmath>
 
-namespace ui::systems
+namespace ui::managers
 {
 
 /**
@@ -371,4 +371,4 @@ private:
     std::unordered_map<int, GlyphInfo> m_glyphCache;
 };
 
-} // namespace ui::systems
+} // namespace ui::managers

@@ -44,6 +44,7 @@
 #include <stack>
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_gpu.h>
+#include <SDL3/SDL_video.h>
 #include <entt/entt.hpp>
 #include <Eigen/Dense>
 #include <cmrc/cmrc.hpp>
@@ -51,14 +52,14 @@
 #include "../singleton/Logger.hpp"
 #include "../singleton/Registry.hpp"
 #include "../singleton/Dispatcher.hpp"
-#include "SDL3/SDL_video.h"
+
 #include "../common/Components.hpp"
 #include "../common/Tags.hpp"
 #include "../common/Events.hpp"
 #include "../interface/Isystem.hpp"
 #include "../api/Utils.hpp"
 #include "../api/Layout.hpp"
-#include "FontManager.hpp"
+#include "../managers/FontManager.hpp"
 
 CMRC_DECLARE(ui_fonts); // NOLINT
 
