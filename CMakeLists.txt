@@ -27,7 +27,22 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF) #禁用编译器扩展
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON) #生成compile_commands.json文件
 
+# 必须在 project() 之后立即添加
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
+# 针对旧版 CMake 或某些第三方库的兼容处理
+if(MSVC OR (CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC"))
+    set(variables 
+        CMAKE_C_FLAGS_RELEASE 
+        CMAKE_C_FLAGS_DEBUG 
+        CMAKE_CXX_FLAGS_RELEASE 
+        CMAKE_CXX_FLAGS_DEBUG)
+    foreach(variable ${variables})
+        if(${variable} MATCHES "/MD")
+            string(REPLACE "/MD" "/MT" ${variable} "${${variable}}")
+        endif()
+    endforeach()
+endif()
 #==================== 编译选项 ====================
 # 通用警告选项
 if (MSVC)
@@ -43,7 +58,7 @@ if (MSVC)
     # 3. 修复 MSVC 对 C++23 的识别问题
     # 日志显示你用了 /std:c++23 但编译器不认识。MSVC 目前应使用 /std:c++latest
     add_compile_options(/std:c++latest)
-    
+        
     # 4. 忽略那个烦人的 C4228 警告
     add_compile_options(/wd4228)
 endif()
@@ -57,7 +72,6 @@ endif()
 
 
 # ==================== 第三方库 ====================
-# Build SDL_image as static library
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 add_subdirectory(third_party/asio)
 
@@ -71,7 +85,6 @@ add_subdirectory(third_party/spdlog)
 
 add_subdirectory(third_party/SDL)
 
-add_subdirectory(third_party/SDL_ttf)
 add_subdirectory(third_party/stb)
 
 add_subdirectory(third_party/abseil-cpp)

@@ -205,7 +205,7 @@ struct Text
     using is_component_tag = void;
     std::string content; // 文本内容
     Color color{1.0F, 1.0F, 1.0F, 1.0F};
-    float fontSize = 0.0F; // 0 表示使用默认字体大小
+    float fontSize = 24.0F; // 0 表示使用默认字体大小
 
     float wrapWidth = 0.0F;
     policies::TextWrap wordWrap = policies::TextWrap::None;    // 默认不换行

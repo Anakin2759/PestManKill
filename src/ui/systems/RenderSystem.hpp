@@ -17,7 +17,7 @@
     - Vulkan 默认
     - DX12
 
-    使用SDL ttf渲染字体到GPU纹理上
+    使用 stb_truetype 渲染字体到GPU纹理上
     默认字体用 assets/fonts/NotoSansSC-VariableFont_wght.ttf
     静态资源都用cmrc打包
     驱动和窗口是1对多关系
@@ -44,7 +44,6 @@
 #include <stack>
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_gpu.h>
-#include <SDL3_ttf/SDL_ttf.h>
 #include <entt/entt.hpp>
 #include <Eigen/Dense>
 #include <cmrc/cmrc.hpp>
@@ -59,6 +58,7 @@
 #include "../interface/Isystem.hpp"
 #include "../api/Utils.hpp"
 #include "../api/Layout.hpp"
+#include "FontManager.hpp"
 
 CMRC_DECLARE(ui_fonts); // NOLINT
 
@@ -548,13 +548,6 @@ private:
      */
     void loadDefaultFont()
     {
-        // SDL3_ttf: TTF_Init() 返回 bool，true 表示成功，false 表示失败
-        if (TTF_WasInit() == 0 && !TTF_Init())
-        {
-            Logger::error("Failed to initialize SDL_ttf: {}", SDL_GetError());
-            return;
-        }
-
         // 从 cmrc 嵌入资源加载字体
         auto filesystem = cmrc::ui_fonts::get_filesystem();
         const char* fontPath = "assets/fonts/NotoSansSC-VariableFont_wght.ttf";
@@ -567,18 +560,15 @@ private:
 
         auto fontFile = filesystem.open(fontPath);
 
-        // 使用 SDL_IOFromConstMem 从内存加载字体
-        SDL_IOStream* fontIO = SDL_IOFromConstMem(fontFile.begin(), static_cast<size_t>(fontFile.size()));
-        if (fontIO == nullptr)
+        // 使用 FontManager 加载字体
+        if (!m_fontManager.loadFromMemory(
+                reinterpret_cast<const uint8_t*>(fontFile.begin()), static_cast<size_t>(fontFile.size()), 24.0F, 2.0F))
         {
-            Logger::info("Failed to create IOStream for font: {}", SDL_GetError());
-            return;
+            Logger::error("Failed to load default font with stb_truetype");
         }
-
-        m_defaultFont = TTF_OpenFontIO(fontIO, true, 16.0F);
-        if (m_defaultFont == nullptr)
+        else
         {
-            Logger::info("Failed to load default font: {}", SDL_GetError());
+            Logger::info("Default font loaded successfully with stb_truetype");
         }
     }
 
@@ -646,11 +636,7 @@ private:
             m_fragmentShader = nullptr;
         }
 
-        if (m_defaultFont != nullptr)
-        {
-            TTF_CloseFont(m_defaultFont);
-            m_defaultFont = nullptr;
-        }
+        // FontManager 会自动清理
         // 释放窗口声明
         for (auto* window : m_claimedWindows)
         {
@@ -666,8 +652,6 @@ private:
             SDL_DestroyGPUDevice(m_gpuDevice);
             m_gpuDevice = nullptr;
         }
-
-        TTF_Quit();
     }
 
     /**
@@ -819,7 +803,7 @@ private:
             loadShaders();
         }
 
-        if (m_defaultFont == nullptr)
+        if (!m_fontManager.isLoaded())
         {
             loadDefaultFont();
         }
@@ -1048,7 +1032,7 @@ private:
                     {
                         if (policies::HasFlag(sizeComp->sizePolicy, policies::Size::VAuto))
                         {
-                            const float lineHeight = static_cast<float>(TTF_GetFontHeight(m_defaultFont));
+                            const float lineHeight = static_cast<float>(m_fontManager.getFontHeight());
                             if (lineHeight > 0.0F)
                             {
                                 const auto lines =
@@ -1131,7 +1115,7 @@ private:
                     color = Eigen::Vector4f(0.5F, 0.5F, 0.5F, alpha);
                 }
 
-                const float lineHeight = static_cast<float>(TTF_GetFontHeight(m_defaultFont));
+                const float lineHeight = static_cast<float>(m_fontManager.getFontHeight());
 
                 const auto modeVal = static_cast<uint8_t>(textEdit->inputMode);
                 const auto multiFlag = static_cast<uint8_t>(policies::TextFlag::Multiline);
@@ -1465,15 +1449,16 @@ private:
                  policies::Alignment alignment,
                  float opacity)
     {
-        if (m_defaultFont == nullptr || text.empty()) return;
+        if (!m_fontManager.isLoaded() || text.empty()) return;
 
-        // 使用 SDL_ttf 渲染文本到纹理
+        // 使用 stb_truetype 渲染文本到纹理
         uint32_t textWidth = 0;
         uint32_t textHeight = 0;
         SDL_GPUTexture* textTexture = renderTextToTexture(text, color, textWidth, textHeight);
         if (textTexture == nullptr) return;
 
-        Eigen::Vector2f textSize(static_cast<float>(textWidth), static_cast<float>(textHeight));
+        float scale = m_fontManager.getOversampleScale();
+        Eigen::Vector2f textSize(static_cast<float>(textWidth) / scale, static_cast<float>(textHeight) / scale);
 
         float drawX = pos.x();
         float drawY = pos.y();
@@ -1577,7 +1562,7 @@ private:
         if (textComp && !textComp->content.empty())
         {
             float textWidth = measureTextWidth(textComp->content);
-            float textHeight = m_defaultFont ? static_cast<float>(TTF_GetFontHeight(m_defaultFont)) : 16.0F;
+            float textHeight = m_fontManager.isLoaded() ? static_cast<float>(m_fontManager.getFontHeight()) : 16.0F;
             textSize = {textWidth, textHeight};
         }
 
@@ -1673,20 +1658,15 @@ private:
         }
 
         // 使用 IconFont 渲染文本
-        TTF_Font* iconFont = static_cast<TTF_Font*>(iconComp->fontHandle);
+        // TODO: IconFont 支持需要重新实现，因为已经移除了 SDL_ttf
+        // 暂时跳过 IconFont 渲染
+        // FontManager* iconFont = static_cast<FontManager*>(iconComp->fontHandle);
 
-        // 临时保存当前字体
-        TTF_Font* prevFont = m_defaultFont;
-        m_defaultFont = iconFont;
-
-        // 渲染图标字符
+        // 渲染图标字符（使用默认字体）
         Eigen::Vector4f color(
             iconComp->tintColor.red, iconComp->tintColor.green, iconComp->tintColor.blue, iconComp->tintColor.alpha);
 
         addText(iconChar, pos, size, color, policies::Alignment::CENTER, alpha);
-
-        // 恢复原字体
-        m_defaultFont = prevFont;
     }
 
     static size_t nextUtf8CharLen(unsigned char c)
@@ -1700,11 +1680,8 @@ private:
 
     float measureTextWidth(const std::string& text) const
     {
-        if (m_defaultFont == nullptr || text.empty()) return 0.0F;
-        int measuredWidth = 0;
-        size_t measuredLength = 0;
-        TTF_MeasureString(m_defaultFont, text.c_str(), text.size(), 100000, &measuredWidth, &measuredLength);
-        return static_cast<float>(measuredWidth);
+        if (!m_fontManager.isLoaded() || text.empty()) return 0.0F;
+        return static_cast<float>(m_fontManager.measureTextWidth(text));
     }
 
     std::string ltrimSpaces(std::string text) const
@@ -1721,7 +1698,7 @@ private:
     std::vector<std::string> wrapTextLines(const std::string& text, int maxWidth, policies::TextWrap wrapMode) const
     {
         std::vector<std::string> lines;
-        if (m_defaultFont == nullptr)
+        if (!m_fontManager.isLoaded())
         {
             lines.push_back(text);
             return lines;
@@ -1750,10 +1727,10 @@ private:
                 {
                     int measuredWidth = 0;
                     size_t measuredLength = 0;
-                    bool ok = TTF_MeasureString(
-                        m_defaultFont, segment.c_str(), segment.size(), maxWidth, &measuredWidth, &measuredLength);
+                    measuredWidth =
+                        m_fontManager.measureString(segment.c_str(), segment.size(), maxWidth, &measuredLength);
 
-                    if (!ok || measuredLength == 0)
+                    if (measuredLength == 0)
                     {
                         size_t len = nextUtf8CharLen(static_cast<unsigned char>(segment[0]));
                         lines.push_back(segment.substr(0, len));
@@ -1795,17 +1772,17 @@ private:
     std::string getTailThatFits(const std::string& text, int maxWidth, float& outWidth) const
     {
         outWidth = 0.0F;
-        if (m_defaultFont == nullptr || text.empty() || maxWidth <= 0) return std::string();
+        if (!m_fontManager.isLoaded() || text.empty() || maxWidth <= 0) return std::string();
 
         size_t start = 0;
         while (start < text.size())
         {
             int measuredWidth = 0;
             size_t measuredLength = 0;
-            bool ok = TTF_MeasureString(
-                m_defaultFont, text.c_str() + start, text.size() - start, maxWidth, &measuredWidth, &measuredLength);
+            measuredWidth =
+                m_fontManager.measureString(text.c_str() + start, text.size() - start, maxWidth, &measuredLength);
 
-            if (ok && measuredLength == text.size() - start)
+            if (measuredLength == text.size() - start)
             {
                 outWidth = static_cast<float>(measuredWidth);
                 return text.substr(start);
@@ -1852,9 +1829,9 @@ private:
                         float wrapWidth,
                         float opacity)
     {
-        if (m_defaultFont == nullptr || text.empty() || wrapWidth <= 0.0F) return;
+        if (!m_fontManager.isLoaded() || text.empty() || wrapWidth <= 0.0F) return;
 
-        const float lineHeight = static_cast<float>(TTF_GetFontHeight(m_defaultFont));
+        const float lineHeight = static_cast<float>(m_fontManager.getFontHeight());
         if (lineHeight <= 0.0F) return;
 
         std::vector<std::string> lines = wrapTextLines(text, static_cast<int>(wrapWidth), wrapMode);
@@ -1892,14 +1869,14 @@ private:
     }
 
     /**
-     * @brief 使用 SDL_ttf 渲染文本到 GPU 纹理
+     * @brief 使用 stb_truetype 渲染文本到 GPU 纹理
      */
     SDL_GPUTexture* renderTextToTexture(const std::string& text,
                                         const Eigen::Vector4f& color,
                                         uint32_t& outWidth,
                                         uint32_t& outHeight)
     {
-        if (m_defaultFont == nullptr) return nullptr;
+        if (!m_fontManager.isLoaded()) return nullptr;
 
         // 检查缓存
         std::string cacheKey = text + "_" + std::to_string(color.x()) + "_" + std::to_string(color.y()) + "_" +
@@ -1913,25 +1890,21 @@ private:
             return it->second.texture;
         }
 
-        // 渲染文本到 Surface
-        SDL_Color sdlColor = {static_cast<uint8_t>(color.x() * 255),
-                              static_cast<uint8_t>(color.y() * 255),
-                              static_cast<uint8_t>(color.z() * 255),
-                              static_cast<uint8_t>(color.w() * 255)};
+        // 使用 FontManager 渲染文本到 RGBA 位图
+        int bitmapWidth = 0;
+        int bitmapHeight = 0;
 
-        SDL_Surface* rawSurface = TTF_RenderText_Blended(m_defaultFont, text.c_str(), text.size(), sdlColor);
-        if (rawSurface == nullptr)
-        {
-            Logger::info("Failed to render text: %s", SDL_GetError());
-            return nullptr;
-        }
+        std::vector<uint8_t> bitmap = m_fontManager.renderTextBitmap(text,
+                                                                     static_cast<uint8_t>(color.x() * 255),
+                                                                     static_cast<uint8_t>(color.y() * 255),
+                                                                     static_cast<uint8_t>(color.z() * 255),
+                                                                     static_cast<uint8_t>(color.w() * 255),
+                                                                     bitmapWidth,
+                                                                     bitmapHeight);
 
-        // 转换为 RGBA32，确保格式与 GPU 纹理一致
-        SDL_Surface* textSurface = SDL_ConvertSurface(rawSurface, SDL_PIXELFORMAT_RGBA32);
-        SDL_DestroySurface(rawSurface);
-        if (textSurface == nullptr)
+        if (bitmap.empty() || bitmapWidth == 0 || bitmapHeight == 0)
         {
-            Logger::info("Failed to convert text surface: %s", SDL_GetError());
+            Logger::info("Failed to render text bitmap");
             return nullptr;
         }
 
@@ -1939,8 +1912,8 @@ private:
         SDL_GPUTextureCreateInfo textureInfo = {};
         textureInfo.type = SDL_GPU_TEXTURETYPE_2D;
         textureInfo.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
-        textureInfo.width = static_cast<uint32_t>(textSurface->w);
-        textureInfo.height = static_cast<uint32_t>(textSurface->h);
+        textureInfo.width = static_cast<uint32_t>(bitmapWidth);
+        textureInfo.height = static_cast<uint32_t>(bitmapHeight);
         textureInfo.layer_count_or_depth = 1;
         textureInfo.num_levels = 1;
         textureInfo.usage = SDL_GPU_TEXTUREUSAGE_SAMPLER;
@@ -1948,14 +1921,13 @@ private:
         SDL_GPUTexture* texture = SDL_CreateGPUTexture(m_gpuDevice, &textureInfo);
         if (texture == nullptr)
         {
-            SDL_DestroySurface(textSurface);
             return nullptr;
         }
 
         // 上传纹理数据
         SDL_GPUTransferBufferCreateInfo transferInfo = {};
         transferInfo.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
-        transferInfo.size = static_cast<uint32_t>(textSurface->pitch * textSurface->h);
+        transferInfo.size = static_cast<uint32_t>(bitmap.size());
 
         SDL_GPUTransferBuffer* transferBuffer = SDL_CreateGPUTransferBuffer(m_gpuDevice, &transferInfo);
 
@@ -1964,34 +1936,31 @@ private:
             void* data = SDL_MapGPUTransferBuffer(m_gpuDevice, transferBuffer, false);
             if (data != nullptr)
             {
-                SDL_memcpy(data, textSurface->pixels, textSurface->pitch * textSurface->h);
+                SDL_memcpy(data, bitmap.data(), bitmap.size());
                 SDL_UnmapGPUTransferBuffer(m_gpuDevice, transferBuffer);
 
                 SDL_GPUCommandBuffer* uploadCmdBuf = SDL_AcquireGPUCommandBuffer(m_gpuDevice);
                 SDL_GPUCopyPass* copyPass = SDL_BeginGPUCopyPass(uploadCmdBuf);
 
-                SDL_GPUTextureTransferInfo transferInfo = {};
-                transferInfo.transfer_buffer = transferBuffer;
-                transferInfo.offset = 0;
-                const uint32_t bytesPerPixel = 4;
-                transferInfo.pixels_per_row = static_cast<uint32_t>(textSurface->pitch / bytesPerPixel);
-                transferInfo.rows_per_layer = static_cast<uint32_t>(textSurface->h);
+                SDL_GPUTextureTransferInfo textureTransferInfo = {};
+                textureTransferInfo.transfer_buffer = transferBuffer;
+                textureTransferInfo.offset = 0;
+                textureTransferInfo.pixels_per_row = static_cast<uint32_t>(bitmapWidth);
+                textureTransferInfo.rows_per_layer = static_cast<uint32_t>(bitmapHeight);
 
                 SDL_GPUTextureRegion textureRegion = {};
                 textureRegion.texture = texture;
-                textureRegion.w = static_cast<uint32_t>(textSurface->w);
-                textureRegion.h = static_cast<uint32_t>(textSurface->h);
+                textureRegion.w = static_cast<uint32_t>(bitmapWidth);
+                textureRegion.h = static_cast<uint32_t>(bitmapHeight);
                 textureRegion.d = 1;
 
-                SDL_UploadToGPUTexture(copyPass, &transferInfo, &textureRegion, false);
+                SDL_UploadToGPUTexture(copyPass, &textureTransferInfo, &textureRegion, false);
                 SDL_EndGPUCopyPass(copyPass);
                 SDL_SubmitGPUCommandBuffer(uploadCmdBuf);
 
                 SDL_ReleaseGPUTransferBuffer(m_gpuDevice, transferBuffer);
             }
         }
-
-        SDL_DestroySurface(textSurface);
 
         // 缓存纹理
         m_textureCache[cacheKey] = {texture, textureInfo.width, textureInfo.height};
@@ -2242,8 +2211,8 @@ private:
     SDL_GPUShader* m_vertexShader = nullptr;
     SDL_GPUShader* m_fragmentShader = nullptr;
     SDL_GPUSampler* m_sampler = nullptr;
-    TTF_Font* m_defaultFont = nullptr;
-    std::string m_gpuDriver; // GPU 驱动名称（vulkan 或 d3d12）
+    mutable FontManager m_fontManager; // 字体管理器
+    std::string m_gpuDriver;           // GPU 驱动名称（vulkan 或 d3d12）
 
     std::vector<RenderBatch> m_batches;
     SDL_GPUBuffer* m_vertexBuffer = nullptr;

@@ -1,52 +1,17 @@
-#If:
-  #PathExclude: [third_party/.*]
+If:
+  PathExclude: [third_party/.*]
 
 CompileFlags:
   CompilationDatabase: build
+  Compiler: clang-cl
   Add:
-    - "-x"
-    - "c++"
-    - "-std=c++23"
-    # 启用所有错误报告
-    - "-ferror-limit=0"
-    # 禁用宏回溯限制，便于调试
-    - "-fmacro-backtrace-limit=0"
-    # 禁用模板回溯限制
-    - "-ftemplate-backtrace-limit=0"
-    # 添加常用警告
-    - "-Wextra"
-    # 定义调试宏
-    - "-DCLANGD_ANALYSIS=1"
-    # C++ 特定警告控制
+    - "--std=c++23"
     - "-Wno-unused-parameter"
     - "-Wno-missing-field-initializers"
 
-
-    
-    # 启用 MSVC 扩展以支持特定语法
-    # 使用与 MSVC 相同的扩展和兼容性选项
-    - "-fms-compatibility"
-    # 允许 Microsoft 特定的语言扩展
-    - "-fms-extensions"
-    # 注意: 不要使用 -fdelayed-template-parsing，它与 C++20 concepts/requires 不兼容
-    # 设置 MSVC 兼容的语言版本
-    - "-fms-compatibility-version=19.50"
----
-# 诊断配置
 Diagnostics:
-  # 抑制常见的无害警告
   Suppress:
     - "unused-parameter"
-    - "misc-unused-parameters"
-  ClangTidy:
-    Remove:
-      - "readability-function-size"
 
-# 代码补全配置
-Completion:
-  AllScopes: Yes
-
-# 索引配置
 Index:
   Background: Build
-
