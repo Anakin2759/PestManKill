@@ -48,20 +48,6 @@ entt::entity CreateTextBrowser(std::string_view initialText = "",
                                std::string_view alias = "");
 entt::entity CreateCheckBox(const std::string& label, bool checked = false, std::string_view alias = "");
 
-// Icon API
-void SetIcon(entt::entity entity,
-             const std::string& textureId,
-             policies::IconPosition position = policies::IconPosition::Left,
-             float iconSize = 16.0F,
-             float spacing = 4.0F);
 
-void SetIcon(entt::entity entity,
-             const std::string& fontName,
-             uint32_t codepoint,
-             policies::IconPosition position = policies::IconPosition::Left,
-             float iconSize = 16.0F,
-             float spacing = 4.0F);
-
-void RemoveIcon(entt::entity entity);
 
 } // namespace ui::factory

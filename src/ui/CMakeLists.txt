@@ -100,6 +100,18 @@ cmrc_add_resource_library(ui_fonts
     assets/shader/frag.dxil
 )
 
+cmrc_add_resource_library(ui_icons
+    ALIAS icons              # 在 C++ 中调用的别名
+    NAMESPACE ui_icons          # C++ 命名空间
+    assets/icons/MaterialSymbolsOutlined[FILL,GRAD,opsz,wght].ttf
+    assets/icons/MaterialSymbolsOutlined[FILL,GRAD,opsz,wght].codepoints
+    assets/icons/MaterialSymbolsRounded[FILL,GRAD,opsz,wght].ttf
+    assets/icons/MaterialSymbolsRounded[FILL,GRAD,opsz,wght].codepoints
+    assets/icons/MaterialSymbolsSharp[FILL,GRAD,opsz,wght].ttf
+    assets/icons/MaterialSymbolsSharp[FILL,GRAD,opsz,wght].codepoints
+    
+)
+
 # 依赖项
 target_link_libraries(ui PRIVATE
     SDL3::SDL3
@@ -108,6 +120,7 @@ target_link_libraries(ui PRIVATE
     yogacore
     eigen
     ui_fonts
+    ui_icons
     spdlog::spdlog_header_only
 )
 target_compile_features(ui PUBLIC cxx_std_23)

@@ -26,7 +26,7 @@ namespace ui::systems
 RenderSystem::RenderSystem()
     : m_deviceManager(std::make_unique<managers::DeviceManager>()),
       m_fontManager(std::make_unique<managers::FontManager>()),
-      m_iconManager(std::make_unique<managers::IconManager>(*m_deviceManager)), m_pipelineCache(nullptr),
+      m_iconManager(std::make_unique<managers::IconManager>(m_deviceManager.get())), m_pipelineCache(nullptr),
       m_textTextureCache(nullptr), m_batchManager(std::make_unique<managers::BatchManager>()), m_commandBuffer(nullptr)
 {
     m_stats.frameCount = 0;
@@ -36,17 +36,17 @@ RenderSystem::RenderSystem()
 
 RenderSystem::~RenderSystem()
 {
-    Logger::info("[RenderSystem] 析构开始");
     cleanup();
     Logger::info("[RenderSystem] 析构完成");
 }
 
 RenderSystem::RenderSystem(RenderSystem&& other) noexcept
     : m_deviceManager(std::move(other.m_deviceManager)), m_fontManager(std::move(other.m_fontManager)),
-      m_pipelineCache(std::move(other.m_pipelineCache)), m_textTextureCache(std::move(other.m_textTextureCache)),
-      m_batchManager(std::move(other.m_batchManager)), m_commandBuffer(std::move(other.m_commandBuffer)),
-      m_renderers(std::move(other.m_renderers)), m_stats(other.m_stats), m_whiteTexture(other.m_whiteTexture),
-      m_screenWidth(other.m_screenWidth), m_screenHeight(other.m_screenHeight)
+      m_iconManager(std::move(other.m_iconManager)), m_pipelineCache(std::move(other.m_pipelineCache)),
+      m_textTextureCache(std::move(other.m_textTextureCache)), m_batchManager(std::move(other.m_batchManager)),
+      m_commandBuffer(std::move(other.m_commandBuffer)), m_renderers(std::move(other.m_renderers)),
+      m_stats(other.m_stats), m_whiteTexture(other.m_whiteTexture), m_screenWidth(other.m_screenWidth),
+      m_screenHeight(other.m_screenHeight)
 {
     Logger::info("[RenderSystem] 移动构造完成");
     other.m_whiteTexture = nullptr;
@@ -61,6 +61,7 @@ RenderSystem& RenderSystem::operator=(RenderSystem&& other) noexcept
 
         m_deviceManager = std::move(other.m_deviceManager);
         m_fontManager = std::move(other.m_fontManager);
+        m_iconManager = std::move(other.m_iconManager);
         m_pipelineCache = std::move(other.m_pipelineCache);
         m_textTextureCache = std::move(other.m_textTextureCache);
         m_batchManager = std::move(other.m_batchManager);
@@ -72,6 +73,7 @@ RenderSystem& RenderSystem::operator=(RenderSystem&& other) noexcept
         m_screenHeight = other.m_screenHeight;
 
         other.m_whiteTexture = nullptr;
+        other.m_iconManager = nullptr;
         Logger::info("[RenderSystem] 移动赋值完成");
     }
     return *this;
@@ -157,7 +159,9 @@ void RenderSystem::cleanup()
     m_deviceManager->cleanup();
     Logger::info("[RenderSystem] cleanup() 完成");
 }
-
+/**
+ * @brief 创建一个 1x1 白色纹理
+ */
 void RenderSystem::createWhiteTexture()
 {
     SDL_GPUDevice* device = m_deviceManager->getDevice();
@@ -347,15 +351,36 @@ void RenderSystem::ensureInitialized()
         m_textTextureCache = std::make_unique<managers::TextTextureCache>(*m_deviceManager, *m_fontManager);
     }
 
-    // 初始化 IconManager 并加载默认图标字体
     if (m_iconManager)
     {
         static bool iconsLoaded = false;
         if (!iconsLoaded)
         {
-            // 加载 MaterialSymbols 字体
-            std::string fontBase = "src/ui/assets/icons/MaterialSymbolsRounded[FILL,GRAD,opsz,wght]";
-            m_iconManager->loadIconFont("MaterialSymbols", fontBase + ".ttf", fontBase + ".codepoints", 16);
+            Logger::info("[RenderSystem] 初始化 IconManager 并加载默认图标字体");
+            // 加载 MaterialSymbols 字体 (使用嵌入资源)
+            try
+            {
+                auto filesystem = cmrc::ui_icons::get_filesystem();
+                const std::string fontPath = "assets/icons/MaterialSymbolsRounded[FILL,GRAD,opsz,wght].ttf";
+                const std::string cpPath = "assets/icons/MaterialSymbolsRounded[FILL,GRAD,opsz,wght].codepoints";
+
+                if (filesystem.exists(fontPath) && filesystem.exists(cpPath))
+                {
+                    auto fontFile = filesystem.open(fontPath);
+                    auto cpFile = filesystem.open(cpPath);
+                    m_iconManager->loadIconFontFromMemory(
+                        "MaterialSymbols", fontFile.begin(), fontFile.size(), cpFile.begin(), cpFile.size(), 24);
+                    Logger::info("[RenderSystem]默认图标字体加载完成");
+                }
+                else
+                {
+                    Logger::warn("[RenderSystem] 默认图标字体未在 cmrc 中找到");
+                }
+            }
+            catch (const std::exception& e)
+            {
+                Logger::error("[RenderSystem] 加载默认图标字体失败: {}", e.what());
+            }
             iconsLoaded = true;
         }
     }
@@ -378,11 +403,7 @@ void RenderSystem::initializeRenderers()
 
     m_renderers.push_back(std::make_unique<renderers::ShapeRenderer>());
     m_renderers.push_back(std::make_unique<renderers::TextRenderer>());
-
-    if (m_iconManager)
-    {
-        m_renderers.push_back(std::make_unique<renderers::IconRenderer>(*m_iconManager));
-    }
+    if (m_iconManager) m_renderers.push_back(std::make_unique<renderers::IconRenderer>(m_iconManager.get()));
 
     m_renderers.push_back(std::make_unique<renderers::ScrollBarRenderer>());
 

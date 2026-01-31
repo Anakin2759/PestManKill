@@ -54,12 +54,9 @@ if (MSVC)
 
     # 2. 核心：防止 windows.h 引入不必要的宏（如 data, min, max）
     add_compile_definitions(WIN32_LEAN_AND_MEAN NOMINMAX)
-
-    # 3. 修复 MSVC 对 C++23 的识别问题
-    # 日志显示你用了 /std:c++23 但编译器不认识。MSVC 目前应使用 /std:c++23preview
     add_compile_options(/std:c++23preview)
         
-    # 4. 忽略那个烦人的 C4228 警告
+    # 忽略烦人的 C4228 警告
     add_compile_options(/wd4228)
 endif()
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")

@@ -278,25 +278,4 @@ entt::entity CreateCheckBox(const std::string& label, bool checked, std::string_
     return entity;
 }
 
-void SetIcon(
-    entt::entity entity, const std::string& textureId, policies::IconPosition position, float iconSize, float spacing)
-{
-    ui::icon::SetIcon(entity, textureId, position, iconSize, spacing);
-}
-
-void SetIcon(entt::entity entity,
-             const std::string& fontName,
-             uint32_t codepoint,
-             policies::IconPosition position,
-             float iconSize,
-             float spacing)
-{
-    ui::icon::SetIcon(entity, fontName, codepoint, position, iconSize, spacing);
-}
-
-void RemoveIcon(entt::entity entity)
-{
-    ui::icon::RemoveIcon(entity);
-}
-
 } // namespace ui::factory

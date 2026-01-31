@@ -159,7 +159,7 @@ enum class TextWrap : uint8_t
     Char  // 按字符换行
 };
 
-enum class TextFlag : uint8_t
+enum class TextFlag : uint32_t
 {
     Default = 0,
     Password = 1 << 0,     // 掩码显示
@@ -168,8 +168,9 @@ enum class TextFlag : uint8_t
     Transferable = 1 << 3, // 支持文本拖拽/复制
     RichText = 1 << 4,     // 启用富文本/标记语言解析
     NoWrap = 1 << 5,       // 强制不换行
-    Color = 1 << 6,        // 启用文本颜色标记解析 \e[xxm
+    Ansi = 1 << 6,         // 启用 ANSI 转义码解析
     Underline = 1 << 7     // 启用下划线
+
 };
 
 /**
@@ -290,20 +291,12 @@ enum class WindowFlag : uint16_t
 /**
  * @brief 图标位置枚举 - 图标相对于文本的位置
  */
-enum class IconPosition : uint8_t
+enum class IconFlag : uint8_t
 {
-    Left,  // 图标在文本左侧
-    Right, // 图标在文本右侧
-    Top,   // 图标在文本上方
-    Bottom // 图标在文本下方
-};
-/**
- * @brief 图标类型枚举 - 区分纹理图标和字体图标
- */
-enum class IconType : uint8_t
-{
-    Texture, // 纹理图标（PNG、JPG等图像文件）
-    Font     // 字体图标（IconFont.ttf，使用字符编码渲染）
+    // --- 渲染类型 (Flags) ---
+    Default = 0,
+    Texture = 1 << 0, // 是贴图还是矢量字体
+    HasText = 1 << 1, // 是否携带文本标签
 };
 
 enum class Log : uint16_t

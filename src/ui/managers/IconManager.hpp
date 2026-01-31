@@ -13,6 +13,7 @@
  * - 通过图标名称获取 Unicode 码点
  * - 管理多个 IconFont 图标库
     - 默认加载ui/assets/icons/*.ttf和codepoints文件
+    cmrc::ui_fonts 库中预置了 MaterialSymbols 图标字体
     使用stb_truetype进行字体渲染不再引入stbttf库
  *
  * ************************************************************************
@@ -68,7 +69,10 @@ struct TextureInfo
 class IconManager
 {
 public:
-    IconManager(DeviceManager& deviceManager) : m_deviceManager(deviceManager) {}
+    IconManager(DeviceManager* deviceManager) : m_deviceManager(deviceManager)
+    {
+        Logger::info("IconManager initialized");
+    }
     ~IconManager() { shutdown(); }
 
     /**
@@ -83,6 +87,23 @@ public:
                       const std::string& fontPath,
                       const std::string& codepointsPath,
                       int fontSize = 16);
+
+    /**
+     * @brief 从内存加载 IconFont 字体和 codepoints 数据
+     * @param name 字体库名称
+     * @param fontData 字体数据指针
+     * @param fontLength 字体数据长度
+     * @param codepointsData codepoints 数据指针
+     * @param codepointsLength codepoints 数据长度
+     * @param fontSize 字体大小
+     * @return 是否加载成功
+     */
+    bool loadIconFontFromMemory(const std::string& name,
+                                const void* fontData,
+                                size_t fontLength,
+                                const void* codepointsData,
+                                size_t codepointsLength,
+                                int fontSize = 16);
 
     /**
      * @brief 通过图标名称获取 Unicode 码点
@@ -100,22 +121,22 @@ public:
     stbtt_fontinfo* getFont(const std::string& fontName);
 
     /**
-     * @brief Check if icon exists
+     * @brief 检查图标是否存在
      */
     bool hasIcon(const std::string& fontName, const std::string& iconName) const;
 
     /**
-     * @brief Get all icon names in a font
+     * @brief 获取字体库中所有图标名称
      */
     std::vector<std::string> getIconNames(const std::string& fontName) const;
 
     /**
-     * @brief Unload a specific font
+     * @brief 卸载指定字体库
      */
     void unloadIconFont(const std::string& fontName);
 
     /**
-     * @brief Clean up all resources
+     * @brief 清理所有资源
      */
     void shutdown();
 
@@ -143,11 +164,11 @@ private:
      */
     std::unordered_map<std::string, uint32_t> parseCodepoints(const std::string& filePath);
 
-    std::unordered_map<std::string, uint32_t> parseCodepointsTXT(std::ifstream& file);
+    std::unordered_map<std::string, uint32_t> parseCodepointsTXT(std::istream& file);
 
-    std::unordered_map<std::string, uint32_t> parseCodepointsJSON(std::ifstream& file);
+    std::unordered_map<std::string, uint32_t> parseCodepointsJSON(std::istream& file);
 
-    DeviceManager& m_deviceManager;
+    DeviceManager* m_deviceManager;
     std::unordered_map<std::string, FontData> m_fonts;
     std::unordered_map<std::string, std::unordered_map<std::string, uint32_t>> m_codepoints;
 

@@ -32,6 +32,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 
         // 创建菜单对话框
         client::view::CreateMenuDialog();
+        ui::utils::TimerCallback(5000, []() { std::cout << "定时任务执行！" << std::endl; });
 
         app.exec();
     }

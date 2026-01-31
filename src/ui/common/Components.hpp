@@ -491,7 +491,7 @@ struct Icon
     static constexpr float DEFAULT_SIZE = 16.0F;
     static constexpr float DEFAULT_SPACING = 4.0F;
 
-    policies::IconType type = policies::IconType::Texture; // 图标类型
+    policies::IconFlag type = policies::IconFlag::Default; // 图标类型
 
     // 纹理图标相关字段（type == Texture 时使用）
     std::string textureId;  // 图标纹理ID
@@ -503,10 +503,38 @@ struct Icon
     uint32_t codepoint = 0;     // Unicode 码点（如 0xF015 表示 home 图标）
 
     // 通用字段
-    Vec2 size{DEFAULT_SIZE, DEFAULT_SIZE};                          // 图标尺寸
-    policies::IconPosition position = policies::IconPosition::Left; // 相对于文本的位置
-    float spacing = DEFAULT_SPACING;                                // 与文本的间距
-    Color tintColor{1.0F, 1.0F, 1.0F, 1.0F};                        // 图标颜色
+    Vec2 size{DEFAULT_SIZE, DEFAULT_SIZE};                     // 图标尺寸
+    policies::IconFlag iconflag = policies::IconFlag::Default; // 相对于文本的位置
+    float spacing = DEFAULT_SPACING;                           // 与文本的间距
+    Color tintColor{1.0F, 1.0F, 1.0F, 1.0F};                   // 图标颜色
 };
+
+/**
+ * @brief 日历组件
+ */
+struct Calendar
+{
+    using is_component_tag = void;
+    int year = 1970;
+    int month = 1; // 1-12
+    int day = 1;   // 1-31
+};
+
+/**
+ * @brief 插入符组件
+ */
+struct Caret
+{
+    using is_component_tag = void;
+    float blinkInterval = 0.5F; // 闪烁间隔（秒）
+    bool visible = true;
+};
+
+struct Menu
+{
+    using is_component_tag = void;
+};
+
+
 
 } // namespace ui::components

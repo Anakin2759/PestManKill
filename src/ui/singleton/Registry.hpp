@@ -136,6 +136,11 @@ public:
         return getInstance().m_registry.on_construct<Type>();
     }
 
+    /**
+     * @brief 获取全局上下文存储
+     */
+    static auto& ctx() { return getInstance().m_registry.ctx(); }
+
 private:
     Registry() = default;
 

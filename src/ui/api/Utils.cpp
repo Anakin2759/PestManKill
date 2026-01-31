@@ -2,6 +2,8 @@
 #include <cstdint>
 #include "../singleton/Registry.hpp"
 #include "../singleton/Dispatcher.hpp"
+#include "../common/Components.hpp"
+#include "../common/GlobalContext.hpp"
 namespace ui::utils
 {
 void MarkLayoutDirty(::entt::entity entity)
@@ -66,7 +68,19 @@ void QuitUiEventLoop()
 
 void InvokeTask(std::move_only_function<void()> func)
 {
-    events::QueuedTask task{std::move(func)};
+    events::QueuedTask task{.func = std::move(func), .intervalMs = 0, .remainingMs = 0, .singleShoot = true};
+    Dispatcher::Enqueue<events::QueuedTask>(std::move(task));
+}
+
+void TimerCallback(uint32_t interval, std::move_only_function<void()> func)
+{
+    auto& frameSlot = Registry::ctx().get<globalContext::FrameContext>().frameSlot;
+    events::QueuedTask task;
+    task.func = std::move(func);
+    task.intervalMs = interval;
+    task.remainingMs = interval;
+    task.singleShoot = false;
+    task.frameSlot = frameSlot;
     Dispatcher::Enqueue<events::QueuedTask>(std::move(task));
 }
 

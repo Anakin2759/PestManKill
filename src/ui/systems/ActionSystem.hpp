@@ -42,6 +42,7 @@ public:
         Dispatcher::Sink<ui::events::ClickEvent>().connect<&ActionSystem::onClickEvent>(*this);
         Dispatcher::Sink<ui::events::HoverEvent>().connect<&ActionSystem::onHoverEvent>(*this);
         Dispatcher::Sink<ui::events::UnhoverEvent>().connect<&ActionSystem::onUnhoverEvent>(*this);
+        Dispatcher::Sink<ui::events::QueuedTask>().connect<&ActionSystem::onQueuedTask>(*this);
     }
 
     void unregisterHandlersImpl()
@@ -49,6 +50,7 @@ public:
         Dispatcher::Sink<ui::events::ClickEvent>().disconnect<&ActionSystem::onClickEvent>(*this);
         Dispatcher::Sink<ui::events::HoverEvent>().disconnect<&ActionSystem::onHoverEvent>(*this);
         Dispatcher::Sink<ui::events::UnhoverEvent>().disconnect<&ActionSystem::onUnhoverEvent>(*this);
+        Dispatcher::Sink<ui::events::QueuedTask>().disconnect<&ActionSystem::onQueuedTask>(*this);
     }
 
 private:
@@ -96,6 +98,26 @@ private:
         {
             hoverable->onUnhover();
         }
+    }
+
+    void onQueuedTask(ui::events::QueuedTask& event)
+    {
+        auto& frameContext = Registry::ctx().get<globalContext::FrameContext>();
+        event.remainingMs =
+            frameContext.intervalMs < event.remainingMs ? event.remainingMs - frameContext.intervalMs : 0;
+
+        if (event.remainingMs == 0 && event.frameSlot != frameContext.frameSlot)
+        {
+            event.func();
+            if (event.singleShoot)
+            {
+                return;
+            }
+            event.remainingMs = event.intervalMs;
+        }
+
+        event.frameSlot = frameContext.frameSlot;
+        Dispatcher::Enqueue<ui::events::QueuedTask>(std::move(event));
     }
 };
 } // namespace ui::systems

@@ -38,47 +38,12 @@
 #include "../interface/Isystem.hpp"
 #include "../common/Events.hpp"
 #include "HitTestSystem.hpp"
+#include "../common/GlobalContext.hpp"
 
 namespace ui::systems
 {
 
-/**
- * @brief 全局UI状态管理
- */
-struct GlobalState
-{
-    Vec2 latestMousePosition{0.0F, 0.0F};   // 全局最新鼠标位置
-    Vec2 latestMouseDelta{0.0F, 0.0F};      // 全局最新鼠标移动增量
-    Vec2 latestScrollDelta{0.0F, 0.0F};     // 全局最新滚轮滚动增量
-    entt::entity focusedEntity{entt::null}; // 当前获得焦点的实体
-    entt::entity activeEntity{entt::null};  // 当前处于活动状态的实体（鼠标按下）
-    entt::entity hoveredEntity{entt::null}; // 当前悬停的实体
-
-    // 拖拽状态
-    bool isDraggingScrollbar{false};
-    entt::entity dragScrollEntity{entt::null};
-    Vec2 dragStartMousePos{0.0f, 0.0f};
-    Vec2 dragStartScrollOffset{0.0f, 0.0f};
-    bool isVerticalDrag{true};
-    float dragTrackLength{0.0f}; // 轨道可活动区域长度
-    float dragThumbSize{0.0f};   // 滑块大小
-
-    /**
-     * @brief 重置所有状态
-     */
-    void reset()
-    {
-        latestMousePosition = Vec2{0.0F, 0.0F};
-        latestMouseDelta = Vec2{0.0F, 0.0F};
-        latestScrollDelta = Vec2{0.0F, 0.0F};
-        focusedEntity = entt::null;
-        activeEntity = entt::null;
-        hoveredEntity = entt::null;
-
-        isDraggingScrollbar = false;
-        dragScrollEntity = entt::null;
-    }
-};
+// GlobalState now lives in ui::globalContext::GlobalState (see GlobalContext.hpp)
 
 class StateSystem : public ui::interface::EnableRegister<StateSystem>
 {
@@ -121,15 +86,6 @@ public:
         Dispatcher::Sink<events::EndFrame>().disconnect<&StateSystem::onEndFrame>(*this);
     }
 
-    /**
-     * @brief 获取全局状态（单例）
-     */
-    static GlobalState& getGlobalState()
-    {
-        static GlobalState state;
-        return state;
-    }
-
     // ===================================================================
     // 状态管理事件处理
     // ===================================================================
@@ -139,7 +95,7 @@ public:
      */
     void onHoverEvent(const events::HoverEvent& event)
     {
-        auto& state = getGlobalState();
+        auto& state = Registry::ctx().get<globalContext::StateContext>();
 
         // 标记旧悬停实体需要移除 Hover 标签
         if (state.hoveredEntity != entt::null && Registry::Valid(state.hoveredEntity))
@@ -162,7 +118,7 @@ public:
      */
     void onUnhoverEvent(const events::UnhoverEvent& event)
     {
-        auto& state = getGlobalState();
+        auto& state = Registry::ctx().get<globalContext::StateContext>();
 
         if (Registry::Valid(event.entity))
         {
@@ -183,7 +139,7 @@ public:
      */
     void onMousePressEvent(const events::MousePressEvent& event)
     {
-        auto& state = getGlobalState();
+        auto& state = Registry::ctx().get<globalContext::StateContext>();
 
         // 标记旧激活实体需要移除 Active 标签
         if (state.activeEntity != entt::null && Registry::Valid(state.activeEntity))
@@ -206,7 +162,7 @@ public:
      */
     void onMouseReleaseEvent(const events::MouseReleaseEvent& event)
     {
-        auto& state = getGlobalState();
+        auto& state = Registry::ctx().get<globalContext::StateContext>();
 
         if (Registry::Valid(event.entity))
         {
@@ -228,7 +184,7 @@ public:
 
     void onHitPointerMove(const events::HitPointerMove& event)
     {
-        auto& state = getGlobalState();
+        auto& state = Registry::ctx().get<globalContext::StateContext>();
         state.latestMousePosition = event.raw.position;
         state.latestMouseDelta = event.raw.delta;
 
@@ -285,7 +241,7 @@ public:
     {
         if (event.raw.button != SDL_BUTTON_LEFT) return;
 
-        auto& state = getGlobalState();
+        auto& state = Registry::ctx().get<globalContext::StateContext>();
         state.latestMousePosition = event.raw.position;
 
         if (event.raw.pressed)
@@ -295,8 +251,6 @@ public:
             entt::entity scrollEntity = entt::null;
             bool isVertical = true;
             entt::entity current = event.hitEntity;
-
-            
 
             while (current != entt::null && Registry::Valid(current))
             {
@@ -367,7 +321,6 @@ public:
             if (Registry::TryGet<components::Clickable>(releasedEntity) != nullptr)
             {
                 auto& baseInfo = Registry::Get<components::BaseInfo>(releasedEntity); // 确保实体有效
-                Logger::debug("StateSystem: Click Event on entity {}", baseInfo.alias);
                 Dispatcher::Trigger<events::ClickEvent>(events::ClickEvent{releasedEntity});
             }
 
@@ -410,7 +363,7 @@ public:
 
     void onHitPointerWheel(const events::HitPointerWheel& event)
     {
-        auto& state = getGlobalState();
+        auto& state = Registry::ctx().get<globalContext::StateContext>();
         state.latestScrollDelta = event.raw.delta;
 
         entt::entity target = entt::null;
@@ -478,7 +431,7 @@ public:
      */
     static void setFocus(entt::entity entity, SDL_Window* sdlWindow = nullptr)
     {
-        auto& state = getGlobalState();
+        auto& state = Registry::ctx().get<globalContext::StateContext>();
 
         // 移除旧焦点实体的标签（Focus 需要立即应用）
         if (state.focusedEntity != entt::null && Registry::Valid(state.focusedEntity))
@@ -511,7 +464,7 @@ public:
      */
     static void clearFocus(SDL_Window* sdlWindow = nullptr)
     {
-        auto& state = getGlobalState();
+        auto& state = Registry::ctx().get<globalContext::StateContext>();
 
         if (state.focusedEntity != entt::null && Registry::Valid(state.focusedEntity))
         {

@@ -5,7 +5,8 @@
  * @author AnakinLiu (azrael2759@qq.com)
  * @date 2026-01-30
  * @version 0.1
- * @brief
+ * @brief 管理 GPU 设备和窗口声明
+
  *
  * ************************************************************************
  * @copyright Copyright (c) 2026 AnakinLiu
@@ -110,7 +111,6 @@ public:
 
     bool initialize()
     {
-        Logger::info("DeviceManager::initialize() start");
         if (m_gpuDevice != nullptr) return true;
 
         // 1. 组装责任链

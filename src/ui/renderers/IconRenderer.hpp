@@ -38,7 +38,7 @@ namespace ui::renderers
 class IconRenderer : public core::IRenderer
 {
 public:
-    IconRenderer(managers::IconManager& iconManager) : m_iconManager(iconManager) {}
+    IconRenderer(managers::IconManager* iconManager) : m_iconManager(iconManager) {}
 
     bool canHandle(entt::entity entity) const override { return Registry::AnyOf<components::Icon>(entity); }
 
@@ -52,9 +52,6 @@ public:
         const auto* iconComp = Registry::TryGet<components::Icon>(entity);
         if (!iconComp) return;
 
-        // 根据类型判断是否有有效数据
-        if (iconComp->type == policies::IconType::Texture && iconComp->textureId.empty()) return;
-        if (iconComp->type == policies::IconType::Font && iconComp->codepoint == 0) return;
 
         // 计算图标的绘制位置和大小
         Eigen::Vector2f iconDrawPos = context.position;
@@ -68,10 +65,10 @@ public:
         Eigen::Vector2f uvMax = {1.0f, 1.0f};
         Eigen::Vector2f actualIconSize = iconDrawSize;
 
-        if (iconComp->type == policies::IconType::Texture)
+        if (HasFlag(iconComp->type, policies::IconFlag::Texture))
         {
             // 纹理图标
-            if (auto* textureInfo = m_iconManager.getTextureInfo(iconComp->textureId))
+            if (auto* textureInfo = m_iconManager->getTextureInfo(iconComp->textureId))
             {
                 iconTexture = textureInfo->texture;
                 uvMin = textureInfo->uvMin;
@@ -83,7 +80,7 @@ public:
                 return; // 纹理不存在
             }
         }
-        else if (iconComp->type == policies::IconType::Font)
+        else if (HasFlag(iconComp->type, ~policies::IconFlag::Texture))
         {
             // 字体图标
             // fontHandle 暂时存储为字体名称字符串指针，或者为空则使用默认
@@ -94,7 +91,7 @@ public:
                 fontName = static_cast<const char*>(iconComp->fontHandle);
             }
 
-            if (auto* textureInfo = m_iconManager.getTextureInfo(fontName, iconComp->codepoint, iconComp->size.y()))
+            if (auto* textureInfo = m_iconManager->getTextureInfo(fontName, iconComp->codepoint, iconComp->size.y()))
             {
                 iconTexture = textureInfo->texture;
                 uvMin = textureInfo->uvMin;
@@ -127,7 +124,7 @@ public:
     }
 
 private:
-    managers::IconManager& m_iconManager;
+    managers::IconManager* m_iconManager;
 };
 
 } // namespace ui::renderers

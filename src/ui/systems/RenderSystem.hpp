@@ -46,6 +46,7 @@
 #include "../core/RenderContext.hpp"
 
 CMRC_DECLARE(ui_fonts);
+CMRC_DECLARE(ui_icons);
 
 namespace ui::systems
 {

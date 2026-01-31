@@ -7,6 +7,7 @@
 #include "singleton/Logger.hpp"
 #include <SDL3/SDL.h>
 #include "TaskChain.hpp"
+#include "../common/GlobalContext.hpp"
 static constexpr int DEFAULT_WIDTH = 800;
 static constexpr int DEFAULT_HEIGHT = 600;
 static constexpr int FRAME_DELAY_MS = 16;     // ~60 FPS
@@ -23,6 +24,8 @@ Application::Application(int argc, char* argv[])
     }
 
     Logger::info("SDL 初始化成功");
+    Registry::ctx().emplace<globalContext::FrameContext>();
+    Registry::ctx().emplace<globalContext::StateContext>();
 
     m_systems.registerAllHandlers();
     auto taskChain = tasks::QueuedTask{} | tasks::InputTask{} | tasks::RenderTask{};

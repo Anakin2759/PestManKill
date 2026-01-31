@@ -91,7 +91,7 @@ inline void CreateMainWindow()
 
     // 发送按钮 - 固定宽度 (使用回车图标)
     auto sendBtn = ui::factory::CreateButton("", "sendBtn");
-    ui::factory::SetIcon(sendBtn, "MaterialSymbols", 0xe31b, ui::policies::IconPosition::Left, 20.0f, 0.0f);
+    ui::icon::SetIcon(sendBtn, "MaterialSymbols", 0xe31b, ui::policies::IconFlag::Default, 20.0f, 0.0f);
     ui::size::SetSizePolicy(sendBtn, ui::policies::Size::HFixed | ui::policies::Size::VFill);
     ui::size::SetSize(sendBtn, 40.0F, 0.0F); // 缩窄宽度以适配图标
 

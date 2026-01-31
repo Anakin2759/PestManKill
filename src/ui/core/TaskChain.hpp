@@ -148,17 +148,12 @@ struct InputTask
 struct QueuedTask
 {
     using is_task_tag = void;
-    uint32_t m_remainingTime = 0;
-    uint32_t m_delayTime = 0;
 
     void operator()(uint32_t delta)
     {
-        if (m_remainingTime > delta)
-        {
-            m_remainingTime -= delta;
-            return;
-        }
-        m_remainingTime = m_delayTime;
+        auto& frameContext = Registry::ctx().get<globalContext::FrameContext>();
+        frameContext.intervalMs = delta;
+        frameContext.frameSlot = (frameContext.frameSlot + 1) % 2;
         Dispatcher::Update<ui::events::QueuedTask>();
         Dispatcher::Update();
     }

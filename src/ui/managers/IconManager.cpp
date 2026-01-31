@@ -2,6 +2,7 @@
 #include "DeviceManager.hpp"
 #include <SDL3/SDL_gpu.h>
 #include <stb_truetype.h>
+#include <cstring>
 
 namespace ui::managers
 {
@@ -11,6 +12,7 @@ bool IconManager::loadIconFont(const std::string& name,
                                const std::string& codepointsPath,
                                int fontSize)
 {
+    Logger::info("Loading IconFont '{}' from '{}'", name, fontPath);
     // Read file
     std::ifstream file(fontPath, std::ios::binary | std::ios::ate);
     if (!file.is_open())
@@ -48,6 +50,62 @@ bool IconManager::loadIconFont(const std::string& name,
     m_codepoints[name] = std::move(codepoints);
 
     Logger::info("IconFont '{}' loaded: {} icons", name, m_codepoints[name].size());
+    return true;
+}
+
+bool IconManager::loadIconFontFromMemory(const std::string& name,
+                                         const void* fontData,
+                                         size_t fontLength,
+                                         const void* codepointsData,
+                                         size_t codepointsLength,
+                                         int fontSize)
+{
+    if (!fontData || fontLength == 0) return false;
+
+    // Copy font data because we store it
+    std::vector<unsigned char> buffer(fontLength);
+    std::memcpy(buffer.data(), fontData, fontLength);
+
+    stbtt_fontinfo info;
+    if (!stbtt_InitFont(&info, buffer.data(), stbtt_GetFontOffsetForIndex(buffer.data(), 0)))
+    {
+        Logger::error("Failed to init font from memory: {}", name);
+        return false;
+    }
+
+    // Parse codepoints from memory
+    std::string codepointsStr(static_cast<const char*>(codepointsData), codepointsLength);
+    std::istringstream stream(codepointsStr);
+
+    std::unordered_map<std::string, uint32_t> codepoints;
+
+    // Heuristic to detect JSON vs TXT: check for '{'
+    char firstChar = 0;
+    while (stream >> std::ws && stream.peek() != EOF)
+    {
+        firstChar = static_cast<char>(stream.peek());
+        break; // Only peek first non-whitespace char
+    }
+    stream.seekg(0); // reset stream position
+
+    if (firstChar == '{')
+    {
+        codepoints = parseCodepointsJSON(stream);
+    }
+    else
+    {
+        codepoints = parseCodepointsTXT(stream);
+    }
+
+    if (codepoints.empty())
+    {
+        Logger::warn("No codepoints loaded from memory for: {}", name);
+    }
+
+    m_fonts[name] = FontData{std::move(buffer), info, fontSize};
+    m_codepoints[name] = std::move(codepoints);
+
+    Logger::info("IconFont '{}' loaded from memory: {} icons", name, m_codepoints[name].size());
     return true;
 }
 
@@ -111,7 +169,7 @@ void IconManager::unloadIconFont(const std::string& fontName)
 
 void IconManager::shutdown()
 {
-    SDL_GPUDevice* device = m_deviceManager.getDevice();
+    SDL_GPUDevice* device = m_deviceManager->getDevice();
     if (device)
     {
         for (auto& [key, info] : m_fontTextureCache)
@@ -156,7 +214,7 @@ const TextureInfo* IconManager::getTextureInfo(const std::string& fontName, uint
         return nullptr;
     }
 
-    SDL_GPUDevice* device = m_deviceManager.getDevice();
+    SDL_GPUDevice* device = m_deviceManager->getDevice();
     if (!device)
     {
         stbtt_FreeBitmap(bitmap, nullptr);
@@ -252,7 +310,7 @@ std::unordered_map<std::string, uint32_t> IconManager::parseCodepoints(const std
     return result;
 }
 
-std::unordered_map<std::string, uint32_t> IconManager::parseCodepointsTXT(std::ifstream& file)
+std::unordered_map<std::string, uint32_t> IconManager::parseCodepointsTXT(std::istream& file)
 {
     std::unordered_map<std::string, uint32_t> result;
     std::string line;
@@ -282,7 +340,7 @@ std::unordered_map<std::string, uint32_t> IconManager::parseCodepointsTXT(std::i
     return result;
 }
 
-std::unordered_map<std::string, uint32_t> IconManager::parseCodepointsJSON(std::ifstream& file)
+std::unordered_map<std::string, uint32_t> IconManager::parseCodepointsJSON(std::istream& file)
 {
     std::unordered_map<std::string, uint32_t> result;
     std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());

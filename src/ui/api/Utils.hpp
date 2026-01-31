@@ -14,4 +14,6 @@ void CloseWindow(::entt::entity entity);
 void QuitUiEventLoop();
 
 void InvokeTask(std::move_only_function<void()> func);
+
+void TimerCallback(uint32_t interval, std::move_only_function<void()> func);
 } // namespace ui::utils
