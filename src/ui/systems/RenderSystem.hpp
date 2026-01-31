@@ -36,6 +36,7 @@
 #include "../common/Events.hpp"
 #include "../interface/Isystem.hpp"
 #include "../managers/FontManager.hpp"
+#include "../managers/IconManager.hpp"
 #include "../managers/DeviceManager.hpp"
 #include "../managers/PipelineCache.hpp"
 #include "../managers/TextTextureCache.hpp"
@@ -127,6 +128,7 @@ private:
 private:
     std::unique_ptr<managers::DeviceManager> m_deviceManager;
     std::unique_ptr<managers::FontManager> m_fontManager;
+    std::unique_ptr<managers::IconManager> m_iconManager;
     std::unique_ptr<managers::PipelineCache> m_pipelineCache;
     std::unique_ptr<managers::TextTextureCache> m_textTextureCache;
     std::unique_ptr<managers::BatchManager> m_batchManager;

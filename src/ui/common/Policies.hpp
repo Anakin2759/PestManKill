@@ -248,11 +248,13 @@ enum class Scroll : uint8_t
     Both        // 双向滚动
 };
 
-enum class ScrollBarVisibility : uint8_t
+enum class ScrollBar : uint8_t
 {
-    Auto,
-    AlwaysOn,
-    AlwaysOff
+    Default = 0,
+    NoVisibility = 1 << 0,
+    Draggable = 1 << 1,
+    AutoHide = 1 << 2
+
 };
 
 /**

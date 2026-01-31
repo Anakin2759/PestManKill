@@ -25,8 +25,9 @@ namespace ui::systems
 
 RenderSystem::RenderSystem()
     : m_deviceManager(std::make_unique<managers::DeviceManager>()),
-      m_fontManager(std::make_unique<managers::FontManager>()), m_pipelineCache(nullptr), m_textTextureCache(nullptr),
-      m_batchManager(std::make_unique<managers::BatchManager>()), m_commandBuffer(nullptr)
+      m_fontManager(std::make_unique<managers::FontManager>()),
+      m_iconManager(std::make_unique<managers::IconManager>(*m_deviceManager)), m_pipelineCache(nullptr),
+      m_textTextureCache(nullptr), m_batchManager(std::make_unique<managers::BatchManager>()), m_commandBuffer(nullptr)
 {
     m_stats.frameCount = 0;
     m_stats.batchCount = 0;
@@ -306,23 +307,22 @@ void RenderSystem::update() noexcept
         Registry::Remove<components::RenderDirtyTag>(entity);
     }
 }
-
+/**
+ * @brief 确保渲染系统已初始化
+ */
 void RenderSystem::ensureInitialized()
 {
-    Logger::info("[RenderSystem] ensureInitialized called");
     if ((SDL_WasInit(SDL_INIT_VIDEO) & SDL_INIT_VIDEO) == 0)
     {
         Logger::warn("[RenderSystem] SDL_INIT_VIDEO not initialized");
         return;
     }
 
-    Logger::info("[RenderSystem] Initiating DeviceManager...");
     if (!m_deviceManager->initialize())
     {
         Logger::error("Failed to initialize RenderSystem: GPU device initialization failed");
         return;
     }
-    Logger::info("[RenderSystem] DeviceManager initialized");
 
     if (m_pipelineCache == nullptr)
     {
@@ -347,6 +347,19 @@ void RenderSystem::ensureInitialized()
         m_textTextureCache = std::make_unique<managers::TextTextureCache>(*m_deviceManager, *m_fontManager);
     }
 
+    // 初始化 IconManager 并加载默认图标字体
+    if (m_iconManager)
+    {
+        static bool iconsLoaded = false;
+        if (!iconsLoaded)
+        {
+            // 加载 MaterialSymbols 字体
+            std::string fontBase = "src/ui/assets/icons/MaterialSymbolsRounded[FILL,GRAD,opsz,wght]";
+            m_iconManager->loadIconFont("MaterialSymbols", fontBase + ".ttf", fontBase + ".codepoints", 16);
+            iconsLoaded = true;
+        }
+    }
+
     if (m_commandBuffer == nullptr)
     {
         m_commandBuffer = std::make_unique<managers::CommandBuffer>(*m_deviceManager, *m_pipelineCache);
@@ -366,9 +379,10 @@ void RenderSystem::initializeRenderers()
     m_renderers.push_back(std::make_unique<renderers::ShapeRenderer>());
     m_renderers.push_back(std::make_unique<renderers::TextRenderer>());
 
-    // TODO: IconManager 需要初始化，暂时注释掉
-    // static managers::IconManager iconManager;
-    // m_renderers.push_back(std::make_unique<renderers::IconRenderer>(iconManager));
+    if (m_iconManager)
+    {
+        m_renderers.push_back(std::make_unique<renderers::IconRenderer>(*m_iconManager));
+    }
 
     m_renderers.push_back(std::make_unique<renderers::ScrollBarRenderer>());
 

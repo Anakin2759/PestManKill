@@ -46,7 +46,7 @@ public:
         }
 
         const auto* scrollArea = Registry::TryGet<components::ScrollArea>(entity);
-        if (!scrollArea || scrollArea->showScrollbars == policies::ScrollBarVisibility::AlwaysOff) return;
+        if (!scrollArea || policies::HasFlag(scrollArea->scrollBar, policies::ScrollBar::NoVisibility)) return;
 
         // 渲染滚动条 (在裁剪之前)
         drawScrollBars(entity, context.position, context.size, *scrollArea, context.alpha, context);

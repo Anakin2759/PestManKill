@@ -13,6 +13,8 @@
 #include "../singleton/Dispatcher.hpp"
 #include <SDL3/SDL_video.h>
 
+#include "Icon.hpp"
+
 namespace ui::factory
 {
 
@@ -247,7 +249,7 @@ entt::entity CreateTextBrowser(std::string_view initialText, std::string_view pl
     // 添加 ScrollArea 组件以支持滚动
     auto& scrollArea = Registry::Emplace<components::ScrollArea>(entity);
     scrollArea.scroll = policies::Scroll::Vertical;
-    scrollArea.showScrollbars = policies::ScrollBarVisibility::Auto;
+    scrollArea.scrollBar = policies::ScrollBar::Draggable | policies::ScrollBar::AutoHide;
     scrollArea.anchor = policies::ScrollAnchor::Smart; // 设置为智能模式
 
     // 设置文本默认对齐方式：左上对齐
@@ -274,6 +276,27 @@ entt::entity CreateCheckBox(const std::string& label, bool checked, std::string_
     text.alignment = ui::policies::Alignment::LEFT | ui::policies::Alignment::VCENTER;
     Registry::Get<components::Size>(entity).sizePolicy = ui::policies::Size::Auto;
     return entity;
+}
+
+void SetIcon(
+    entt::entity entity, const std::string& textureId, policies::IconPosition position, float iconSize, float spacing)
+{
+    ui::icon::SetIcon(entity, textureId, position, iconSize, spacing);
+}
+
+void SetIcon(entt::entity entity,
+             const std::string& fontName,
+             uint32_t codepoint,
+             policies::IconPosition position,
+             float iconSize,
+             float spacing)
+{
+    ui::icon::SetIcon(entity, fontName, codepoint, position, iconSize, spacing);
+}
+
+void RemoveIcon(entt::entity entity)
+{
+    ui::icon::RemoveIcon(entity);
 }
 
 } // namespace ui::factory

@@ -9,12 +9,14 @@ set(UI_SOURCES
     core/SystemManager.cpp
     systems/RenderSystem.cpp
     managers/FontManager.cpp
+    managers/IconManager.cpp
     api/Size.cpp
     api/Visibility.cpp
     api/Layout.cpp
     api/Text.cpp
     api/Animation.cpp
     api/Hierarchy.cpp
+    api/Icon.cpp
     api/Utils.cpp
     api/Factory.cpp
 )

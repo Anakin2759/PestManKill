@@ -89,10 +89,11 @@ inline void CreateMainWindow()
     ui::visibility::SetBorderThickness(chatInput, 1.0F);
     // 注意：圆角已通过 SetBorderRadius 设置 (Background 和 Border 共享)
 
-    // 发送按钮 - 固定宽度
-    auto sendBtn = ui::factory::CreateButton("Send", "sendBtn");
+    // 发送按钮 - 固定宽度 (使用回车图标)
+    auto sendBtn = ui::factory::CreateButton("", "sendBtn");
+    ui::factory::SetIcon(sendBtn, "MaterialSymbols", 0xe31b, ui::policies::IconPosition::Left, 20.0f, 0.0f);
     ui::size::SetSizePolicy(sendBtn, ui::policies::Size::HFixed | ui::policies::Size::VFill);
-    ui::size::SetSize(sendBtn, 60.0F, 0.0F); // Height由VFill决定
+    ui::size::SetSize(sendBtn, 40.0F, 0.0F); // 缩窄宽度以适配图标
 
     // 设置发送按钮背景
     ui::visibility::SetBackgroundColor(sendBtn, {0.2F, 0.5F, 0.8F, 1.0F}); // 蓝色背景

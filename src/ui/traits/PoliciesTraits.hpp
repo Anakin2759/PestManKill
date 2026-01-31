@@ -30,6 +30,7 @@ enum class Easing : uint8_t;
 enum class WindowFlag : uint16_t;
 enum class Position : uint8_t;
 enum class TextFlag : uint8_t;
+enum class ScrollBar : uint8_t;
 } // namespace ui::policies
 
 namespace ui::traits
@@ -46,7 +47,8 @@ using policies = TypeList<ui::policies::Size,
                           ui::policies::Easing,
                           ui::policies::WindowFlag,
                           ui::policies::TextFlag,
-                          ui::policies::TextFlag>;
+                          ui::policies::TextFlag,
+                          ui::policies::ScrollBar>;
 
 // ===================== 策略检测 =====================
 

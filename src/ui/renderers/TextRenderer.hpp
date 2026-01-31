@@ -176,7 +176,8 @@ private:
         Eigen::Vector4f color(textComp.color.red, textComp.color.green, textComp.color.blue, textComp.color.alpha);
 
         // 如果没有内容且有 placeholder，显示 placeholder（灰色）
-        if (displayText.empty() && !textEdit.placeholder.empty())
+        // 在获得焦点（点击）时不再显示
+        if (displayText.empty() && !textEdit.placeholder.empty() && !Registry::AnyOf<components::FocusedTag>(entity))
         {
             displayText = textEdit.placeholder;
             color = Eigen::Vector4f(0.5F, 0.5F, 0.5F, context.alpha);

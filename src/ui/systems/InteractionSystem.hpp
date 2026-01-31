@@ -112,8 +112,9 @@ public:
                     float mx = static_cast<float>(event.button.x);
                     float my = static_cast<float>(event.button.y);
                     uint32_t winId = event.button.windowID;
+                    uint8_t button = event.button.button;
                     Dispatcher::Enqueue<ui::events::RawPointerButton>(
-                        ui::events::RawPointerButton{Vec2(mx, my), winId, true});
+                        ui::events::RawPointerButton{Vec2(mx, my), winId, true, button});
 
                     break;
                 }
@@ -122,8 +123,9 @@ public:
                     float mx = static_cast<float>(event.button.x);
                     float my = static_cast<float>(event.button.y);
                     uint32_t winId = event.button.windowID;
+                    uint8_t button = event.button.button;
                     Dispatcher::Enqueue<ui::events::RawPointerButton>(
-                        ui::events::RawPointerButton{Vec2(mx, my), winId, false});
+                        ui::events::RawPointerButton{Vec2(mx, my), winId, false, button});
 
                     break;
                 }

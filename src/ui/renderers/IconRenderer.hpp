@@ -86,17 +86,25 @@ public:
         else if (iconComp->type == policies::IconType::Font)
         {
             // 字体图标
-            // TODO: FontManager 应该提供获取字体图标纹理的接口，这里暂时简化
-            // 需要将字体图标渲染到一张纹理图集上，然后根据字符的UV来绘制
-            // 目前 TextTextureCache 只处理普通文本，需要一个 IconFontTextureCache
-            // 暂用白色纹理占位
-            iconTexture = context.deviceManager->getWhiteTexture();
-            if (iconTexture == nullptr) return;
+            // fontHandle 暂时存储为字体名称字符串指针，或者为空则使用默认
+            std::string fontName = "MaterialSymbols";
+            if (iconComp->fontHandle != nullptr)
+            {
+                // 注意：这里假设 fontHandle 是一个 const char*
+                fontName = static_cast<const char*>(iconComp->fontHandle);
+            }
 
-            // 假定字体图标与文本大小一致
-            // float iconWidth = context.fontManager->measureTextWidth(iconComp->fontIconName);
-            // float iconHeight = context.fontManager->getFontHeight();
-            // actualIconSize = {iconWidth, iconHeight};
+            if (auto* textureInfo = m_iconManager.getTextureInfo(fontName, iconComp->codepoint, iconComp->size.y()))
+            {
+                iconTexture = textureInfo->texture;
+                uvMin = textureInfo->uvMin;
+                uvMax = textureInfo->uvMax;
+                actualIconSize = {textureInfo->width, textureInfo->height};
+            }
+            else
+            {
+                return; // 图标渲染失败
+            }
         }
 
         if (iconTexture)

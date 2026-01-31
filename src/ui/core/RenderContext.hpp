@@ -23,6 +23,7 @@ namespace ui::managers
 {
 class DeviceManager;
 class FontManager;
+class IconManager;
 class TextTextureCache;
 class BatchManager;
 } // namespace ui::managers

@@ -283,12 +283,10 @@ public:
 
     void onHitPointerButton(const events::HitPointerButton& event)
     {
+        if (event.raw.button != SDL_BUTTON_LEFT) return;
+
         auto& state = getGlobalState();
         state.latestMousePosition = event.raw.position;
-        Logger::debug("StateSystem: Hit Pointer Button Event at ({}, {}), hit entity {}",
-                      event.raw.position.x(),
-                      event.raw.position.y(),
-                      static_cast<uint32_t>(event.hitEntity));
 
         if (event.raw.pressed)
         {
@@ -298,13 +296,7 @@ public:
             bool isVertical = true;
             entt::entity current = event.hitEntity;
 
-            // 如果 hitEntity 为空，可能是点击在空白处（但可能在滚动条上），尝试从 state.hoveredEntity 或其他线索？
-            // 实际上 HitTestSystem 如果返回了实体，说明在实体范围内。滚动条通常在实体范围内。
-            // 如果点击了滚动条，HitTestSystem 应该返回了拥有 ScrollArea 的实体，或者是其子实体。
-            // 我们从命中实体向上查找 ScrollArea。
-
-            // 如果 hitEntity 为空，可能是因为 HitTestSystem 认为不在任何实体 Rect 内（例如 ZOrder 问题），但如果
-            // ScrollBar 浮动在外面... 假设 HitTestSystem 正常工作，我们至少命中了一个 Window 或 Container。
+            
 
             while (current != entt::null && Registry::Valid(current))
             {
@@ -855,7 +847,9 @@ private:
     bool checkScrollbarHit(entt::entity entity, const Vec2& mousePos, bool& outIsVertical)
     {
         const auto* scrollArea = Registry::TryGet<components::ScrollArea>(entity);
-        if (!scrollArea || scrollArea->showScrollbars == policies::ScrollBarVisibility::AlwaysOff) return false;
+        if (!scrollArea || policies::HasFlag(scrollArea->scrollBar, policies::ScrollBar::NoVisibility)) return false;
+
+        if (!policies::HasFlag(scrollArea->scrollBar, policies::ScrollBar::Draggable)) return false;
 
         const auto* sizeComp = Registry::TryGet<components::Size>(entity);
         if (!sizeComp) return false;

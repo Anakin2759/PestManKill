@@ -35,6 +35,8 @@
 namespace ui::managers
 {
 
+class DeviceManager;
+
 struct FontData
 {
     std::vector<unsigned char> buffer;
@@ -66,6 +68,9 @@ struct TextureInfo
 class IconManager
 {
 public:
+    IconManager(DeviceManager& deviceManager) : m_deviceManager(deviceManager) {}
+    ~IconManager() { shutdown(); }
+
     /**
      * @brief 加载 IconFont 字体和 codepoints 文件
      * @param name 字体库名称（用于后续引用）
@@ -74,50 +79,10 @@ public:
      * @param fontSize 字体大小
      * @return 是否加载成功
      */
-    static bool LoadIconFont(const std::string& name,
-                             const std::string& fontPath,
-                             const std::string& codepointsPath,
-                             int fontSize = 16)
-    {
-        // Read file
-        std::ifstream file(fontPath, std::ios::binary | std::ios::ate);
-        if (!file.is_open())
-        {
-            Logger::error("Failed to open font file: {}", fontPath);
-            return false;
-        }
-
-        std::streamsize size = file.tellg();
-        file.seekg(0, std::ios::beg);
-
-        std::vector<unsigned char> buffer(size);
-        if (!file.read((char*)buffer.data(), size))
-        {
-            Logger::error("Failed to read font file: {}", fontPath);
-            return false;
-        }
-
-        stbtt_fontinfo info;
-        if (!stbtt_InitFont(&info, buffer.data(), stbtt_GetFontOffsetForIndex(buffer.data(), 0)))
-        {
-            Logger::error("Failed to init font: {}", fontPath);
-            return false;
-        }
-
-        // 解析 codepoints 文件
-        auto codepoints = ParseCodepoints(codepointsPath);
-        if (codepoints.empty())
-        {
-            Logger::warn("No codepoints loaded from: {}", codepointsPath);
-        }
-
-        // 存储字体和映射
-        s_fonts[name] = FontData{std::move(buffer), info, fontSize};
-        s_codepoints[name] = std::move(codepoints);
-
-        Logger::info("IconFont '{}' loaded: {} icons", name, s_codepoints[name].size());
-        return true;
-    }
+    bool loadIconFont(const std::string& name,
+                      const std::string& fontPath,
+                      const std::string& codepointsPath,
+                      int fontSize = 16);
 
     /**
      * @brief 通过图标名称获取 Unicode 码点
@@ -125,219 +90,71 @@ public:
      * @param iconName 图标名称（如 "home", "user"）
      * @return Unicode 码点，未找到返回 0
      */
-    static uint32_t GetCodepoint(const std::string& fontName, const std::string& iconName)
-    {
-        auto fontIt = s_codepoints.find(fontName);
-        if (fontIt == s_codepoints.end())
-        {
-            Logger::warn("IconFont '{}' not found", fontName);
-            return 0;
-        }
-
-        auto iconIt = fontIt->second.find(iconName);
-        if (iconIt == fontIt->second.end())
-        {
-            Logger::warn("Icon '{}' not found in font '{}'", iconName, fontName);
-            return 0;
-        }
-
-        return iconIt->second;
-    }
+    uint32_t getCodepoint(const std::string& fontName, const std::string& iconName) const;
 
     /**
      * @brief 获取字体信息
      * @param fontName 字体库名称
      * @return stbtt_fontinfo 指针，未找到返回 nullptr
      */
-    static stbtt_fontinfo* GetFont(const std::string& fontName)
-    {
-        auto it = s_fonts.find(fontName);
-        if (it == s_fonts.end())
-        {
-            Logger::warn("Font '{}' not found", fontName);
-            return nullptr;
-        }
-        return &it->second.info;
-    }
+    stbtt_fontinfo* getFont(const std::string& fontName);
 
     /**
      * @brief Check if icon exists
      */
-    static bool HasIcon(const std::string& fontName, const std::string& iconName)
-    {
-        auto fontIt = s_codepoints.find(fontName);
-        if (fontIt == s_codepoints.end()) return false;
-        return fontIt->second.find(iconName) != fontIt->second.end();
-    }
+    bool hasIcon(const std::string& fontName, const std::string& iconName) const;
 
     /**
      * @brief Get all icon names in a font
      */
-    static std::vector<std::string> GetIconNames(const std::string& fontName)
-    {
-        std::vector<std::string> names;
-        auto it = s_codepoints.find(fontName);
-        if (it != s_codepoints.end())
-        {
-            names.reserve(it->second.size());
-            for (const auto& [name, codepoint] : it->second)
-            {
-                names.push_back(name);
-            }
-        }
-        return names;
-    }
+    std::vector<std::string> getIconNames(const std::string& fontName) const;
 
     /**
      * @brief Unload a specific font
      */
-    static void UnloadIconFont(const std::string& fontName)
-    {
-        s_fonts.erase(fontName);
-        s_codepoints.erase(fontName);
-        Logger::info("IconFont '{}' unloaded", fontName);
-    }
+    void unloadIconFont(const std::string& fontName);
 
     /**
      * @brief Clean up all resources
      */
-    static void Shutdown()
-    {
-        s_fonts.clear();
-        s_codepoints.clear();
-        Logger::info("IconManager shutdown");
-    }
+    void shutdown();
 
-    // Instance method required by IconRenderer
-    const TextureInfo* getTextureInfo(const std::string& id) const
+    /**
+     * @brief 获取图标纹理信息（字体图标）
+     */
+    const TextureInfo* getTextureInfo(const std::string& fontName, uint32_t codepoint, float size);
+
+    /**
+     * @brief 获取图标纹理信息（普通纹理图标 - 暂未实现完整逻辑，目前仅作为接口）
+     */
+    const TextureInfo* getTextureInfo(const std::string& textureId) const
     {
-        return nullptr; // Not implemented yet
+        auto it = m_imageTextureCache.find(textureId);
+        if (it != m_imageTextureCache.end())
+        {
+            return &it->second;
+        }
+        return nullptr;
     }
 
 private:
     /**
      * @brief 解析 codepoints 文件
-     *
-     * 支持格式：
-     * 1. TXT 格式：
-     *    home e001
-     *    user e002
-     *
-     * 2. JSON 格式：
-     *    {"home": "e001", "user": "e002"}
      */
-    static std::unordered_map<std::string, uint32_t> ParseCodepoints(const std::string& filePath)
-    {
-        std::unordered_map<std::string, uint32_t> result;
-        std::ifstream file(filePath);
+    std::unordered_map<std::string, uint32_t> parseCodepoints(const std::string& filePath);
 
-        if (!file.is_open())
-        {
-            Logger::error("Failed to open codepoints file: {}", filePath);
-            return result;
-        }
+    std::unordered_map<std::string, uint32_t> parseCodepointsTXT(std::ifstream& file);
 
-        // 判断文件格式
-        if (filePath.ends_with(".json"))
-        {
-            result = ParseCodepointsJSON(file);
-        }
-        else
-        {
-            result = ParseCodepointsTXT(file);
-        }
+    std::unordered_map<std::string, uint32_t> parseCodepointsJSON(std::ifstream& file);
 
-        file.close();
-        return result;
-    }
+    DeviceManager& m_deviceManager;
+    std::unordered_map<std::string, FontData> m_fonts;
+    std::unordered_map<std::string, std::unordered_map<std::string, uint32_t>> m_codepoints;
 
-    /**
-     * @brief 解析 TXT 格式的 codepoints 文件
-     * 格式：iconName hexCodepoint
-     */
-    static std::unordered_map<std::string, uint32_t> ParseCodepointsTXT(std::ifstream& file)
-    {
-        std::unordered_map<std::string, uint32_t> result;
-        std::string line;
-
-        while (std::getline(file, line))
-        {
-            if (line.empty() || line[0] == '#') continue; // 跳过空行和注释
-
-            std::istringstream iss(line);
-            std::string iconName;
-            std::string hexCode;
-
-            if (iss >> iconName >> hexCode)
-            {
-                try
-                {
-                    uint32_t codepoint = std::stoul(hexCode, nullptr, 16);
-                    result[iconName] = codepoint;
-                }
-                catch (...)
-                {
-                    Logger::warn("Invalid codepoint format: {} - {}", iconName, hexCode);
-                }
-            }
-        }
-
-        return result;
-    }
-
-    /**
-     * @brief 解析 JSON 格式的 codepoints 文件
-     * 简化版 JSON 解析（仅支持 {"name": "code"} 格式）
-     */
-    static std::unordered_map<std::string, uint32_t> ParseCodepointsJSON(std::ifstream& file)
-    {
-        std::unordered_map<std::string, uint32_t> result;
-        std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-
-        // 简化的 JSON 解析
-        size_t pos = 0;
-        while (true)
-        {
-            // 查找键
-            size_t keyStart = content.find('"', pos);
-            if (keyStart == std::string::npos) break;
-
-            size_t keyEnd = content.find('"', keyStart + 1);
-            if (keyEnd == std::string::npos) break;
-
-            std::string key = content.substr(keyStart + 1, keyEnd - keyStart - 1);
-
-            // 查找值
-            size_t valueStart = content.find('"', keyEnd + 1);
-            if (valueStart == std::string::npos) break;
-
-            size_t valueEnd = content.find('"', valueStart + 1);
-            if (valueEnd == std::string::npos) break;
-
-            std::string value = content.substr(valueStart + 1, valueEnd - valueStart - 1);
-
-            try
-            {
-                uint32_t codepoint = std::stoul(value, nullptr, 16);
-                result[key] = codepoint;
-            }
-            catch (...)
-            {
-                Logger::warn("Invalid codepoint in JSON: {} - {}", key, value);
-            }
-
-            pos = valueEnd + 1;
-        }
-
-        return result;
-    }
-
-    static std::unordered_map<std::string, FontData> s_fonts;
-    static std::unordered_map<std::string, std::unordered_map<std::string, uint32_t>> s_codepoints;
+    // 缓存：键为 "fontName_codepoint_size"
+    std::unordered_map<std::string, TextureInfo> m_fontTextureCache;
+    // 缓存：键为 textureId
+    std::unordered_map<std::string, TextureInfo> m_imageTextureCache;
 };
-
-// 静态成员初始化
-inline std::unordered_map<std::string, FontData> IconManager::s_fonts;
-inline std::unordered_map<std::string, std::unordered_map<std::string, uint32_t>> IconManager::s_codepoints;
 
 } // namespace ui::managers

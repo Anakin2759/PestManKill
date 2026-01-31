@@ -267,7 +267,8 @@ struct RawPointerButton
     using is_event_tag = void;
     Vec2 position;
     uint32_t windowID;
-    bool pressed; // true = down, false = up
+    bool pressed;   // true = down, false = up
+    uint8_t button; // SDL_BUTTON_LEFT, etc.
 };
 
 // 原始滚轮事件
