@@ -23,14 +23,6 @@ target_compile_definitions(
 )
 
 
-# 显式编译选项以确保 MSVC/clang-cl 正确识别 C++23
-target_compile_options(utils INTERFACE
-    $<$<CXX_COMPILER_ID:GNU>:-std=c++23>
-    $<$<AND:$<CXX_COMPILER_ID:Clang>,$<NOT:$<CXX_COMPILER_FRONTEND_VARIANT:MSVC>>>:-std=c++23>
-    $<$<CXX_COMPILER_ID:MSVC>:/std:c++23preview>
-    $<$<AND:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_FRONTEND_VARIANT:MSVC>>:/std:c++23preview>
-)
-
 # 导出头文件列表（用于 IDE 项目视图）
 set(UTILS_HEADERS
     Dispatcher.h

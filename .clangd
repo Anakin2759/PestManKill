@@ -3,8 +3,9 @@ If:
 
 CompileFlags:
   CompilationDatabase: build
-  Compiler: cl
+  Compiler: clang-cl
   Add:
+    - "--std=c++23"
     - "-Wno-unused-parameter"
     - "-Wno-missing-field-initializers"
 

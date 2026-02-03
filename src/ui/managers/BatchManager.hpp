@@ -16,6 +16,7 @@
 #pragma once
 #include <vector>
 #include <optional>
+#include <array>
 #include <SDL3/SDL_gpu.h>
 #include <SDL3/SDL_rect.h>
 #include <Eigen/Dense>
@@ -36,7 +37,6 @@ class BatchManager
 {
 public:
     BatchManager() = default;
-    ~BatchManager() = default;
 
     /**
      * @brief 清空所有批次
@@ -83,7 +83,7 @@ public:
             {
                 const auto& curr = m_currentBatch->pushConstants;
                 const auto& next = pushConstants;
-                constexpr float EPSILON = 0.001f;
+                constexpr float EPSILON = 0.001F;
 
                 bool paramsMatch = true;
 
@@ -157,18 +157,18 @@ public:
     void addRect(const Eigen::Vector2f& pos,
                  const Eigen::Vector2f& size,
                  const Eigen::Vector4f& color,
-                 const Eigen::Vector2f& uvMin = {0.0f, 0.0f},
-                 const Eigen::Vector2f& uvMax = {1.0f, 1.0f})
+                 const Eigen::Vector2f& uvMin = {0.0F, 0.0F},
+                 const Eigen::Vector2f& uvMax = {1.0F, 1.0F})
     {
         if (!m_currentBatch.has_value())
         {
             return;
         }
 
-        uint16_t baseIndex = static_cast<uint16_t>(m_currentBatch->vertices.size());
+        auto baseIndex = static_cast<uint16_t>(m_currentBatch->vertices.size());
 
         // 添加4个顶点
-        render::Vertex vertices[4];
+        std::array<render::Vertex, 4> vertices{};
 
         // 左上
         vertices[0].position[0] = pos.x();
@@ -210,22 +210,22 @@ public:
         vertices[3].color[2] = color.z();
         vertices[3].color[3] = color.w();
 
-        for (int i = 0; i < 4; ++i)
+        for (const auto& val : vertices)
         {
-            m_currentBatch->vertices.push_back(vertices[i]);
+            m_currentBatch->vertices.push_back(val);
         }
 
         // 添加6个索引（2个三角形）
-        uint16_t indices[6] = {baseIndex,
-                               static_cast<uint16_t>(baseIndex + 1),
-                               static_cast<uint16_t>(baseIndex + 2),
-                               baseIndex,
-                               static_cast<uint16_t>(baseIndex + 2),
-                               static_cast<uint16_t>(baseIndex + 3)};
+        std::array<uint16_t, 6> indices = {baseIndex,
+                                           static_cast<uint16_t>(baseIndex + 1),
+                                           static_cast<uint16_t>(baseIndex + 2),
+                                           baseIndex,
+                                           static_cast<uint16_t>(baseIndex + 2),
+                                           static_cast<uint16_t>(baseIndex + 3)};
 
-        for (int i = 0; i < 6; ++i)
+        for (const auto& idx : indices)
         {
-            m_currentBatch->indices.push_back(indices[i]);
+            m_currentBatch->indices.push_back(idx);
         }
     }
 
@@ -257,17 +257,17 @@ public:
     /**
      * @brief 获取所有批次
      */
-    const std::vector<render::RenderBatch>& getBatches() const { return m_batches; }
+    [[nodiscard]] const std::vector<render::RenderBatch>& getBatches() const { return m_batches; }
 
     /**
      * @brief 获取批次数量
      */
-    size_t getBatchCount() const { return m_batches.size(); }
+    [[nodiscard]] size_t getBatchCount() const { return m_batches.size(); }
 
     /**
      * @brief 获取总顶点数
      */
-    size_t getTotalVertexCount() const
+    [[nodiscard]] size_t getTotalVertexCount() const
     {
         size_t count = 0;
         for (const auto& batch : m_batches)

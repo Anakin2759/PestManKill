@@ -29,10 +29,7 @@
 #include <cmrc/cmrc.hpp>
 
 #include "../singleton/Logger.hpp"
-#include "../singleton/Registry.hpp"
 #include "../singleton/Dispatcher.hpp"
-#include "../common/Components.hpp"
-#include "../common/Tags.hpp"
 #include "../common/Events.hpp"
 #include "../interface/Isystem.hpp"
 #include "../managers/FontManager.hpp"

@@ -28,6 +28,7 @@ struct FrameContext
     using is_component_tag = void;
     uint32_t intervalMs = 0; // 时间间隔（毫秒）
     uint8_t frameSlot = 0;
+    std::vector<uint32_t> taskHandleList; // 任务句柄列表
 };
 
 /**
@@ -46,11 +47,11 @@ struct StateContext
     // 拖拽状态
     bool isDraggingScrollbar{false};
     entt::entity dragScrollEntity{entt::null};
-    Vec2 dragStartMousePos{0.0f, 0.0f};
-    Vec2 dragStartScrollOffset{0.0f, 0.0f};
+    Vec2 dragStartMousePos{0.0F, 0.0F};
+    Vec2 dragStartScrollOffset{0.0F, 0.0F};
     bool isVerticalDrag{true};
-    float dragTrackLength{0.0f}; // 轨道可活动区域长度
-    float dragThumbSize{0.0f};   // 滑块大小
+    float dragTrackLength{0.0F}; // 轨道可活动区域长度
+    float dragThumbSize{0.0F};   // 滑块大小
 
     /**
      * @brief 重置所有状态

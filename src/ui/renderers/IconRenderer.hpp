@@ -52,7 +52,6 @@ public:
         const auto* iconComp = Registry::TryGet<components::Icon>(entity);
         if (!iconComp) return;
 
-
         // 计算图标的绘制位置和大小
         Eigen::Vector2f iconDrawPos = context.position;
         // 使用组件定义的尺寸和颜色
@@ -106,6 +105,37 @@ public:
 
         if (iconTexture)
         {
+            // 计算绘制位置：考虑 Padding 与是否存在文本
+            Eigen::Vector2f contentPos = context.position;
+            Eigen::Vector2f contentSize = context.size;
+
+            if (const auto* padding = Registry::TryGet<components::Padding>(entity))
+            {
+                // Padding values: x=Top, y=Right, z=Bottom, w=Left
+                contentPos.x() += padding->values.w();
+                contentPos.y() += padding->values.x();
+                contentSize.x() = std::max(0.0F, contentSize.x() - padding->values.y() - padding->values.w());
+                contentSize.y() = std::max(0.0F, contentSize.y() - padding->values.x() - padding->values.z());
+            }
+
+            Eigen::Vector2f drawPos = contentPos;
+
+            // 如果存在文本且非空，则将图标与文本一起居中（图标在文本左侧）
+            if (const auto* textComp = Registry::TryGet<components::Text>(entity);
+                textComp && !textComp->content.empty() && context.fontManager)
+            {
+                float textWidth = context.fontManager->measureTextWidth(textComp->content);
+                float totalWidth = actualIconSize.x() + iconComp->spacing + textWidth;
+                drawPos.x() = contentPos.x() + std::max(0.0F, (contentSize.x() - totalWidth) * 0.5F);
+                drawPos.y() = contentPos.y() + std::max(0.0F, (contentSize.y() - actualIconSize.y()) * 0.5F);
+            }
+            else
+            {
+                // 仅图标时，直接在控件内容区居中
+                drawPos.x() = contentPos.x() + std::max(0.0F, (contentSize.x() - actualIconSize.x()) * 0.5F);
+                drawPos.y() = contentPos.y() + std::max(0.0F, (contentSize.y() - actualIconSize.y()) * 0.5F);
+            }
+
             render::UiPushConstants pushConstants{};
             pushConstants.screen_size[0] = context.screenWidth;
             pushConstants.screen_size[1] = context.screenHeight;
@@ -114,7 +144,7 @@ public:
             pushConstants.opacity = context.alpha;
 
             context.batchManager->beginBatch(iconTexture, context.currentScissor, pushConstants);
-            context.batchManager->addRect(iconDrawPos, actualIconSize, tint, uvMin, uvMax);
+            context.batchManager->addRect(drawPos, actualIconSize, tint, uvMin, uvMax);
         }
     }
 

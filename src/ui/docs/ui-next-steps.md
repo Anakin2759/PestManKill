@@ -4,10 +4,9 @@
 
 目前 Icon 系统已有初步架构，但尚未完全跑通。
 
-- [ ] **IconManager 补完**: 实现从 TTF 码点生成位图并缓存到 GPU 纹理的逻辑。
-- [ ] **IconRenderer 集成**: 恢复 `RenderSystem` 中被注释掉的 `IconRenderer`，实现基于矩形和白色纹理（或 Icon 图集）的图标渲染。
-- [ ] **API 提供**: 在 `Factory.hpp` 中暴露 `SetIcon` 方法，支持为按钮和标签快速挂载图标。
-- [ ] **资源整合**: 扫描 `ui/assets/icons` 下的图标库并自动加载。
+- [X] **IconManager 补完**: 实现从 TTF 码点生成位图并缓存到 GPU 纹理的逻辑。
+- [X] **IconRenderer 集成**: 恢复 `RenderSystem` 中被注释掉的 `IconRenderer`，实现基于矩形和白色纹理（或 Icon 图集）的图标渲染。
+- [X] **资源整合**: 扫描 `ui/assets/icons` 下的图标库并自动加载。
 
 ## 2. 交互体验增强 (Priority: Medium)
 
@@ -29,3 +28,11 @@
 
 - [ ] **样式抽离**: 将常用的颜色、圆角、间距等硬编码参数整合为 `Theme` 资源。
 - [ ] **动态切换**: 支持在运行时一键切换全局主题方案（如 Dark/Light Mode）。
+
+## 6.CPU渲染支持 (Priority: Low)
+
+- [ ] **引入SwiftShader**: cpu模拟vulkan。
+
+## 7.终极目标：实现DSL (Priority: Low)
+
+- [ ] **引入一种简单的json-like DSL用来描述界面**。

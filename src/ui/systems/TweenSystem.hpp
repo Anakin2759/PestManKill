@@ -54,13 +54,13 @@ private:
     {
         switch (easing)
         {
-            case policies::Easing::Linear: // 线性缓动
+            case policies::Easing::LINEAR: // 线性缓动
                 return time;
-            case policies::Easing::EaseInQuad: // 二次缓入
+            case policies::Easing::EASE_IN_QUAD: // 二次缓入
                 return time * time;
-            case policies::Easing::EaseOutQuad: // 二次缓出
+            case policies::Easing::EASE_OUT_QUAD: // 二次缓出
                 return time * (2.0F - time);
-            case policies::Easing::EaseInOutQuad: // 二次缓入缓出
+            case policies::Easing::EASE_IN_OUT_QUAD: // 二次缓入缓出
                 return time < 0.5F ? 2.0F * time * time : -1.0F + (4.0F - 2.0F * time) * time;
             default:
                 return time;

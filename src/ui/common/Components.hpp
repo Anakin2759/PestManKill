@@ -251,7 +251,7 @@ struct Image
 struct Clickable
 {
     using is_component_tag = void;
-    on_event<> onClick;
+    on_event<> onClick{};
     policies::Feature enabled = policies::Feature::Enabled;
 };
 
@@ -261,8 +261,8 @@ struct Clickable
 struct Hoverable
 {
     using is_component_tag = void;
-    on_event<> onHover;
-    on_event<> onUnhover;
+    on_event<> onHover{};
+    on_event<> onUnhover{};
     policies::Feature enabled = policies::Feature::Enabled;
 };
 
@@ -272,8 +272,8 @@ struct Hoverable
 struct Pressable
 {
     using is_component_tag = void;
-    on_event<> onPress;   // 鼠标按下时触发
-    on_event<> onRelease; // 鼠标松开时触发
+    on_event<> onPress{};   // 鼠标按下时触发
+    on_event<> onRelease{}; // 鼠标松开时触发
     policies::Feature enabled = policies::Feature::Enabled;
 };
 
@@ -306,7 +306,7 @@ struct AnimationTime
     using is_component_tag = void;
     float duration = 1.0F;
     float elapsed = 0.0F;
-    policies::Easing easing = policies::Easing::Linear;
+    policies::Easing easing = policies::Easing::LINEAR;
     policies::Play mode = policies::Play::ONCE;
 };
 
@@ -443,7 +443,7 @@ struct SliderInfo
     // 当前值
     float step = 0.0F;                                                  // 步长，0 表示连续滑动
     policies::Orientation vertical = policies::Orientation::Horizontal; // 是否为垂直滑块
-    on_event<float> onValueChanged;                                     // 值变化回调
+    on_event<float> onValueChanged{};                                   // 值变化回调
     policies::Alignment labelAlignment = policies::Alignment::NONE;     // 标签对齐方式
 };
 
@@ -464,7 +464,7 @@ struct ScrollBar
     bool dragging = false;                                            // 是否正在拖动滑块
     Color thumbColor{0.5F, 0.5F, 0.5F, 0.8F};                         // 滑块颜色
     Color trackColor{0.2F, 0.2F, 0.2F, 0.5F};                         // 轨道颜色
-    on_event<float> onScroll;                                         // 滚动回调
+    on_event<float> onScroll{};                                       // 滚动回调
 };
 
 /**
@@ -534,7 +534,5 @@ struct Menu
 {
     using is_component_tag = void;
 };
-
-
 
 } // namespace ui::components

@@ -25,8 +25,7 @@
 
 #include <unordered_map>
 #include <string>
-#include <fstream>
-#include <sstream>
+#include <string_view>
 #include <vector>
 #include <stb_truetype.h>
 #include <SDL3/SDL.h>
@@ -111,29 +110,29 @@ public:
      * @param iconName 图标名称（如 "home", "user"）
      * @return Unicode 码点，未找到返回 0
      */
-    uint32_t getCodepoint(const std::string& fontName, const std::string& iconName) const;
+    uint32_t getCodepoint(std::string_view fontName, std::string_view iconName) const;
 
     /**
      * @brief 获取字体信息
      * @param fontName 字体库名称
      * @return stbtt_fontinfo 指针，未找到返回 nullptr
      */
-    stbtt_fontinfo* getFont(const std::string& fontName);
+    stbtt_fontinfo* getFont(std::string_view fontName);
 
     /**
      * @brief 检查图标是否存在
      */
-    bool hasIcon(const std::string& fontName, const std::string& iconName) const;
+    bool hasIcon(std::string_view fontName, std::string_view iconName) const;
 
     /**
      * @brief 获取字体库中所有图标名称
      */
-    std::vector<std::string> getIconNames(const std::string& fontName) const;
+    std::vector<std::string> getIconNames(std::string_view fontName) const;
 
     /**
      * @brief 卸载指定字体库
      */
-    void unloadIconFont(const std::string& fontName);
+    void unloadIconFont(std::string_view fontName);
 
     /**
      * @brief 清理所有资源
@@ -143,15 +142,14 @@ public:
     /**
      * @brief 获取图标纹理信息（字体图标）
      */
-    const TextureInfo* getTextureInfo(const std::string& fontName, uint32_t codepoint, float size);
+    const TextureInfo* getTextureInfo(std::string_view fontName, uint32_t codepoint, float size);
 
     /**
      * @brief 获取图标纹理信息（普通纹理图标 - 暂未实现完整逻辑，目前仅作为接口）
      */
-    const TextureInfo* getTextureInfo(const std::string& textureId) const
+    const TextureInfo* getTextureInfo(std::string_view textureId) const
     {
-        auto it = m_imageTextureCache.find(textureId);
-        if (it != m_imageTextureCache.end())
+        if (auto it = m_imageTextureCache.find(textureId); it != m_imageTextureCache.end())
         {
             return &it->second;
         }
@@ -159,23 +157,36 @@ public:
     }
 
 private:
+    // 使用透明哈希 (C++20/23) 以支持 string_view 查找而无需分配临时 string
+    struct StringHash
+    {
+        using is_transparent = void;
+        size_t operator()(std::string_view sv) const { return std::hash<std::string_view>{}(sv); }
+    };
+
+    template <typename T>
+    using StringMap = std::unordered_map<std::string, T, StringHash, std::equal_to<>>;
+
+    using CodepointMap = StringMap<uint32_t>;
+
     /**
      * @brief 解析 codepoints 文件
      */
-    std::unordered_map<std::string, uint32_t> parseCodepoints(const std::string& filePath);
+    CodepointMap parseCodepoints(const std::string& filePath);
 
-    std::unordered_map<std::string, uint32_t> parseCodepointsTXT(std::istream& file);
+    CodepointMap parseCodepointsTXT(std::istream& file);
 
-    std::unordered_map<std::string, uint32_t> parseCodepointsJSON(std::istream& file);
+    CodepointMap parseCodepointsJSON(std::istream& file);
 
     DeviceManager* m_deviceManager;
-    std::unordered_map<std::string, FontData> m_fonts;
-    std::unordered_map<std::string, std::unordered_map<std::string, uint32_t>> m_codepoints;
+
+    StringMap<FontData> m_fonts;
+    StringMap<CodepointMap> m_codepoints;
 
     // 缓存：键为 "fontName_codepoint_size"
-    std::unordered_map<std::string, TextureInfo> m_fontTextureCache;
+    StringMap<TextureInfo> m_fontTextureCache;
     // 缓存：键为 textureId
-    std::unordered_map<std::string, TextureInfo> m_imageTextureCache;
+    StringMap<TextureInfo> m_imageTextureCache;
 };
 
 } // namespace ui::managers

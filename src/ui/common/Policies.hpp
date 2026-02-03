@@ -60,18 +60,18 @@ enum class Play : uint8_t
  */
 enum class Easing : uint8_t
 {
-    Linear, // 线性
+    LINEAR, // 线性
 
     // 常用缓动曲线
-    EaseInSine,    // 正弦缓入
-    EaseOutSine,   // 正弦缓出
-    EaseInOutSine, // 正弦缓入缓出
+    EASE_IN_SINE,     // 正弦缓入
+    EASE_OUT_SINE,    // 正弦缓出
+    EASE_IN_OUT_SINE, // 正弦缓入缓出
 
-    EaseInQuad,    // 二次方缓入
-    EaseOutQuad,   // 二次方缓出
-    EaseInOutQuad, // 二次方缓入缓出
+    EASE_IN_QUAD,     // 二次方缓入
+    EASE_OUT_QUAD,    // 二次方缓出
+    EASE_IN_OUT_QUAD, // 二次方缓入缓出
 
-    Custom // 自定义 (例如通过函数指针 Component)
+    CUSTOM // 自定义 (例如通过函数指针 Component)
 };
 
 /**

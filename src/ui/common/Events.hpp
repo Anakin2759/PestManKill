@@ -19,9 +19,9 @@
  */
 
 #pragma once
+#include <cstdint>
 #include <entt/entt.hpp>
 #include <string>
-#include <vector>
 #include "Types.hpp"
 #ifdef CreateWindow
 #undef CreateWindow
@@ -250,6 +250,7 @@ struct QueuedTask
     uint32_t remainingMs = 0;
     bool singleShoot = false;
     uint8_t frameSlot = 0;
+    bool quitAfterExecute = false;
 };
 
 // =====================================================================

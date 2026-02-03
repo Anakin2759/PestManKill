@@ -107,19 +107,19 @@ public:
         {
             path.push_back(current);
             const auto* hierarchy = Registry::TryGet<components::Hierarchy>(current);
-            current = hierarchy ? hierarchy->parent : entt::null;
+            current = hierarchy == nullptr ? entt::null : hierarchy->parent;
         }
 
         // 从根到当前实体正向遍历，累加位置偏移
-        Vec2 pos(0.0f, 0.0f);
+        Vec2 pos(0.0F, 0.0F);
         for (auto it = path.rbegin(); it != path.rend(); ++it)
         {
-            entt::entity e = *it;
+            entt::entity entity = *it;
             // 窗口本身的 Position 是屏幕坐标，在窗口内交互时应视为原点(0,0)，忽略其屏幕位置偏移
-            if (Registry::AnyOf<components::WindowTag, components::DialogTag>(e)) continue;
+            if (Registry::AnyOf<components::WindowTag, components::DialogTag>(entity)) continue;
 
-            const auto* posComp = Registry::TryGet<components::Position>(e);
-            if (posComp)
+            const auto* posComp = Registry::TryGet<components::Position>(entity);
+            if (posComp != nullptr)
             {
                 pos.x() += posComp->value.x();
                 pos.y() += posComp->value.y();
@@ -144,7 +144,7 @@ public:
                 rootWindow = current;
             }
             const auto* hierarchy = Registry::TryGet<components::Hierarchy>(current);
-            current = hierarchy ? hierarchy->parent : entt::null;
+            current = hierarchy == nullptr ? entt::null : hierarchy->parent;
         }
 
         return rootWindow;
@@ -158,11 +158,9 @@ public:
      */
     std::vector<entt::entity> getZOrderedInteractables(entt::entity topWindow)
     {
-        // 检查缓存是否有效
-        auto it = m_zOrderCache.find(topWindow);
-        if (it != m_zOrderCache.end() && !it->second.dirty)
+        if (auto iterator = m_zOrderCache.find(topWindow); iterator != m_zOrderCache.end() && !iterator->second.dirty)
         {
-            return it->second.entities;
+            return iterator->second.entities;
         }
 
         // 重建缓存
@@ -173,50 +171,18 @@ public:
 
         for (auto entity : view)
         {
-            // 筛选条件：必须是 Clickable 或可编辑的 TextEdit (输入框) 或 ScrollArea (滚动区域)
-            bool isInteractive =
-                Registry::AnyOf<components::Clickable>(entity) || Registry::AnyOf<components::ScrollArea>(entity);
-            if (!isInteractive && Registry::AnyOf<components::TextEditTag>(entity))
-            {
-                const auto* edit = Registry::TryGet<components::TextEdit>(entity);
-                if (edit != nullptr && !policies::HasFlag(edit->inputMode, policies::TextFlag::ReadOnly))
-                {
-                    isInteractive = true;
-                }
-            }
-            if (!isInteractive) continue;
-
-            // 忽略禁用或不可见的实体
-            if (Registry::AnyOf<components::DisabledTag>(entity) || !Registry::AnyOf<components::VisibleTag>(entity))
+            if (!isEntityInteractable(entity))
             {
                 continue;
             }
 
             // 检查该实体是否属于 topWindow
-            entt::entity rootWindow = findRootWindow(entity);
-            if (rootWindow != topWindow) continue;
+            if (findRootWindow(entity) != topWindow)
+            {
+                continue;
+            }
 
-            // 计算 Z-Order：优先使用 ZOrderIndex 组件，其次是层级深度
-            int zOrder = 0;
-            const auto* zOrderComp = Registry::TryGet<components::ZOrderIndex>(entity);
-            if (zOrderComp)
-            {
-                zOrder = zOrderComp->value;
-            }
-            else
-            {
-                // 回退到深度排序：层级越深（子元素），Z-Order 越高
-                int depth = 0;
-                entt::entity current = entity;
-                while (current != entt::null)
-                {
-                    const auto* hierarchy = Registry::TryGet<components::Hierarchy>(current);
-                    current = hierarchy ? hierarchy->parent : entt::null;
-                    depth++;
-                }
-                zOrder = depth;
-            }
-            interactables.emplace_back(zOrder, entity);
+            interactables.emplace_back(calculateZOrder(entity), entity);
         }
 
         // 排序：Z-Order 值越大（越靠近前端）的排在前面
@@ -290,11 +256,57 @@ private:
      */
     void invalidateWindowCache(entt::entity window)
     {
-        auto it = m_zOrderCache.find(window);
-        if (it != m_zOrderCache.end())
+        auto iterator = m_zOrderCache.find(window);
+        if (iterator != m_zOrderCache.end())
         {
-            it->second.dirty = true;
+            iterator->second.dirty = true;
         }
+    }
+
+    /**
+     * @brief 检查实体是否可交互且可见
+     */
+    static bool isEntityInteractable(entt::entity entity)
+    {
+        bool isInteractive = Registry::AnyOf<components::Clickable, components::ScrollArea>(entity);
+
+        if (!isInteractive && Registry::AnyOf<components::TextEditTag>(entity))
+        {
+            if (const auto* edit = Registry::TryGet<components::TextEdit>(entity))
+            {
+                isInteractive = !policies::HasFlag(edit->inputMode, policies::TextFlag::ReadOnly);
+            }
+        }
+
+        if (!isInteractive)
+        {
+            return false;
+        }
+
+        // 忽略禁用或不可见的实体
+        return !Registry::AnyOf<components::DisabledTag>(entity) && Registry::AnyOf<components::VisibleTag>(entity);
+    }
+
+    /**
+     * @brief 计算实体的 Z-Order
+     */
+    static int calculateZOrder(entt::entity entity)
+    {
+        if (const auto* zOrderComp = Registry::TryGet<components::ZOrderIndex>(entity))
+        {
+            return zOrderComp->value;
+        }
+
+        // 回退到深度排序：层级越深（子元素），Z-Order 越高
+        int depth = 0;
+        entt::entity current = entity;
+        while (current != entt::null)
+        {
+            const auto* hierarchy = Registry::TryGet<components::Hierarchy>(current);
+            current = hierarchy != nullptr ? hierarchy->parent : entt::null;
+            depth++;
+        }
+        return depth;
     }
 
     /**
@@ -309,7 +321,7 @@ private:
     /**
      * @brief 层级关系变化回调
      */
-    void onHierarchyChanged(entt::registry& reg, entt::entity entity)
+    void onHierarchyChanged([[maybe_unused]] entt::registry& reg, [[maybe_unused]] entt::entity entity)
     {
         // 层级变化可能影响多个窗口，为简化处理，使所有缓存失效
         invalidateAllCaches();
@@ -318,7 +330,7 @@ private:
     /**
      * @brief 可见性变化回调
      */
-    void onVisibilityChanged(entt::registry& reg, entt::entity entity)
+    void onVisibilityChanged([[maybe_unused]] entt::registry& reg, [[maybe_unused]] entt::entity entity)
     {
         entt::entity window = findRootWindow(entity);
         invalidateWindowCache(window);
@@ -341,22 +353,22 @@ private:
         return findHitEntity(pos, topWindow);
     }
 
-    void onRawPointerMove(const events::RawPointerMove& ev)
+    void onRawPointerMove(const events::RawPointerMove& event)
     {
-        const entt::entity hit = resolveHitEntity(ev.position, ev.windowID);
-        Dispatcher::Enqueue<events::HitPointerMove>(events::HitPointerMove{ev, hit});
+        const entt::entity hit = resolveHitEntity(event.position, event.windowID);
+        Dispatcher::Enqueue<events::HitPointerMove>(events::HitPointerMove{.raw = event, .hitEntity = hit});
     }
 
-    void onRawPointerButton(const events::RawPointerButton& ev)
+    void onRawPointerButton(const events::RawPointerButton& event)
     {
-        const entt::entity hit = resolveHitEntity(ev.position, ev.windowID);
-        Dispatcher::Enqueue<events::HitPointerButton>(events::HitPointerButton{ev, hit});
+        const entt::entity hit = resolveHitEntity(event.position, event.windowID);
+        Dispatcher::Enqueue<events::HitPointerButton>(events::HitPointerButton{.raw = event, .hitEntity = hit});
     }
 
-    void onRawPointerWheel(const events::RawPointerWheel& ev)
+    void onRawPointerWheel(const events::RawPointerWheel& event)
     {
-        const entt::entity hit = resolveHitEntity(ev.position, ev.windowID);
-        Dispatcher::Enqueue<events::HitPointerWheel>(events::HitPointerWheel{ev, hit});
+        const entt::entity hit = resolveHitEntity(event.position, event.windowID);
+        Dispatcher::Enqueue<events::HitPointerWheel>(events::HitPointerWheel{.raw = event, .hitEntity = hit});
     }
 };
 

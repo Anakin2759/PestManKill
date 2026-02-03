@@ -30,7 +30,7 @@
 #include "../singleton/Logger.hpp"
 #include "../interface/Isystem.hpp"
 #include "../common/Components.hpp"
-
+#include "../common/GlobalContext.hpp"
 namespace ui::systems
 {
 class ActionSystem : public ui::interface::EnableRegister<ActionSystem>
@@ -63,7 +63,7 @@ private:
         if (!Registry::Valid(event.entity)) return;
 
         auto* clickable = Registry::TryGet<ui::components::Clickable>(event.entity);
-        if (clickable && clickable->enabled == policies::Feature::Enabled && clickable->onClick)
+        if (clickable != nullptr && clickable->enabled == policies::Feature::Enabled && clickable->onClick)
         {
             Logger::info("Entity {} clicked", static_cast<uint32_t>(event.entity));
             clickable->onClick();
@@ -79,7 +79,7 @@ private:
         if (!Registry::Valid(event.entity)) return;
 
         auto* hoverable = Registry::TryGet<ui::components::Hoverable>(event.entity);
-        if (hoverable && hoverable->enabled == policies::Feature::Enabled && hoverable->onHover)
+        if (hoverable != nullptr && hoverable->enabled == policies::Feature::Enabled && hoverable->onHover)
         {
             hoverable->onHover();
         }
@@ -94,7 +94,7 @@ private:
         if (!Registry::Valid(event.entity)) return;
 
         auto* hoverable = Registry::TryGet<ui::components::Hoverable>(event.entity);
-        if (hoverable && hoverable->enabled == policies::Feature::Enabled && hoverable->onUnhover)
+        if (hoverable != nullptr && hoverable->enabled == policies::Feature::Enabled && hoverable->onUnhover)
         {
             hoverable->onUnhover();
         }
@@ -117,7 +117,10 @@ private:
         }
 
         event.frameSlot = frameContext.frameSlot;
-        Dispatcher::Enqueue<ui::events::QueuedTask>(std::move(event));
+        if (!event.quitAfterExecute)
+        {
+            Dispatcher::Enqueue<ui::events::QueuedTask>(std::move(event));
+        }
     }
 };
 } // namespace ui::systems

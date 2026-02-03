@@ -16,6 +16,7 @@
 #pragma once
 #include <Eigen/Dense>
 #include <SDL3/SDL_rect.h>
+#include <SDL3/SDL_gpu.h>
 #include <vector>
 #include <optional>
 
@@ -44,18 +45,17 @@ namespace ui::core
 struct RenderContext
 {
     // 当前位置（世界坐标）
-    Eigen::Vector2f position{0.0f, 0.0f};
+    Eigen::Vector2f position{0.0F, 0.0F};
 
     // 当前大小
-    Eigen::Vector2f size{0.0f, 0.0f};
+    Eigen::Vector2f size{0.0F, 0.0F};
 
     // 累积透明度
-    float alpha = 1.0f;
+    float alpha = 1.0F;
 
     // 屏幕尺寸
-    float screenWidth = 0.0f;
-    float screenHeight = 0.0f;
-
+    float screenWidth = 0.0F;
+    float screenHeight = 0.0F;
     // 裁剪区域栈
     std::vector<SDL_Rect> scissorStack;
 

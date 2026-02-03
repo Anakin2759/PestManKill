@@ -3,6 +3,7 @@
 #include <SDL3/SDL_gpu.h>
 #include <stb_truetype.h>
 #include <cstring>
+#include <fstream> // 提供 basic_ifstream 的完整定义
 
 namespace ui::managers
 {
@@ -14,7 +15,7 @@ bool IconManager::loadIconFont(const std::string& name,
 {
     Logger::info("Loading IconFont '{}' from '{}'", name, fontPath);
     // Read file
-    std::ifstream file(fontPath, std::ios::binary | std::ios::ate);
+    std::ifstream file(fontPath, std::ios::binary | std::ios::ate); // NOLINT
     if (!file.is_open())
     {
         Logger::error("Failed to open font file: {}", fontPath);
@@ -32,7 +33,7 @@ bool IconManager::loadIconFont(const std::string& name,
     }
 
     stbtt_fontinfo info;
-    if (!stbtt_InitFont(&info, buffer.data(), stbtt_GetFontOffsetForIndex(buffer.data(), 0)))
+    if (stbtt_InitFont(&info, buffer.data(), stbtt_GetFontOffsetForIndex(buffer.data(), 0)) == 0)
     {
         Logger::error("Failed to init font: {}", fontPath);
         return false;
@@ -46,7 +47,7 @@ bool IconManager::loadIconFont(const std::string& name,
     }
 
     // 存储字体和映射
-    m_fonts[name] = FontData{std::move(buffer), info, fontSize};
+    m_fonts[name] = FontData{.buffer = std::move(buffer), .info = info, .fontSize = fontSize};
     m_codepoints[name] = std::move(codepoints);
 
     Logger::info("IconFont '{}' loaded: {} icons", name, m_codepoints[name].size());
@@ -60,14 +61,14 @@ bool IconManager::loadIconFontFromMemory(const std::string& name,
                                          size_t codepointsLength,
                                          int fontSize)
 {
-    if (!fontData || fontLength == 0) return false;
+    if (fontData == nullptr || fontLength == 0) return false;
 
     // Copy font data because we store it
     std::vector<unsigned char> buffer(fontLength);
     std::memcpy(buffer.data(), fontData, fontLength);
 
     stbtt_fontinfo info;
-    if (!stbtt_InitFont(&info, buffer.data(), stbtt_GetFontOffsetForIndex(buffer.data(), 0)))
+    if (stbtt_InitFont(&info, buffer.data(), stbtt_GetFontOffsetForIndex(buffer.data(), 0)) == 0)
     {
         Logger::error("Failed to init font from memory: {}", name);
         return false;
@@ -77,7 +78,7 @@ bool IconManager::loadIconFontFromMemory(const std::string& name,
     std::string codepointsStr(static_cast<const char*>(codepointsData), codepointsLength);
     std::istringstream stream(codepointsStr);
 
-    std::unordered_map<std::string, uint32_t> codepoints;
+    CodepointMap codepoints;
 
     // Heuristic to detect JSON vs TXT: check for '{'
     char firstChar = 0;
@@ -102,54 +103,52 @@ bool IconManager::loadIconFontFromMemory(const std::string& name,
         Logger::warn("No codepoints loaded from memory for: {}", name);
     }
 
-    m_fonts[name] = FontData{std::move(buffer), info, fontSize};
+    m_fonts[name] = FontData{.buffer = std::move(buffer), .info = info, .fontSize = fontSize};
     m_codepoints[name] = std::move(codepoints);
 
     Logger::info("IconFont '{}' loaded from memory: {} icons", name, m_codepoints[name].size());
     return true;
 }
 
-uint32_t IconManager::getCodepoint(const std::string& fontName, const std::string& iconName) const
+uint32_t IconManager::getCodepoint(std::string_view fontName, std::string_view iconName) const
 {
-    auto fontIt = m_codepoints.find(fontName);
-    if (fontIt == m_codepoints.end())
+    if (auto fontIt = m_codepoints.find(fontName); fontIt != m_codepoints.end())
     {
-        Logger::warn("IconFont '{}' not found", fontName);
-        return 0;
-    }
-
-    auto iconIt = fontIt->second.find(iconName);
-    if (iconIt == fontIt->second.end())
-    {
+        if (auto iconIt = fontIt->second.find(iconName); iconIt != fontIt->second.end())
+        {
+            return iconIt->second;
+        }
         Logger::warn("Icon '{}' not found in font '{}'", iconName, fontName);
         return 0;
     }
 
-    return iconIt->second;
+    Logger::warn("IconFont '{}' not found", fontName);
+    return 0;
 }
 
-stbtt_fontinfo* IconManager::getFont(const std::string& fontName)
+stbtt_fontinfo* IconManager::getFont(std::string_view fontName)
 {
-    auto it = m_fonts.find(fontName);
-    if (it == m_fonts.end())
+    if (auto iterator = m_fonts.find(fontName); iterator != m_fonts.end())
     {
-        return nullptr;
+        return &iterator->second.info;
     }
-    return &it->second.info;
+    return nullptr;
 }
 
-bool IconManager::hasIcon(const std::string& fontName, const std::string& iconName) const
+bool IconManager::hasIcon(std::string_view fontName, std::string_view iconName) const
 {
-    auto fontIt = m_codepoints.find(fontName);
-    if (fontIt == m_codepoints.end()) return false;
-    return fontIt->second.find(iconName) != fontIt->second.end();
+    // C++20/23 标准优化：利用透明哈希进行 contains 检查，避免 string 分配
+    if (auto it = m_codepoints.find(fontName); it != m_codepoints.end())
+    {
+        return it->second.contains(iconName);
+    }
+    return false;
 }
 
-std::vector<std::string> IconManager::getIconNames(const std::string& fontName) const
+std::vector<std::string> IconManager::getIconNames(std::string_view fontName) const
 {
     std::vector<std::string> names;
-    auto it = m_codepoints.find(fontName);
-    if (it != m_codepoints.end())
+    if (auto it = m_codepoints.find(fontName); it != m_codepoints.end())
     {
         names.reserve(it->second.size());
         for (const auto& [name, codepoint] : it->second)
@@ -160,7 +159,7 @@ std::vector<std::string> IconManager::getIconNames(const std::string& fontName) 
     return names;
 }
 
-void IconManager::unloadIconFont(const std::string& fontName)
+void IconManager::unloadIconFont(std::string_view fontName)
 {
     m_fonts.erase(fontName);
     m_codepoints.erase(fontName);
@@ -170,15 +169,15 @@ void IconManager::unloadIconFont(const std::string& fontName)
 void IconManager::shutdown()
 {
     SDL_GPUDevice* device = m_deviceManager->getDevice();
-    if (device)
+    if (device != nullptr)
     {
         for (auto& [key, info] : m_fontTextureCache)
         {
-            if (info.texture) SDL_ReleaseGPUTexture(device, info.texture);
+            if (info.texture != nullptr) SDL_ReleaseGPUTexture(device, info.texture);
         }
         for (auto& [key, info] : m_imageTextureCache)
         {
-            if (info.texture) SDL_ReleaseGPUTexture(device, info.texture);
+            if (info.texture != nullptr) SDL_ReleaseGPUTexture(device, info.texture);
         }
     }
     m_fontTextureCache.clear();
@@ -188,11 +187,12 @@ void IconManager::shutdown()
     Logger::info("IconManager shutdown");
 }
 
-const TextureInfo* IconManager::getTextureInfo(const std::string& fontName, uint32_t codepoint, float size)
+const TextureInfo* IconManager::getTextureInfo(std::string_view fontName, uint32_t codepoint, float size)
 {
-    std::string cacheKey = fontName + "_" + std::to_string(codepoint) + "_" + std::to_string(static_cast<int>(size));
-    auto it = m_fontTextureCache.find(cacheKey);
-    if (it != m_fontTextureCache.end())
+    // 构造 cache key：在频繁调用中仍可能分配内存，但内部 Map 查找已透明化
+    std::string cacheKey =
+        std::string(fontName) + "_" + std::to_string(codepoint) + "_" + std::to_string(static_cast<int>(size));
+    if (auto it = m_fontTextureCache.find(cacheKey); it != m_fontTextureCache.end())
     {
         return &it->second;
     }
@@ -206,23 +206,27 @@ const TextureInfo* IconManager::getTextureInfo(const std::string& fontName, uint
     stbtt_fontinfo* info = &fontDataIt->second.info;
     float scale = stbtt_ScaleForPixelHeight(info, size);
 
-    int width, height, xoff, yoff;
-    unsigned char* bitmap = stbtt_GetCodepointBitmap(info, 0, scale, codepoint, &width, &height, &xoff, &yoff);
+    int width{};
+    int height{};
+    int xoff{};
+    int yoff{};
+    unsigned char* bitmap =
+        stbtt_GetCodepointBitmap(info, 0, scale, static_cast<int>(codepoint), &width, &height, &xoff, &yoff);
 
-    if (!bitmap)
+    if (bitmap == nullptr)
     {
         return nullptr;
     }
 
     SDL_GPUDevice* device = m_deviceManager->getDevice();
-    if (!device)
+    if (device == nullptr)
     {
         stbtt_FreeBitmap(bitmap, nullptr);
         return nullptr;
     }
 
     // Convert alpha bitmap to RGBA
-    std::vector<uint32_t> rgbaPixels(width * height);
+    std::vector<uint32_t> rgbaPixels(static_cast<size_t>(width) * static_cast<size_t>(height));
     for (int i = 0; i < width * height; ++i)
     {
         uint8_t alpha = bitmap[i];
@@ -241,7 +245,7 @@ const TextureInfo* IconManager::getTextureInfo(const std::string& fontName, uint
     texInfo.usage = SDL_GPU_TEXTUREUSAGE_SAMPLER;
 
     SDL_GPUTexture* texture = SDL_CreateGPUTexture(device, &texInfo);
-    if (!texture)
+    if (texture == nullptr)
     {
         return nullptr;
     }
@@ -275,10 +279,10 @@ const TextureInfo* IconManager::getTextureInfo(const std::string& fontName, uint
     SDL_SubmitGPUCommandBuffer(cmd);
     SDL_ReleaseGPUTransferBuffer(device, transferBuffer);
 
-    TextureInfo texInfoResult;
+    TextureInfo texInfoResult{};
     texInfoResult.texture = texture;
-    texInfoResult.uvMin = {0.0f, 0.0f};
-    texInfoResult.uvMax = {1.0f, 1.0f};
+    texInfoResult.uvMin = {0.0F, 0.0F};
+    texInfoResult.uvMax = {1.0F, 1.0F};
     texInfoResult.width = static_cast<float>(width);
     texInfoResult.height = static_cast<float>(height);
 
@@ -286,9 +290,9 @@ const TextureInfo* IconManager::getTextureInfo(const std::string& fontName, uint
     return &m_fontTextureCache[cacheKey];
 }
 
-std::unordered_map<std::string, uint32_t> IconManager::parseCodepoints(const std::string& filePath)
+IconManager::CodepointMap IconManager::parseCodepoints(const std::string& filePath)
 {
-    std::unordered_map<std::string, uint32_t> result;
+    CodepointMap result;
     std::ifstream file(filePath);
 
     if (!file.is_open())
@@ -310,9 +314,9 @@ std::unordered_map<std::string, uint32_t> IconManager::parseCodepoints(const std
     return result;
 }
 
-std::unordered_map<std::string, uint32_t> IconManager::parseCodepointsTXT(std::istream& file)
+IconManager::CodepointMap IconManager::parseCodepointsTXT(std::istream& file)
 {
-    std::unordered_map<std::string, uint32_t> result;
+    CodepointMap result;
     std::string line;
 
     while (std::getline(file, line))
@@ -340,9 +344,9 @@ std::unordered_map<std::string, uint32_t> IconManager::parseCodepointsTXT(std::i
     return result;
 }
 
-std::unordered_map<std::string, uint32_t> IconManager::parseCodepointsJSON(std::istream& file)
+IconManager::CodepointMap IconManager::parseCodepointsJSON(std::istream& file)
 {
-    std::unordered_map<std::string, uint32_t> result;
+    CodepointMap result;
     std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
 
     size_t pos = 0;

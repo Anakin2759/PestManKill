@@ -21,13 +21,32 @@
 
 namespace ui::factory
 {
-
+/**
+ * @brief 创建 UI 应用程序实例
+ * @param argc 命令行参数数量
+ * @param argv 命令行参数数组
+ * @return UI 应用程序实例
+ */
 Application CreateApplication(int argc, char* argv[]);
-
+/**
+ * @brief 创建一个基础的 UI 组件实体
+ * @param alias 组件别名
+ * @return entt::entity 创建的实体
+ */
 entt::entity CreateBaseWidget(std::string_view alias = "");
-
+/**
+ * @brief 为指定实体创建一个淡入动画组件
+ * @param entity 目标实体
+ * @param duration 动画持续时间（秒）
+ */
 void CreateFadeInAnimation(entt::entity entity, float duration);
 
+/**
+ * @brief 创建一个按钮实体
+ * @param content 按钮显示的文本内容
+ * @param alias 组件别名
+ * @return entt::entity 创建的实体
+ */
 entt::entity CreateButton(const std::string& content, std::string_view alias = "");
 entt::entity CreateLabel(const std::string& content, std::string_view alias = "");
 entt::entity CreateTextEdit(const std::string& placeholder = "", bool multiline = false, std::string_view alias = "");
@@ -46,8 +65,14 @@ entt::entity
 entt::entity CreateTextBrowser(std::string_view initialText = "",
                                std::string_view placeholder = "",
                                std::string_view alias = "");
+
+/**
+ * @brief 创建一个复选框实体
+ * @param label 复选框标签文本
+ * @param checked 是否默认选中
+ * @param alias 组件别名
+ * @return entt::entity 创建的实体
+ */
 entt::entity CreateCheckBox(const std::string& label, bool checked = false, std::string_view alias = "");
-
-
 
 } // namespace ui::factory

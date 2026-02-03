@@ -71,10 +71,16 @@ void InvokeTask(std::move_only_function<void()> func)
     events::QueuedTask task{.func = std::move(func), .intervalMs = 0, .remainingMs = 0, .singleShoot = true};
     Dispatcher::Enqueue<events::QueuedTask>(std::move(task));
 }
-
-void TimerCallback(uint32_t interval, std::move_only_function<void()> func)
+/**
+ * @brief 注册一个定时任务，返回任务句柄
+ * @param interval 间隔时间（毫秒）
+ * @param func 任务函数
+ * @return 任务句柄
+ */
+TaskHandle TimerCallback(uint32_t interval, std::move_only_function<void()> func)
 {
     auto& frameSlot = Registry::ctx().get<globalContext::FrameContext>().frameSlot;
+    auto& taskHandleList = Registry::ctx().get<globalContext::FrameContext>().taskHandleList;
     events::QueuedTask task;
     task.func = std::move(func);
     task.intervalMs = interval;
@@ -82,6 +88,7 @@ void TimerCallback(uint32_t interval, std::move_only_function<void()> func)
     task.singleShoot = false;
     task.frameSlot = frameSlot;
     Dispatcher::Enqueue<events::QueuedTask>(std::move(task));
+    return 0;
 }
 
 } // namespace ui::utils

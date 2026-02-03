@@ -54,7 +54,6 @@ if (MSVC)
 
     # 2. 核心：防止 windows.h 引入不必要的宏（如 data, min, max）
     add_compile_definitions(WIN32_LEAN_AND_MEAN NOMINMAX)
-    add_compile_options(/std:c++23preview)
         
     # 忽略烦人的 C4228 警告
     add_compile_options(/wd4228)
