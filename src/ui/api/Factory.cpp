@@ -61,7 +61,6 @@ entt::entity CreateButton(const std::string& content, std::string_view alias)
     auto entity = CreateBaseWidget(alias);
     Registry::Emplace<components::ButtonTag>(entity);
     Registry::Emplace<components::Clickable>(entity);
-    Registry::Emplace<components::ButtonState>(entity);
     auto& text = Registry::Emplace<components::Text>(entity);
     text.content = content;
     text.alignment = ui::policies::Alignment::CENTER;

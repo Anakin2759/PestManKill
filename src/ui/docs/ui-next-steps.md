@@ -32,7 +32,13 @@
 ## 6.CPU渲染支持 (Priority: Low)
 
 - [ ] **引入SwiftShader**: cpu模拟vulkan。
+- [ ] 提供一个全局状态组件，管理渲染后端策略
+- [ ] 默认策略：按照责任链遍历，谁先能够渲染就选谁
+- [ ] VULKAN策略 使用VULKAN
+- [ ] D3D12策略 使用D3D12
+- [ ] 后备策略，使用cpu模拟vulkan的dll(打包在资源文件中)走vulkan的路径，但是仍然算单独策略
 
 ## 7.终极目标：实现DSL (Priority: Low)
 
 - [ ] **引入一种简单的json-like DSL用来描述界面**。
+- [ ] 写一个DSL解析工具 动态调用工厂函数/工具函数/回调函数

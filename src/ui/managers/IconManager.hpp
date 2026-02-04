@@ -12,7 +12,7 @@
  * - 解析 codepoints 映射文件（JSON 或 TXT 格式）
  * - 通过图标名称获取 Unicode 码点
  * - 管理多个 IconFont 图标库
-    - 默认加载ui/assets/icons/*.ttf和codepoints文件
+    - 默认加载ui/assets/icons/xxx.ttf 和 codepoints 文件
     cmrc::ui_fonts 库中预置了 MaterialSymbols 图标字体
     使用stb_truetype进行字体渲染不再引入stbttf库
  *
@@ -27,6 +27,9 @@
 #include <string>
 #include <string_view>
 #include <vector>
+#include <array>
+#include <chrono>
+#include <algorithm>
 #include <stb_truetype.h>
 #include <SDL3/SDL.h>
 #include <Eigen/Core>
@@ -53,6 +56,13 @@ struct TextureInfo
     float height;
 };
 
+struct CachedTextureEntry
+{
+    TextureInfo textureInfo;
+    std::chrono::steady_clock::time_point lastAccessTime;
+    uint32_t accessCount = 0;
+};
+
 /**
  * @brief IconFont 管理器
  *
@@ -68,11 +78,15 @@ struct TextureInfo
 class IconManager
 {
 public:
-    IconManager(DeviceManager* deviceManager) : m_deviceManager(deviceManager)
+    explicit IconManager(DeviceManager* deviceManager) : m_deviceManager(deviceManager)
     {
         Logger::info("IconManager initialized");
     }
     ~IconManager() { shutdown(); }
+    IconManager(const IconManager&) = delete;
+    IconManager& operator=(const IconManager&) = delete;
+    IconManager(IconManager&&) noexcept = default;
+    IconManager& operator=(IconManager&&) = default;
 
     /**
      * @brief 加载 IconFont 字体和 codepoints 文件
@@ -147,13 +161,29 @@ public:
     /**
      * @brief 获取图标纹理信息（普通纹理图标 - 暂未实现完整逻辑，目前仅作为接口）
      */
-    const TextureInfo* getTextureInfo(std::string_view textureId) const
+    [[nodiscard]] const TextureInfo* getTextureInfo(std::string_view textureId) const
     {
-        if (auto it = m_imageTextureCache.find(textureId); it != m_imageTextureCache.end())
+        if (auto iterator = m_imageTextureCache.find(textureId); iterator != m_imageTextureCache.end())
         {
-            return &it->second;
+            return &iterator->second.textureInfo;
         }
         return nullptr;
+    }
+
+    /**
+     * @brief 获取缓存统计信息
+     */
+    struct CacheStats
+    {
+        size_t fontCacheSize;
+        size_t imageCacheSize;
+        size_t maxCacheSize;
+        size_t evictionCount;
+    };
+
+    CacheStats getCacheStats() const
+    {
+        return {m_fontTextureCache.size(), m_imageTextureCache.size(), MAX_FONT_CACHE_SIZE, m_evictionCount};
     }
 
 private:
@@ -161,7 +191,7 @@ private:
     struct StringHash
     {
         using is_transparent = void;
-        size_t operator()(std::string_view sv) const { return std::hash<std::string_view>{}(sv); }
+        size_t operator()(std::string_view stringView) const { return std::hash<std::string_view>{}(stringView); }
     };
 
     template <typename T>
@@ -178,15 +208,53 @@ private:
 
     CodepointMap parseCodepointsJSON(std::istream& file);
 
+    /**
+     * @brief 量化图标大小，减少缓存条目数量
+     */
+    static float quantizeSize(float size)
+    {
+        // 量化到标准尺寸：16, 24, 32, 48, 64, 96, 128
+        constexpr std::array<float, 7> STANDARD_SIZES = {16.0F, 24.0F, 32.0F, 48.0F, 64.0F, 96.0F, 128.0F};
+        for (float standardSize : STANDARD_SIZES)
+        {
+            if (size <= standardSize)
+            {
+                return standardSize;
+            }
+        }
+        return 128.0F; // 最大尺寸
+    }
+
+    /**
+     * @brief 驱逐最少使用的缓存条目（LRU策略）
+     */
+    void evictLRUFromFontCache();
+
+    /**
+     * @brief 创建并上传图标纹理
+     */
+    SDL_GPUTexture* createAndUploadIconTexture(SDL_GPUDevice* device,
+                                               const std::vector<uint32_t>& rgbaPixels,
+                                               uint32_t width,
+                                               uint32_t height);
+
     DeviceManager* m_deviceManager;
 
     StringMap<FontData> m_fonts;
     StringMap<CodepointMap> m_codepoints;
 
+    // 缓存容量限制
+    static constexpr size_t MAX_FONT_CACHE_SIZE = 128;
+    static constexpr size_t MAX_IMAGE_CACHE_SIZE = 64;
+    static constexpr size_t EVICTION_BATCH = 16;
+
     // 缓存：键为 "fontName_codepoint_size"
-    StringMap<TextureInfo> m_fontTextureCache;
+    StringMap<CachedTextureEntry> m_fontTextureCache;
     // 缓存：键为 textureId
-    StringMap<TextureInfo> m_imageTextureCache;
+    StringMap<CachedTextureEntry> m_imageTextureCache;
+
+    // 统计信息
+    mutable size_t m_evictionCount = 0;
 };
 
 } // namespace ui::managers

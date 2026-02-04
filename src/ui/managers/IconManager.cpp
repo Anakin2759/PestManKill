@@ -137,7 +137,6 @@ stbtt_fontinfo* IconManager::getFont(std::string_view fontName)
 
 bool IconManager::hasIcon(std::string_view fontName, std::string_view iconName) const
 {
-    // C++20/23 标准优化：利用透明哈希进行 contains 检查，避免 string 分配
     if (auto it = m_codepoints.find(fontName); it != m_codepoints.end())
     {
         return it->second.contains(iconName);
@@ -171,30 +170,51 @@ void IconManager::shutdown()
     SDL_GPUDevice* device = m_deviceManager->getDevice();
     if (device != nullptr)
     {
-        for (auto& [key, info] : m_fontTextureCache)
+        for (auto& [key, entry] : m_fontTextureCache)
         {
-            if (info.texture != nullptr) SDL_ReleaseGPUTexture(device, info.texture);
+            if (entry.textureInfo.texture != nullptr)
+            {
+                SDL_ReleaseGPUTexture(device, entry.textureInfo.texture);
+            }
         }
-        for (auto& [key, info] : m_imageTextureCache)
+        for (auto& [key, entry] : m_imageTextureCache)
         {
-            if (info.texture != nullptr) SDL_ReleaseGPUTexture(device, info.texture);
+            if (entry.textureInfo.texture != nullptr)
+            {
+                SDL_ReleaseGPUTexture(device, entry.textureInfo.texture);
+            }
         }
     }
     m_fontTextureCache.clear();
     m_imageTextureCache.clear();
     m_fonts.clear();
     m_codepoints.clear();
-    Logger::info("IconManager shutdown");
+    Logger::info("[IconManager] Shutdown complete. Total evictions: {}", m_evictionCount);
 }
 
 const TextureInfo* IconManager::getTextureInfo(std::string_view fontName, uint32_t codepoint, float size)
 {
-    // 构造 cache key：在频繁调用中仍可能分配内存，但内部 Map 查找已透明化
+    // 量化大小以减少缓存条目
+    float quantizedSize = quantizeSize(size);
+
+    // 构造 cache key
     std::string cacheKey =
-        std::string(fontName) + "_" + std::to_string(codepoint) + "_" + std::to_string(static_cast<int>(size));
-    if (auto it = m_fontTextureCache.find(cacheKey); it != m_fontTextureCache.end())
+        std::string(fontName) + "_" + std::to_string(codepoint) + "_" + std::to_string(static_cast<int>(quantizedSize));
+
+    // 检查缓存
+    auto iter = m_fontTextureCache.find(cacheKey);
+    if (iter != m_fontTextureCache.end())
     {
-        return &it->second;
+        // 更新访问时间和计数
+        iter->second.lastAccessTime = std::chrono::steady_clock::now();
+        iter->second.accessCount++;
+        return &iter->second.textureInfo;
+    }
+
+    // 如果缓存已满，执行 LRU 驱逐
+    if (m_fontTextureCache.size() >= MAX_FONT_CACHE_SIZE)
+    {
+        evictLRUFromFontCache();
     }
 
     auto fontDataIt = m_fonts.find(fontName);
@@ -204,7 +224,7 @@ const TextureInfo* IconManager::getTextureInfo(std::string_view fontName, uint32
     }
 
     stbtt_fontinfo* info = &fontDataIt->second.info;
-    float scale = stbtt_ScaleForPixelHeight(info, size);
+    float scale = stbtt_ScaleForPixelHeight(info, quantizedSize);
 
     int width{};
     int height{};
@@ -215,6 +235,7 @@ const TextureInfo* IconManager::getTextureInfo(std::string_view fontName, uint32
 
     if (bitmap == nullptr)
     {
+        Logger::warn("[IconManager] Failed to generate bitmap for codepoint {}", codepoint);
         return nullptr;
     }
 
@@ -222,6 +243,7 @@ const TextureInfo* IconManager::getTextureInfo(std::string_view fontName, uint32
     if (device == nullptr)
     {
         stbtt_FreeBitmap(bitmap, nullptr);
+        Logger::error("[IconManager] GPU device is null");
         return nullptr;
     }
 
@@ -235,59 +257,26 @@ const TextureInfo* IconManager::getTextureInfo(std::string_view fontName, uint32
 
     stbtt_FreeBitmap(bitmap, nullptr);
 
-    SDL_GPUTextureCreateInfo texInfo = {};
-    texInfo.type = SDL_GPU_TEXTURETYPE_2D;
-    texInfo.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
-    texInfo.width = static_cast<uint32_t>(width);
-    texInfo.height = static_cast<uint32_t>(height);
-    texInfo.layer_count_or_depth = 1;
-    texInfo.num_levels = 1;
-    texInfo.usage = SDL_GPU_TEXTUREUSAGE_SAMPLER;
-
-    SDL_GPUTexture* texture = SDL_CreateGPUTexture(device, &texInfo);
+    // 创建并上传纹理
+    SDL_GPUTexture* texture =
+        createAndUploadIconTexture(device, rgbaPixels, static_cast<uint32_t>(width), static_cast<uint32_t>(height));
     if (texture == nullptr)
     {
         return nullptr;
     }
 
-    // Upload to GPU
-    SDL_GPUTransferBufferCreateInfo transferInfo = {};
-    transferInfo.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
-    transferInfo.size = static_cast<uint32_t>(rgbaPixels.size() * sizeof(uint32_t));
+    // 创建缓存条目
+    CachedTextureEntry entry{};
+    entry.textureInfo.texture = texture;
+    entry.textureInfo.uvMin = {0.0F, 0.0F};
+    entry.textureInfo.uvMax = {1.0F, 1.0F};
+    entry.textureInfo.width = static_cast<float>(width);
+    entry.textureInfo.height = static_cast<float>(height);
+    entry.lastAccessTime = std::chrono::steady_clock::now();
+    entry.accessCount = 1;
 
-    SDL_GPUTransferBuffer* transferBuffer = SDL_CreateGPUTransferBuffer(device, &transferInfo);
-    void* mappedData = SDL_MapGPUTransferBuffer(device, transferBuffer, false);
-    SDL_memcpy(mappedData, rgbaPixels.data(), transferInfo.size);
-    SDL_UnmapGPUTransferBuffer(device, transferBuffer);
-
-    SDL_GPUCommandBuffer* cmd = SDL_AcquireGPUCommandBuffer(device);
-    SDL_GPUCopyPass* copyPass = SDL_BeginGPUCopyPass(cmd);
-
-    SDL_GPUTextureTransferInfo srcInfo = {};
-    srcInfo.transfer_buffer = transferBuffer;
-    srcInfo.pixels_per_row = static_cast<uint32_t>(width);
-    srcInfo.rows_per_layer = static_cast<uint32_t>(height);
-
-    SDL_GPUTextureRegion dstRegion = {};
-    dstRegion.texture = texture;
-    dstRegion.w = static_cast<uint32_t>(width);
-    dstRegion.h = static_cast<uint32_t>(height);
-    dstRegion.d = 1;
-
-    SDL_UploadToGPUTexture(copyPass, &srcInfo, &dstRegion, false);
-    SDL_EndGPUCopyPass(copyPass);
-    SDL_SubmitGPUCommandBuffer(cmd);
-    SDL_ReleaseGPUTransferBuffer(device, transferBuffer);
-
-    TextureInfo texInfoResult{};
-    texInfoResult.texture = texture;
-    texInfoResult.uvMin = {0.0F, 0.0F};
-    texInfoResult.uvMax = {1.0F, 1.0F};
-    texInfoResult.width = static_cast<float>(width);
-    texInfoResult.height = static_cast<float>(height);
-
-    m_fontTextureCache[cacheKey] = texInfoResult;
-    return &m_fontTextureCache[cacheKey];
+    m_fontTextureCache[cacheKey] = entry;
+    return &m_fontTextureCache[cacheKey].textureInfo;
 }
 
 IconManager::CodepointMap IconManager::parseCodepoints(const std::string& filePath)
@@ -382,6 +371,158 @@ IconManager::CodepointMap IconManager::parseCodepointsJSON(std::istream& file)
     }
 
     return result;
+}
+
+void IconManager::evictLRUFromFontCache()
+{
+    if (m_fontTextureCache.empty())
+    {
+        return;
+    }
+
+    SDL_GPUDevice* device = m_deviceManager->getDevice();
+    if (device == nullptr)
+    {
+        return;
+    }
+
+    // 找到最少使用的条目
+    auto lruEntry = m_fontTextureCache.begin();
+    for (auto iter = m_fontTextureCache.begin(); iter != m_fontTextureCache.end(); ++iter)
+    {
+        if (iter->second.lastAccessTime < lruEntry->second.lastAccessTime)
+        {
+            lruEntry = iter;
+        }
+    }
+
+    // 释放纹理资源
+    if (lruEntry->second.textureInfo.texture != nullptr)
+    {
+        SDL_ReleaseGPUTexture(device, lruEntry->second.textureInfo.texture);
+    }
+
+    Logger::debug("[IconManager] Evicted LRU entry: {} (access count: {})",
+                  lruEntry->first.substr(0, 50),
+                  lruEntry->second.accessCount);
+
+    m_fontTextureCache.erase(lruEntry);
+    m_evictionCount++;
+
+    // 如果仍然过大，批量驱逐
+    if (m_fontTextureCache.size() >= MAX_FONT_CACHE_SIZE)
+    {
+        std::vector<std::pair<std::string, std::chrono::steady_clock::time_point>> entries;
+        entries.reserve(m_fontTextureCache.size());
+
+        for (const auto& [key, entry] : m_fontTextureCache)
+        {
+            entries.emplace_back(key, entry.lastAccessTime);
+        }
+
+        // 按访问时间排序
+        std::sort(entries.begin(),
+                  entries.end(),
+                  [](const auto& first, const auto& second) { return first.second < second.second; });
+
+        // 驱逐最旧的条目
+        size_t evicted = 0;
+        for (size_t idx = 0; idx < std::min(EVICTION_BATCH, entries.size()); ++idx)
+        {
+            auto iter = m_fontTextureCache.find(entries[idx].first);
+            if (iter != m_fontTextureCache.end())
+            {
+                if (iter->second.textureInfo.texture != nullptr)
+                {
+                    SDL_ReleaseGPUTexture(device, iter->second.textureInfo.texture);
+                }
+                m_fontTextureCache.erase(iter);
+                evicted++;
+            }
+        }
+
+        m_evictionCount += evicted;
+        Logger::info("[IconManager] Batch evicted {} entries, cache size: {}", evicted, m_fontTextureCache.size());
+    }
+}
+
+SDL_GPUTexture* IconManager::createAndUploadIconTexture(SDL_GPUDevice* device,
+                                                        const std::vector<uint32_t>& rgbaPixels,
+                                                        uint32_t width,
+                                                        uint32_t height)
+{
+    // 创建纹理
+    SDL_GPUTextureCreateInfo texInfo = {};
+    texInfo.type = SDL_GPU_TEXTURETYPE_2D;
+    texInfo.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
+    texInfo.width = width;
+    texInfo.height = height;
+    texInfo.layer_count_or_depth = 1;
+    texInfo.num_levels = 1;
+    texInfo.usage = SDL_GPU_TEXTUREUSAGE_SAMPLER;
+
+    SDL_GPUTexture* texture = SDL_CreateGPUTexture(device, &texInfo);
+    if (texture == nullptr)
+    {
+        Logger::error("[IconManager] Failed to create GPU texture");
+        return nullptr;
+    }
+
+    // 创建传输缓冲区
+    SDL_GPUTransferBufferCreateInfo transferInfo = {};
+    transferInfo.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
+    transferInfo.size = static_cast<uint32_t>(rgbaPixels.size() * sizeof(uint32_t));
+
+    SDL_GPUTransferBuffer* transferBuffer = SDL_CreateGPUTransferBuffer(device, &transferInfo);
+    if (transferBuffer == nullptr)
+    {
+        Logger::error("[IconManager] Failed to create transfer buffer");
+        SDL_ReleaseGPUTexture(device, texture);
+        return nullptr;
+    }
+
+    // 映射传输缓冲区
+    void* mappedData = SDL_MapGPUTransferBuffer(device, transferBuffer, false);
+    if (mappedData == nullptr)
+    {
+        Logger::error("[IconManager] Failed to map transfer buffer");
+        SDL_ReleaseGPUTransferBuffer(device, transferBuffer);
+        SDL_ReleaseGPUTexture(device, texture);
+        return nullptr;
+    }
+
+    SDL_memcpy(mappedData, rgbaPixels.data(), transferInfo.size);
+    SDL_UnmapGPUTransferBuffer(device, transferBuffer);
+
+    // 上传到GPU
+    SDL_GPUCommandBuffer* cmd = SDL_AcquireGPUCommandBuffer(device);
+    if (cmd == nullptr)
+    {
+        Logger::error("[IconManager] Failed to acquire command buffer");
+        SDL_ReleaseGPUTransferBuffer(device, transferBuffer);
+        SDL_ReleaseGPUTexture(device, texture);
+        return nullptr;
+    }
+
+    SDL_GPUCopyPass* copyPass = SDL_BeginGPUCopyPass(cmd);
+
+    SDL_GPUTextureTransferInfo srcInfo = {};
+    srcInfo.transfer_buffer = transferBuffer;
+    srcInfo.pixels_per_row = width;
+    srcInfo.rows_per_layer = height;
+
+    SDL_GPUTextureRegion dstRegion = {};
+    dstRegion.texture = texture;
+    dstRegion.w = width;
+    dstRegion.h = height;
+    dstRegion.d = 1;
+
+    SDL_UploadToGPUTexture(copyPass, &srcInfo, &dstRegion, false);
+    SDL_EndGPUCopyPass(copyPass);
+    SDL_SubmitGPUCommandBuffer(cmd);
+    SDL_ReleaseGPUTransferBuffer(device, transferBuffer);
+
+    return texture;
 }
 
 } // namespace ui::managers

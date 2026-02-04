@@ -42,6 +42,7 @@
 #include "singleton/Logger.hpp"
 #include "traits/ComponentsTraits.hpp"
 #include "traits/PoliciesTraits.hpp"
+#include "api/Utils.hpp"
 
 namespace ui::systems
 {
@@ -54,9 +55,7 @@ namespace ui::systems
 class LayoutSystem : public ui::interface::EnableRegister<LayoutSystem>
 {
 public:
-    LayoutSystem() : m_yogaConfig(YGConfigNew()) {
-        Logger::info("[LayoutSystem] Yoga 配置创建完成");
-    }
+    LayoutSystem() : m_yogaConfig(YGConfigNew()) { Logger::info("[LayoutSystem] Yoga 配置创建完成"); }
 
     ~LayoutSystem()
     {

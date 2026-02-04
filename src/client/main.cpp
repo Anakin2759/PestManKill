@@ -15,13 +15,10 @@
 
 #include <iostream>
 
-// 工具
-#include "ui.hpp"
-
 #include "src/utils/Functions.h"
 
 // 引入View层
-#include "src/client/view/menu.h"
+#include "View/menu.h"
 
 int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 {

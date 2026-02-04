@@ -40,6 +40,10 @@ public:
     }
 
     ~CommandBuffer() { cleanup(); }
+    CommandBuffer(const CommandBuffer&) = delete;
+    CommandBuffer& operator=(const CommandBuffer&) = delete;
+    CommandBuffer(CommandBuffer&&) = delete;
+    CommandBuffer& operator=(CommandBuffer&&) = delete;
 
     /**
      * @brief 执行渲染批次
@@ -116,11 +120,11 @@ public:
             {
                 Logger::error("Failed to upload vertex or index buffer.");
                 // Release any buffers that might have been created before continuing to the next batch.
-                if (vertexBuffer)
+                if (vertexBuffer != nullptr)
                 {
                     SDL_ReleaseGPUBuffer(device, vertexBuffer);
                 }
-                if (indexBuffer)
+                if (indexBuffer != nullptr)
                 {
                     SDL_ReleaseGPUBuffer(device, indexBuffer);
                 }
@@ -225,7 +229,6 @@ private:
         return buffer;
     }
 
-private:
     DeviceManager& m_deviceManager;
     PipelineCache& m_pipelineCache;
 };

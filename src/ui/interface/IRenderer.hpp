@@ -29,14 +29,19 @@ namespace ui::core
 class IRenderer
 {
 public:
+    IRenderer() = default;
     virtual ~IRenderer() = default;
+    IRenderer(const IRenderer&) = delete;
+    IRenderer& operator=(const IRenderer&) = delete;
+    IRenderer(IRenderer&&) = delete;
+    IRenderer& operator=(IRenderer&&) = delete;
 
     /**
      * @brief 判断该渲染器是否能处理指定实体
      * @param entity 要检查的实体
      * @return true 如果该渲染器可以处理此实体
      */
-    virtual bool canHandle(entt::entity entity) const = 0;
+    [[nodiscard]] virtual bool canHandle(entt::entity entity) const = 0;
 
     /**
      * @brief 收集实体的渲染数据并添加到批次管理器
@@ -49,7 +54,7 @@ public:
      * @brief 获取渲染器的优先级（用于排序）
      * @return 优先级值，越小越先执行
      */
-    virtual int getPriority() const { return 0; }
+    [[nodiscard]] virtual int getPriority() const { return 0; }
 };
 
 } // namespace ui::core

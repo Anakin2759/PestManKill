@@ -39,6 +39,7 @@
 #include "../common/Events.hpp"
 #include "HitTestSystem.hpp"
 #include "../common/GlobalContext.hpp"
+#include "../singleton/Logger.hpp"
 
 namespace ui::systems
 {
@@ -191,50 +192,11 @@ public:
         // 处理滚动条拖拽
         if (state.isDraggingScrollbar && Registry::Valid(state.dragScrollEntity))
         {
-            float deltaPix = state.isVerticalDrag ? (event.raw.position.y() - state.dragStartMousePos.y())
-                                                  : (event.raw.position.x() - state.dragStartMousePos.x());
-
-            auto& scroll = Registry::Get<components::ScrollArea>(state.dragScrollEntity);
-            const auto& sizeComp = Registry::Get<components::Size>(state.dragScrollEntity);
-            float viewportSize = state.isVerticalDrag ? sizeComp.size.y() : sizeComp.size.x();
-
-            if (const auto* padding = Registry::TryGet<components::Padding>(state.dragScrollEntity))
-            {
-                viewportSize -= state.isVerticalDrag ? (padding->values.x() + padding->values.z())
-                                                     : (padding->values.w() + padding->values.y());
-            }
-
-            float contentSize = state.isVerticalDrag ? scroll.contentSize.y() : scroll.contentSize.x();
-            float maxScroll = std::max(0.0f, contentSize - viewportSize);
-            float trackScrollableArea = state.dragTrackLength - state.dragThumbSize;
-
-            if (trackScrollableArea > 0 && maxScroll > 0)
-            {
-                float ratio = deltaPix / trackScrollableArea;
-                float offsetDelta = ratio * maxScroll;
-
-                float& currentOffset = state.isVerticalDrag ? scroll.scrollOffset.y() : scroll.scrollOffset.x();
-                float startOffset =
-                    state.isVerticalDrag ? state.dragStartScrollOffset.y() : state.dragStartScrollOffset.x();
-
-                currentOffset = std::clamp(startOffset + offsetDelta, 0.0f, maxScroll);
-
-                Registry::EmplaceOrReplace<components::LayoutDirtyTag>(state.dragScrollEntity);
-            }
+            handleScrollbarDrag(event, state);
             return;
         }
 
-        if (event.hitEntity != state.hoveredEntity)
-        {
-            if (state.hoveredEntity != entt::null && Registry::Valid(state.hoveredEntity))
-            {
-                Dispatcher::Enqueue<events::UnhoverEvent>(events::UnhoverEvent{state.hoveredEntity});
-            }
-            if (event.hitEntity != entt::null)
-            {
-                Dispatcher::Enqueue<events::HoverEvent>(events::HoverEvent{event.hitEntity});
-            }
-        }
+        handleHoverUpdate(event, state);
     }
 
     void onHitPointerButton(const events::HitPointerButton& event)
@@ -247,118 +209,15 @@ public:
         if (event.raw.pressed)
         {
             // 检查滚动条点击（优先于内容交互）
-            // 向上遍历层级，检查是否有滚动条被点击
-            entt::entity scrollEntity = entt::null;
-            bool isVertical = true;
-            entt::entity current = event.hitEntity;
-
-            while (current != entt::null && Registry::Valid(current))
+            if (tryHandleScrollbarPress(event, state))
             {
-                if (Registry::AnyOf<components::ScrollArea>(current))
-                {
-                    if (checkScrollbarHit(current, event.raw.position, isVertical))
-                    {
-                        scrollEntity = current;
-                        break;
-                    }
-                }
-                const auto* hierarchy = Registry::TryGet<components::Hierarchy>(current);
-                current = hierarchy ? hierarchy->parent : entt::null;
-            }
-
-            if (scrollEntity != entt::null)
-            {
-                state.isDraggingScrollbar = true;
-                state.dragScrollEntity = scrollEntity;
-                state.dragStartMousePos = event.raw.position;
-                state.isVerticalDrag = isVertical;
-
-                auto& scroll = Registry::Get<components::ScrollArea>(scrollEntity);
-                state.dragStartScrollOffset = scroll.scrollOffset;
-
-                calculateScrollbarGeometry(scrollEntity, isVertical, state.dragTrackLength, state.dragThumbSize);
-
                 return; // 消费事件，不处理后续点击
             }
-
-            if (event.hitEntity != entt::null)
-            {
-                if (Registry::AnyOf<components::TextEditTag>(event.hitEntity))
-                {
-                    const auto* edit = Registry::TryGet<components::TextEdit>(event.hitEntity);
-                    if (edit == nullptr || !policies::HasFlag(edit->inputMode, policies::TextFlag::ReadOnly))
-                    {
-                        if (SDL_Window* sdlWindow = SDL_GetWindowFromID(event.raw.windowID))
-                        {
-                            setFocus(event.hitEntity, sdlWindow);
-                        }
-                    }
-                }
-
-                if (Registry::AnyOf<components::Pressable>(event.hitEntity) ||
-                    Registry::AnyOf<components::Clickable>(event.hitEntity) ||
-                    Registry::AnyOf<components::TextEditTag>(event.hitEntity))
-                {
-                    Dispatcher::Trigger<events::MousePressEvent>(events::MousePressEvent{event.hitEntity});
-                }
-            }
+            handleEntityPress(event);
             return;
         }
 
-        // 先保存当前激活实体，点击逻辑需要在释放清理之前完成
-        const entt::entity releasedEntity = state.activeEntity;
-
-        // 如果正在拖拽滚动条，停止拖拽
-        if (state.isDraggingScrollbar)
-        {
-            state.isDraggingScrollbar = false;
-            state.dragScrollEntity = entt::null;
-            // 不 return，允许释放 activeEntity（如果有）
-        }
-
-        if (releasedEntity != entt::null && releasedEntity == event.hitEntity)
-        {
-            if (Registry::TryGet<components::Clickable>(releasedEntity) != nullptr)
-            {
-                auto& baseInfo = Registry::Get<components::BaseInfo>(releasedEntity); // 确保实体有效
-                Dispatcher::Trigger<events::ClickEvent>(events::ClickEvent{releasedEntity});
-            }
-
-            if (SDL_Window* sdlWindow = SDL_GetWindowFromID(event.raw.windowID))
-            {
-                if (Registry::AnyOf<components::TextEditTag>(releasedEntity))
-                {
-                    const auto* edit = Registry::TryGet<components::TextEdit>(releasedEntity);
-                    if (edit == nullptr || !policies::HasFlag(edit->inputMode, policies::TextFlag::ReadOnly))
-                    {
-                        setFocus(releasedEntity, sdlWindow);
-                        return;
-                    }
-                }
-                clearFocus(sdlWindow);
-            }
-        }
-        else
-        {
-            // 兜底：如果没有 activeEntity 但命中了可点击实体，也触发点击
-            if (event.hitEntity != entt::null && Registry::TryGet<components::Clickable>(event.hitEntity) != nullptr)
-            {
-                Logger::debug("StateSystem: Click Event (fallback) on entity {}",
-                              static_cast<uint32_t>(event.hitEntity));
-                Dispatcher::Trigger<events::ClickEvent>(events::ClickEvent{event.hitEntity});
-            }
-
-            if (SDL_Window* sdlWindow = SDL_GetWindowFromID(event.raw.windowID))
-            {
-                clearFocus(sdlWindow);
-            }
-        }
-
-        // 最后再触发释放，避免提前清空 activeEntity 影响点击逻辑
-        if (releasedEntity != entt::null)
-        {
-            Dispatcher::Trigger<events::MouseReleaseEvent>(events::MouseReleaseEvent{releasedEntity});
-        }
+        handleEntityRelease(event, state);
     }
 
     void onHitPointerWheel(const events::HitPointerWheel& event)
@@ -406,7 +265,7 @@ public:
             auto& scroll = Registry::Get<components::ScrollArea>(target);
             const auto& size = Registry::Get<components::Size>(target);
 
-            float step = 30.0f;
+            float step = 30.0F;
             float delta = -event.raw.delta.y() * step;
             scroll.scrollOffset.y() += delta;
 
@@ -415,10 +274,10 @@ public:
             {
                 viewportHeight -= (padding->values.x() + padding->values.z());
             }
-            viewportHeight = std::max(0.0f, viewportHeight);
+            viewportHeight = std::max(0.0F, viewportHeight);
 
-            float maxScroll = std::max(0.0f, scroll.contentSize.y() - viewportHeight);
-            scroll.scrollOffset.y() = std::clamp(scroll.scrollOffset.y(), 0.0f, maxScroll);
+            float maxScroll = std::max(0.0F, scroll.contentSize.y() - viewportHeight);
+            scroll.scrollOffset.y() = std::clamp(scroll.scrollOffset.y(), 0.0F, maxScroll);
 
             Registry::EmplaceOrReplace<components::LayoutDirtyTag>(target);
             ui::utils::MarkRenderDirty(target);
@@ -592,8 +451,9 @@ public:
         // 只在非自动大小模式下同步
         if (policies::HasFlag(sizeComp->sizePolicy, policies::Size::HAuto) ||
             policies::HasFlag(sizeComp->sizePolicy, policies::Size::VAuto))
+        {
             return;
-
+        }
         int currentW = 0;
         int currentH = 0;
         SDL_GetWindowSize(sdlWindow, &currentW, &currentH);
@@ -794,18 +654,200 @@ public:
     }
 
 private:
+    void handleScrollbarDrag(const events::HitPointerMove& event, globalContext::StateContext& state)
+    {
+        float deltaPix = state.isVerticalDrag ? (event.raw.position.y() - state.dragStartMousePos.y())
+                                              : (event.raw.position.x() - state.dragStartMousePos.x());
+
+        auto& scroll = Registry::Get<components::ScrollArea>(state.dragScrollEntity);
+        const auto& sizeComp = Registry::Get<components::Size>(state.dragScrollEntity);
+        float viewportSize = state.isVerticalDrag ? sizeComp.size.y() : sizeComp.size.x();
+
+        if (const auto* padding = Registry::TryGet<components::Padding>(state.dragScrollEntity))
+        {
+            viewportSize -= state.isVerticalDrag ? (padding->values.x() + padding->values.z())
+                                                 : (padding->values.w() + padding->values.y());
+        }
+
+        float contentSize = state.isVerticalDrag ? scroll.contentSize.y() : scroll.contentSize.x();
+        float maxScroll = std::max(0.0F, contentSize - viewportSize);
+        float trackScrollableArea = state.dragTrackLength - state.dragThumbSize;
+
+        if (trackScrollableArea > 0 && maxScroll > 0)
+        {
+            float ratio = deltaPix / trackScrollableArea;
+            float offsetDelta = ratio * maxScroll;
+
+            float& currentOffset = state.isVerticalDrag ? scroll.scrollOffset.y() : scroll.scrollOffset.x();
+            float startOffset =
+                state.isVerticalDrag ? state.dragStartScrollOffset.y() : state.dragStartScrollOffset.x();
+
+            currentOffset = std::clamp(startOffset + offsetDelta, 0.0F, maxScroll);
+
+            Registry::EmplaceOrReplace<components::LayoutDirtyTag>(state.dragScrollEntity);
+        }
+    }
+
+    void handleHoverUpdate(const events::HitPointerMove& event, const globalContext::StateContext& state)
+    {
+        if (event.hitEntity != state.hoveredEntity)
+        {
+            if (state.hoveredEntity != entt::null && Registry::Valid(state.hoveredEntity))
+            {
+                Dispatcher::Enqueue<events::UnhoverEvent>(events::UnhoverEvent{state.hoveredEntity});
+            }
+            if (event.hitEntity != entt::null)
+            {
+                Dispatcher::Enqueue<events::HoverEvent>(events::HoverEvent{event.hitEntity});
+            }
+        }
+    }
+
+    /**
+     * @brief 尝试处理滚动条按下事件
+     * @param event 点击事件
+     * @param state 状态上下文
+     * @return true 如果处理了滚动条按下事件
+     * @return false 如果未处理滚动条按下事件
+     */
+    bool tryHandleScrollbarPress(const events::HitPointerButton& event, globalContext::StateContext& state)
+    {
+        entt::entity scrollEntity = entt::null;
+        bool isVertical = true;
+        entt::entity current = event.hitEntity;
+
+        while (current != entt::null && Registry::Valid(current))
+        {
+            if (Registry::AnyOf<components::ScrollArea>(current))
+            {
+                if (checkScrollbarHit(current, event.raw.position, isVertical))
+                {
+                    scrollEntity = current;
+                    break;
+                }
+            }
+            const auto* hierarchy = Registry::TryGet<components::Hierarchy>(current);
+            current = hierarchy != nullptr ? hierarchy->parent : entt::null;
+        }
+
+        if (scrollEntity != entt::null)
+        {
+            state.isDraggingScrollbar = true;
+            state.dragScrollEntity = scrollEntity;
+            state.dragStartMousePos = event.raw.position;
+            state.isVerticalDrag = isVertical;
+
+            auto& scroll = Registry::Get<components::ScrollArea>(scrollEntity);
+            state.dragStartScrollOffset = scroll.scrollOffset;
+
+            calculateScrollbarGeometry(scrollEntity, isVertical, state.dragTrackLength, state.dragThumbSize);
+
+            return true;
+        }
+        return false;
+    }
+
+    void handleEntityPress(const events::HitPointerButton& event)
+    {
+        if (event.hitEntity != entt::null)
+        {
+            if (Registry::AnyOf<components::TextEditTag>(event.hitEntity))
+            {
+                const auto* edit = Registry::TryGet<components::TextEdit>(event.hitEntity);
+                if (edit == nullptr || !policies::HasFlag(edit->inputMode, policies::TextFlag::ReadOnly))
+                {
+                    if (SDL_Window* sdlWindow = SDL_GetWindowFromID(event.raw.windowID))
+                    {
+                        setFocus(event.hitEntity, sdlWindow);
+                    }
+                }
+            }
+
+            if (Registry::AnyOf<components::Pressable>(event.hitEntity) ||
+                Registry::AnyOf<components::Clickable>(event.hitEntity) ||
+                Registry::AnyOf<components::TextEditTag>(event.hitEntity))
+            {
+                Dispatcher::Trigger<events::MousePressEvent>(events::MousePressEvent{event.hitEntity});
+            }
+        }
+    }
+    /**
+     * @brief 处理实体释放事件
+     * @param event 点击事件
+     * @param state 状态上下文
+     */
+    void handleEntityRelease(const events::HitPointerButton& event, globalContext::StateContext& state)
+    {
+        // 先保存当前激活实体，点击逻辑需要在释放清理之前完成
+        const entt::entity releasedEntity = state.activeEntity;
+
+        // 如果正在拖拽滚动条，停止拖拽
+        if (state.isDraggingScrollbar)
+        {
+            state.isDraggingScrollbar = false;
+            state.dragScrollEntity = entt::null;
+            // 不 return，允许释放 activeEntity（如果有）
+        }
+
+        if (releasedEntity != entt::null && releasedEntity == event.hitEntity)
+        {
+            if (Registry::TryGet<components::Clickable>(releasedEntity) != nullptr)
+            {
+                auto& baseInfo = Registry::Get<components::BaseInfo>(releasedEntity); // 确保实体有效
+                Dispatcher::Trigger<events::ClickEvent>(events::ClickEvent{releasedEntity});
+            }
+
+            if (SDL_Window* sdlWindow = SDL_GetWindowFromID(event.raw.windowID))
+            {
+                if (Registry::AnyOf<components::TextEditTag>(releasedEntity))
+                {
+                    const auto* edit = Registry::TryGet<components::TextEdit>(releasedEntity);
+                    if (edit == nullptr || !policies::HasFlag(edit->inputMode, policies::TextFlag::ReadOnly))
+                    {
+                        setFocus(releasedEntity, sdlWindow);
+                        return;
+                    }
+                }
+                clearFocus(sdlWindow);
+            }
+        }
+        else
+        {
+            // 兜底：如果没有 activeEntity 但命中了可点击实体，也触发点击
+            if (event.hitEntity != entt::null && Registry::TryGet<components::Clickable>(event.hitEntity) != nullptr)
+            {
+                Logger::debug("StateSystem: Click Event (fallback) on entity {}",
+                              static_cast<uint32_t>(event.hitEntity));
+                Dispatcher::Trigger<events::ClickEvent>(events::ClickEvent{event.hitEntity});
+            }
+
+            if (SDL_Window* sdlWindow = SDL_GetWindowFromID(event.raw.windowID))
+            {
+                clearFocus(sdlWindow);
+            }
+        }
+
+        // 最后再触发释放，避免提前清空 activeEntity 影响点击逻辑
+        if (releasedEntity != entt::null)
+        {
+            Dispatcher::Trigger<events::MouseReleaseEvent>(events::MouseReleaseEvent{releasedEntity});
+        }
+    }
+
     /**
      * @brief 检查点是否在滚动条滑块内（简化版，逻辑需与 ScrollBarRenderer 保持一致）
      */
     bool checkScrollbarHit(entt::entity entity, const Vec2& mousePos, bool& outIsVertical)
     {
         const auto* scrollArea = Registry::TryGet<components::ScrollArea>(entity);
-        if (!scrollArea || policies::HasFlag(scrollArea->scrollBar, policies::ScrollBar::NoVisibility)) return false;
-
+        if (scrollArea == nullptr || policies::HasFlag(scrollArea->scrollBar, policies::ScrollBar::NoVisibility))
+        {
+            return false;
+        }
         if (!policies::HasFlag(scrollArea->scrollBar, policies::ScrollBar::Draggable)) return false;
 
         const auto* sizeComp = Registry::TryGet<components::Size>(entity);
-        if (!sizeComp) return false;
+        if (sizeComp == nullptr) return false;
 
         Vec2 pos = HitTestSystem::getAbsolutePosition(entity);
         Vec2 size = sizeComp->size;
@@ -814,11 +856,11 @@ private:
         float viewportHeight = size.y();
         if (const auto* padding = Registry::TryGet<components::Padding>(entity))
         {
-            viewportHeight = std::max(0.0f, size.y() - padding->values.x() - padding->values.z());
-            viewportWidth = std::max(0.0f, size.x() - padding->values.w() - padding->values.y());
+            viewportHeight = std::max(0.0F, size.y() - padding->values.x() - padding->values.z());
+            viewportWidth = std::max(0.0F, size.x() - padding->values.w() - padding->values.y());
         }
 
-        float trackWidth = 12.0f;
+        float trackWidth = 12.0F;
 
         // 检查垂直滚动条
         bool hasVertical =
@@ -827,12 +869,12 @@ private:
         {
             float trackHeight = size.y();
             float visibleRatio = viewportHeight / scrollArea->contentSize.y();
-            float thumbSize = std::max(20.0f, trackHeight * visibleRatio);
-            float maxScroll = std::max(0.0f, scrollArea->contentSize.y() - viewportHeight);
+            float thumbSize = std::max(20.0F, trackHeight * visibleRatio);
+            float maxScroll = std::max(0.0F, scrollArea->contentSize.y() - viewportHeight);
             float scrollRatio =
-                maxScroll > 0.0f ? std::clamp(scrollArea->scrollOffset.y() / maxScroll, 0.0f, 1.0f) : 0.0f;
+                maxScroll > 0.0F ? std::clamp(scrollArea->scrollOffset.y() / maxScroll, 0.0F, 1.0F) : 0.0F;
             float thumbPos = (trackHeight - thumbSize) * scrollRatio;
-            thumbPos = std::clamp(thumbPos, 0.0f, trackHeight - thumbSize);
+            thumbPos = std::clamp(thumbPos, 0.0F, trackHeight - thumbSize);
 
             // 检查滑块区域（稍微放宽点击判定区域到整个轨道宽度）
             float rectX = pos.x() + size.x() - trackWidth;
@@ -869,8 +911,8 @@ private:
         float contentSize = isVertical ? scrollArea.contentSize.y() : scrollArea.contentSize.x();
 
         outTrackLen = isVertical ? sizeComp.size.y() : sizeComp.size.x();
-        float visibleRatio = std::max(0.001f, viewportSize / std::max(1.0f, contentSize));
-        outThumbSize = std::max(20.0f, outTrackLen * visibleRatio);
+        float visibleRatio = std::max(0.001F, viewportSize / std::max(1.0F, contentSize));
+        outThumbSize = std::max(20.0F, outTrackLen * visibleRatio);
     }
 
     // ===================================================================
@@ -940,33 +982,57 @@ private:
         auto& registry = Registry::getInstance();
         if (!Registry::Valid(entity)) return;
 
-        // 1. 递归销毁子节点
-        if (auto* hierarchy = Registry::TryGet<components::Hierarchy>(entity))
+        // 使用迭代代替递归，避免深层嵌套导致栈溢出
+        std::vector<entt::entity> stack;
+        std::vector<entt::entity> toDestroy;
+
+        stack.push_back(entity);
+
+        // 1. 深度优先遍历收集所有需要销毁的实体
+        while (!stack.empty())
         {
-            // 复制一份子节点列表，防止在销毁过程中因引用失效导致崩溃
-            auto children = hierarchy->children;
-            for (auto child : children)
+            entt::entity current = stack.back();
+            stack.pop_back();
+
+            if (!Registry::Valid(current)) continue;
+
+            // 将当前实体加入销毁列表
+            toDestroy.push_back(current);
+
+            // 将子节点加入栈（逆序添加以保持遍历顺序）
+            if (auto* hierarchy = Registry::TryGet<components::Hierarchy>(current))
             {
-                destroyWidget(child);
+                // 复制子节点列表，防止在遍历过程中引用失效
+                auto children = hierarchy->children;
+                for (auto it = children.rbegin(); it != children.rend(); ++it)
+                {
+                    stack.push_back(*it);
+                }
             }
         }
 
-        // 2. 如果是窗口，查找并销毁关联的 SDL_Window 资源
-        if (auto* windowComp = Registry::TryGet<components::Window>(entity))
+        // 2. 逆序销毁：先销毁叶子节点，最后销毁根节点
+        for (entt::entity entity : std::ranges::reverse_view(toDestroy))
         {
-            // 通过 WindowID 找回 SDL_Window 指针
-            if (SDL_Window* sdlWindow = SDL_GetWindowFromID(windowComp->windowID))
+            if (!Registry::Valid(entity)) continue;
+
+            // 如果是窗口，查找并销毁关联的 SDL_Window 资源
+            if (auto* windowComp = Registry::TryGet<components::Window>(entity))
             {
-                // 通知 RenderSystem 解绑上下文（尽管 RenderSystem 可能目前未执行动作，保留逻辑完整性）
-                Dispatcher::Trigger<events::WindowGraphicsContextUnsetEvent>(
-                    events::WindowGraphicsContextUnsetEvent{entity});
+                // 通过 WindowID 找回 SDL_Window 指针
+                if (SDL_Window* sdlWindow = SDL_GetWindowFromID(windowComp->windowID))
+                {
+                    // 通知 RenderSystem 解绑上下文（尽管 RenderSystem 可能目前未执行动作，保留逻辑完整性）
+                    Dispatcher::Trigger<events::WindowGraphicsContextUnsetEvent>(
+                        events::WindowGraphicsContextUnsetEvent{entity});
 
-                SDL_DestroyWindow(sdlWindow);
+                    SDL_DestroyWindow(sdlWindow);
+                }
             }
-        }
 
-        // 3. 最后销毁实体本身
-        Registry::Destroy(entity);
+            // 销毁实体本身
+            Registry::Destroy(entity);
+        }
     }
 };
 

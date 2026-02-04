@@ -36,6 +36,35 @@ struct BaseInfo
     using is_component_tag = void;
     std::string alias; // 组件别名，便于调试和识别
 };
+
+/**
+ * @brief 缩放组件（渲染时生效，不影响布局）
+ */
+struct Scale
+{
+    using is_component_tag = void;
+    Vec2 value{1.0F, 1.0F};
+};
+
+/**
+ * @brief 渲染偏移组件（渲染时生效，不影响布局）
+ * 用于实现按下下沉、悬浮上浮等视觉效果
+ */
+struct RenderOffset
+{
+    using is_component_tag = void;
+    Vec2 value{0.0F, 0.0F};
+};
+
+/**
+ * @brief 透明度组件（叠加）
+ */
+struct Alpha
+{
+    using is_component_tag = void;
+    float value = 1.0F;
+};
+
 // ===================== 基础尺寸与位置 =====================
 
 /**
@@ -127,15 +156,6 @@ struct Shadow
     policies::Feature enabled = policies::Feature::Disabled;
 };
 
-/**
- * @brief 透明度组件
- */
-struct Alpha
-{
-    using is_component_tag = void;
-    float value = 1.0F;
-};
-
 // ===================== 层级与滚动 =====================
 
 /**
@@ -207,7 +227,8 @@ struct Text
     Color color{1.0F, 1.0F, 1.0F, 1.0F};
     float fontSize = 24.0F; // 0 表示使用默认字体大小
 
-    float wrapWidth = 0.0F;
+    float wrapWidth = 0.0F;// 换行宽度，0 表示不换行
+    float lineHeight = 1.2F; // 行高倍数
     policies::TextWrap wordWrap = policies::TextWrap::None;    // 默认不换行
     policies::Alignment alignment = policies::Alignment::NONE; // 默认居中
     policies::TextFlag flags = policies::TextFlag::Default;    // 其他文本属性
@@ -251,8 +272,25 @@ struct Image
 struct Clickable
 {
     using is_component_tag = void;
-    on_event<> onClick{};
+    on_event<> onClick;
     policies::Feature enabled = policies::Feature::Enabled;
+};
+
+/**
+ * @brief 可拖拽组件
+ * 标记实体可被鼠标拖拽移动
+ */
+struct Draggable
+{
+    using is_component_tag = void;
+    policies::Feature enabled = policies::Feature::Enabled;
+    bool lockX = false; // 锁定X轴
+    bool lockY = false; // 锁定Y轴
+
+    // 拖拽开始/结束的回调
+    on_event<> onDragStart;
+    on_event<> onDragEnd;
+    on_event<Vec2> onDragMove; // 参数为 delta
 };
 
 /**
@@ -261,8 +299,8 @@ struct Clickable
 struct Hoverable
 {
     using is_component_tag = void;
-    on_event<> onHover{};
-    on_event<> onUnhover{};
+    on_event<> onHover;
+    on_event<> onUnhover;
     policies::Feature enabled = policies::Feature::Enabled;
 };
 
@@ -272,8 +310,8 @@ struct Hoverable
 struct Pressable
 {
     using is_component_tag = void;
-    on_event<> onPress{};   // 鼠标按下时触发
-    on_event<> onRelease{}; // 鼠标松开时触发
+    on_event<> onPress;   // 鼠标按下时触发
+    on_event<> onRelease; // 鼠标松开时触发
     policies::Feature enabled = policies::Feature::Enabled;
 };
 
@@ -286,25 +324,15 @@ struct Checkable
     policies::CheckState checked = policies::CheckState::Unchecked;
 };
 
-/**
- * @brief 按钮状态组件
- */
-struct ButtonState
-{
-    using is_component_tag = void;
-    policies::ButtonVisual visual = policies::ButtonVisual::Idle;
-    bool triggered = false; // 本帧是否触发过动作
-};
-
 // ===================== 动画组件 =====================
 
 /**
- * @brief 动画时间状态
+ * @brief 动画时间状态 (单位: 毫秒 ms)
  */
 struct AnimationTime
 {
     using is_component_tag = void;
-    float duration = 1.0F;
+    float duration = 200.0F; // 默认200毫秒
     float elapsed = 0.0F;
     policies::Easing easing = policies::Easing::LINEAR;
     policies::Play mode = policies::Play::ONCE;
@@ -330,11 +358,64 @@ struct AnimationAlpha
     float to = 0.0F;
 };
 
-struct Tween
+/**
+ * @brief 缩放动画目标
+ */
+struct AnimationScale
 {
     using is_component_tag = void;
+    Vec2 from{1.0F, 1.0F};
+    Vec2 to{1.0F, 1.0F};
 };
 
+/**
+ * @brief 渲染偏移动画目标
+ */
+struct AnimationRenderOffset
+{
+    using is_component_tag = void;
+    Vec2 from{0.0F, 0.0F};
+    Vec2 to{0.0F, 0.0F};
+};
+
+/**
+ * @brief 颜色动画目标
+ * 注意：目前只支持 Background 组件的 Color
+ */
+struct AnimationColor
+{
+    using is_component_tag = void;
+    Color from;
+    Color to;
+};
+
+/**
+ * @brief 交互动效配置
+ * 当发生交互时，自动触发 Tween 动画
+ */
+struct InteractiveAnimation
+{
+    using is_component_tag = void;
+
+    // 悬停配置
+    std::optional<Vec2> hoverScale;
+    std::optional<Vec2> hoverOffset; // 悬停位移
+    float hoverDuration = 200.0F;    // 毫秒
+
+    // 按下配置
+    std::optional<Vec2> pressScale;
+    std::optional<Vec2> pressOffset; // 按下位移
+    float pressDuration = 100.0F;    // 毫秒
+
+    // 拖曳配置 (当组件支持拖拽时)
+    std::optional<Vec2> dragScale;
+    std::optional<Vec2> dragLiftOffset; // 拖起时的视觉偏移
+    float dragDuration = 200.0F;
+
+    // 原始状态记录（用于恢复）
+    Vec2 normalScale{1.0F, 1.0F};
+    Vec2 normalOffset{0.0F, 0.0F};
+};
 // ===================== 复杂组件数据 =====================
 
 /**
@@ -443,7 +524,7 @@ struct SliderInfo
     // 当前值
     float step = 0.0F;                                                  // 步长，0 表示连续滑动
     policies::Orientation vertical = policies::Orientation::Horizontal; // 是否为垂直滑块
-    on_event<float> onValueChanged{};                                   // 值变化回调
+    on_event<float> onValueChanged;                                     // 值变化回调
     policies::Alignment labelAlignment = policies::Alignment::NONE;     // 标签对齐方式
 };
 
@@ -464,7 +545,7 @@ struct ScrollBar
     bool dragging = false;                                            // 是否正在拖动滑块
     Color thumbColor{0.5F, 0.5F, 0.5F, 0.8F};                         // 滑块颜色
     Color trackColor{0.2F, 0.2F, 0.2F, 0.5F};                         // 轨道颜色
-    on_event<float> onScroll{};                                       // 滚动回调
+    on_event<float> onScroll;                                         // 滚动回调
 };
 
 /**

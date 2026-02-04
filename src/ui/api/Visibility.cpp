@@ -54,6 +54,7 @@ void Show(::entt::entity entity)
         }
     }
     utils::MarkLayoutDirty(entity);
+    utils::MarkRenderDirty(entity);
 }
 
 void Hide(::entt::entity entity)

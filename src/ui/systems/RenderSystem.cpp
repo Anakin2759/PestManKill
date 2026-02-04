@@ -154,6 +154,7 @@ void RenderSystem::cleanup()
     m_pipelineCache.reset();
     m_textTextureCache.reset();
     m_fontManager.reset();
+    m_iconManager.reset();
 
     Logger::info("[RenderSystem] 清理设备管理器");
     m_deviceManager->cleanup();
@@ -424,15 +425,33 @@ void RenderSystem::collectRenderData(entt::entity entity, core::RenderContext& c
     const auto& pos = Registry::Get<components::Position>(entity);
     const auto& size = Registry::Get<components::Size>(entity);
     const auto* alphaComp = Registry::TryGet<components::Alpha>(entity);
+    const auto* scaleComp = Registry::TryGet<components::Scale>(entity);
+    const auto* offsetComp = Registry::TryGet<components::RenderOffset>(entity);
 
-    float globalAlpha = context.alpha * (alphaComp ? alphaComp->value : 1.0F);
+    float globalAlpha = context.alpha * (alphaComp != nullptr ? alphaComp->value : 1.0F);
     Eigen::Vector2f absolutePos = context.position + pos.value;
+    Eigen::Vector2f finalSize = size.size;
+
+    // 应用渲染偏移
+    if (offsetComp != nullptr)
+    {
+        absolutePos += offsetComp->value;
+    }
+
+    // 应用缩放（基于中心点）
+    if (scaleComp != nullptr)
+    {
+        Eigen::Vector2f scaleDiff = size.size.cwiseProduct(Eigen::Vector2f::Ones() - scaleComp->value);
+        absolutePos += scaleDiff * 0.5F;
+        finalSize = size.size.cwiseProduct(scaleComp->value);
+    }
+
     Eigen::Vector2f contentOffset(0.0F, 0.0F);
 
     // 更新上下文
     core::RenderContext entityContext = context;
     entityContext.position = absolutePos;
-    entityContext.size = size.size;
+    entityContext.size = finalSize;
     entityContext.alpha = globalAlpha;
 
     // 处理 ScrollArea
@@ -462,7 +481,7 @@ void RenderSystem::collectRenderData(entt::entity entity, core::RenderContext& c
 
     // 递归处理子元素
     const auto* hierarchy = Registry::TryGet<components::Hierarchy>(entity);
-    if (hierarchy && !hierarchy->children.empty())
+    if (hierarchy != nullptr && !hierarchy->children.empty())
     {
         for (entt::entity child : hierarchy->children)
         {

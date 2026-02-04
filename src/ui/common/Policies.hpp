@@ -31,14 +31,14 @@ enum class Alignment : uint8_t
     NONE = 0,
 
     // 水平对齐 (Horizontal Flags)
-    LEFT = 1 << 0,    // 0x01
-    HCENTER = 1 << 1, // 0x02
-    RIGHT = 1 << 2,   // 0x04
+    LEFT = 1U << 0U,    // 0x01
+    HCENTER = 1U << 1U, // 0x02
+    RIGHT = 1U << 2U,   // 0x04
 
     // 垂直对齐 (Vertical Flags)
-    TOP = 1 << 3,     // 0x08
-    VCENTER = 1 << 4, // 0x10
-    BOTTOM = 1 << 5,  // 0x20
+    TOP = 1U << 3U,     // 0x08
+    VCENTER = 1U << 4U, // 0x10
+    BOTTOM = 1U << 5U,  // 0x20
 
     // 组合常用对齐方式 (可选，但非常实用)
     CENTER = HCENTER | VCENTER, // 0x12
@@ -74,29 +74,8 @@ enum class Easing : uint8_t
     CUSTOM // 自定义 (例如通过函数指针 Component)
 };
 
-/**
- * @brief 交互类型枚举 (注意：建议通过 ECS Event 触发动作，此枚举用于标记UI意图)
- */
-enum class Interaction : uint8_t
-{
-    None = 0,
-    Click = 1 << 0,     // 单击
-    Submit = 1 << 1,    // 确认/提交动作 (取代 Confirm)
-    Cancel = 1 << 2,    // 取消
-    DragStart = 1 << 3, // 拖拽开始
-    DragEnd = 1 << 4,   // 拖拽结束
-    Hover = 1 << 5      // 悬停
-};
 
-/**
- * @brief 按钮视觉状态枚举
- */
-enum class ButtonVisual : uint8_t
-{
-    Idle,    // 默认状态
-    Pressed, // 鼠标按下 (通常等于 Active 状态)
-    Disabled // 不可用状态
-};
+
 
 enum class Focus : uint8_t
 {
@@ -162,15 +141,17 @@ enum class TextWrap : uint8_t
 enum class TextFlag : uint32_t
 {
     Default = 0,
-    Password = 1 << 0,     // 掩码显示
-    ReadOnly = 1 << 1,     // 不可编辑
-    Multiline = 1 << 2,    // 支持多行渲染
-    Transferable = 1 << 3, // 支持文本拖拽/复制
-    RichText = 1 << 4,     // 启用富文本/标记语言解析
-    NoWrap = 1 << 5,       // 强制不换行
-    Ansi = 1 << 6,         // 启用 ANSI 转义码解析
-    Underline = 1 << 7     // 启用下划线
-
+    Password = 1 << 0,               // 掩码显示
+    ReadOnly = 1 << 1,               // 不可编辑
+    Multiline = 1 << 2,              // 支持多行渲染
+    Transferable = 1 << 3,           // 支持文本拖拽/复制
+    RichText = 1 << 4,               // 启用富文本/标记语言解析
+    NoWrap = 1 << 5,                 // 强制不换行
+    Ansi = 1 << 6,                   // 启用 ANSI 转义码解析
+    Underline = 1 << 7,              // 启用下划线
+    WORD_WRAP = 1U << 8U | 0U << 9U, // 启用按单词换行
+    CHAR_WRAP = 0U << 8U | 1U << 9U, // 启用按字符换行
+    NONE_WRAP = 0U << 8U | 0U << 9U, // 不换行
 };
 
 /**

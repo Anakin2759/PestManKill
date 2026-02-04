@@ -22,7 +22,7 @@
 
 #include <vector>
 #include <string>
-#include <memory>
+#include <string_view>
 #include <unordered_map>
 #include <cstdint>
 #include <cmath>
@@ -35,11 +35,11 @@ namespace ui::managers
  */
 struct GlyphInfo
 {
-    int width = 0;
-    int height = 0;
-    int xOffset = 0;
-    int yOffset = 0;
-    int advanceX = 0;
+    int width = 0;               // 位图宽度
+    int height = 0;              // 位图宽高
+    int xOffset = 0;             // 水平偏移
+    int yOffset = 0;             // 垂直偏移
+    int advanceX = 0;            // 水平前进量
     std::vector<uint8_t> bitmap; // 灰度位图数据
 };
 
@@ -54,7 +54,7 @@ public:
 
     FontManager(const FontManager&) = delete;
     FontManager& operator=(const FontManager&) = delete;
-    FontManager(FontManager&&) = default;
+    FontManager(FontManager&&) noexcept = default;
     FontManager& operator=(FontManager&&) = default;
 
     /**
@@ -64,7 +64,7 @@ public:
      * @param fontSize 字体大小（像素）
      * @return 加载成功返回 true
      */
-    bool loadFromMemory(const uint8_t* fontData, size_t dataSize, float fontSize, float oversampleScale = 1.0f)
+    bool loadFromMemory(const uint8_t* fontData, size_t dataSize, float fontSize, float oversampleScale = 1.0F)
     {
         m_fontSize = fontSize;
         m_oversampleScale = oversampleScale;
@@ -93,26 +93,27 @@ public:
     /**
      * @brief 检查字体是否已加载
      */
-    bool isLoaded() const { return m_loaded; }
+    [[nodiscard]] bool isLoaded() const { return m_loaded; }
 
-    float getOversampleScale() const { return m_oversampleScale; }
+    [[nodiscard]] float getOversampleScale() const { return m_oversampleScale; }
 
     /**
      * @brief 获取字体高度（行高）- 逻辑像素
      */
-    int getFontHeight() const
+    [[nodiscard]] int getFontHeight() const
     {
         if (!m_loaded) return 0;
-        return static_cast<int>(std::ceil(((m_ascent - m_descent + m_lineGap) * m_scale) / m_oversampleScale));
+        return static_cast<int>(
+            std::ceil((static_cast<float>(m_ascent - m_descent + m_lineGap) * m_scale) / m_oversampleScale));
     }
 
     /**
      * @brief 获取基线位置 - 逻辑像素
      */
-    int getBaseline() const
+    [[nodiscard]] int getBaseline() const
     {
         if (!m_loaded) return 0;
-        return static_cast<int>(std::ceil((m_ascent * m_scale) / m_oversampleScale));
+        return static_cast<int>(std::ceil((static_cast<float>(m_ascent) * m_scale) / m_oversampleScale));
     }
 
     /**
@@ -126,18 +127,19 @@ public:
     {
         if (!m_loaded || text == nullptr || textLen == 0)
         {
-            if (outMeasuredLength) *outMeasuredLength = 0;
+            if (outMeasuredLength != nullptr) *outMeasuredLength = 0;
             return 0;
         }
 
         int totalWidth = 0;
         size_t bytePos = 0;
+        std::string_view view(text, textLen);
 
         while (bytePos < textLen)
         {
             // 解码 UTF-8 字符
             int codepoint = 0;
-            size_t charLen = decodeUTF8(text + bytePos, textLen - bytePos, codepoint);
+            size_t charLen = decodeUTF8(view.substr(bytePos), codepoint);
             if (charLen == 0) break;
 
             // 获取字形的水平度量
@@ -146,7 +148,8 @@ public:
             stbtt_GetCodepointHMetrics(&m_fontInfo, codepoint, &advanceWidth, &leftSideBearing);
 
             // 逻辑宽度
-            int glyphWidth = static_cast<int>(std::ceil((advanceWidth * m_scale) / m_oversampleScale));
+            int glyphWidth =
+                static_cast<int>(std::ceil((static_cast<float>(advanceWidth) * m_scale) / m_oversampleScale));
 
             if (maxWidth > 0 && totalWidth + glyphWidth > maxWidth)
             {
@@ -157,7 +160,7 @@ public:
             bytePos += charLen;
         }
 
-        if (outMeasuredLength)
+        if (outMeasuredLength != nullptr)
         {
             *outMeasuredLength = bytePos;
         }
@@ -186,29 +189,32 @@ public:
         if (!m_loaded) return info;
 
         // 检查缓存
-        auto it = m_glyphCache.find(codepoint);
-        if (it != m_glyphCache.end())
+        auto iterator = m_glyphCache.find(codepoint);
+        if (iterator != m_glyphCache.end())
         {
-            return it->second;
+            return iterator->second;
         }
 
         // 渲染字形位图
-        int x0, y0, x1, y1;
-        stbtt_GetCodepointBitmapBox(&m_fontInfo, codepoint, m_scale, m_scale, &x0, &y0, &x1, &y1);
+        int fx0{};
+        int fy0{};
+        int fx1{};
+        int fy1{};
+        stbtt_GetCodepointBitmapBox(&m_fontInfo, codepoint, m_scale, m_scale, &fx0, &fy0, &fx1, &fy1);
 
-        info.width = x1 - x0;
-        info.height = y1 - y0;
-        info.xOffset = x0;
-        info.yOffset = y0;
+        info.width = fx1 - fx0;
+        info.height = fy1 - fy0;
+        info.xOffset = fx0;
+        info.yOffset = fy0;
 
         int advanceWidth = 0;
         int leftSideBearing = 0;
         stbtt_GetCodepointHMetrics(&m_fontInfo, codepoint, &advanceWidth, &leftSideBearing);
-        info.advanceX = static_cast<int>(advanceWidth * m_scale);
+        info.advanceX = static_cast<int>(static_cast<float>(advanceWidth) * m_scale);
 
         if (info.width > 0 && info.height > 0)
         {
-            info.bitmap.resize(info.width * info.height);
+            info.bitmap.resize(static_cast<size_t>(info.width) * static_cast<size_t>(info.height));
             stbtt_MakeCodepointBitmap(
                 &m_fontInfo, info.bitmap.data(), info.width, info.height, info.width, m_scale, m_scale, codepoint);
         }
@@ -227,16 +233,8 @@ public:
      * @param outHeight 输出位图高度
      * @return RGBA 位图数据
      */
-    /**
-     * @brief 渲染整个文本到 RGBA 位图
-     * @param text UTF-8 文本
-     * @param color RGBA 颜色 (0-255)
-     * @param outWidth 输出位图宽度
-     * @param outHeight 输出位图高度
-     * @return RGBA 位图数据
-     */
     std::vector<uint8_t> renderTextBitmap(
-        const std::string& text, uint8_t r, uint8_t g, uint8_t b, uint8_t a, int& outWidth, int& outHeight)
+        const std::string& text, uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha, int& outWidth, int& outHeight)
     {
         std::vector<uint8_t> result;
 
@@ -258,11 +256,12 @@ public:
         bool first = true;
 
         size_t bytePos = 0;
+        std::string_view view(text);
 
         while (bytePos < text.size())
         {
             int codepoint = 0;
-            size_t charLen = decodeUTF8(text.c_str() + bytePos, text.size() - bytePos, codepoint);
+            size_t charLen = decodeUTF8(view.substr(bytePos), codepoint);
             if (charLen == 0) break;
 
             GlyphInfo glyph = renderGlyph(codepoint);
@@ -284,10 +283,10 @@ public:
             }
             else
             {
-                if (gMinX < minX) minX = gMinX;
-                if (gMaxX > maxX) maxX = gMaxX;
-                if (gMinY < minY) minY = gMinY;
-                if (gMaxY > maxY) maxY = gMaxY;
+                minX = std::min(minX, gMinX);
+                maxX = std::max(maxX, gMaxX);
+                minY = std::min(minY, gMinY);
+                maxY = std::max(maxY, gMaxY);
             }
 
             cursorX += glyph.advanceX;
@@ -305,8 +304,8 @@ public:
         outWidth = std::max(cursorX, maxX);
 
         // 高度：确保容纳所有像素，同时保持基线对其
-        int fontAscentPixels = static_cast<int>(std::ceil(m_ascent * m_scale));
-        int fontHeight = static_cast<int>(std::ceil((m_ascent - m_descent + m_lineGap) * m_scale));
+        int fontAscentPixels = static_cast<int>(std::ceil(static_cast<float>(m_ascent) * m_scale));
+        int fontHeight = static_cast<int>(std::ceil(static_cast<float>(m_ascent - m_descent + m_lineGap) * m_scale));
 
         int baselineY = fontAscentPixels;
         int topOverflow = (minY + baselineY < 0) ? -(minY + baselineY) : 0;
@@ -318,13 +317,13 @@ public:
         // 创建 RGBA 位图 (初始化为颜色值，Alpha 为 0)
         // 使用直通 Alpha (Straight Alpha) 而非预乘 Alpha，以避免两次混合导致的变暗问题
         // 同时填充 RGB 通道以避免 bilinear filtering 时的边缘黑边
-        result.resize(outWidth * outHeight * 4);
+        result.resize(static_cast<size_t>(outWidth) * static_cast<size_t>(outHeight) * 4);
         for (int i = 0; i < outWidth * outHeight; ++i)
         {
-            result[i * 4 + 0] = r;
-            result[i * 4 + 1] = g;
-            result[i * 4 + 2] = b;
-            result[i * 4 + 3] = 0;
+            result[(i * 4) + 0] = red;
+            result[(i * 4) + 1] = green;
+            result[(i * 4) + 2] = blue;
+            result[(i * 4) + 3] = 0;
         }
 
         // 第二遍：渲染字形到位图
@@ -334,21 +333,21 @@ public:
             const int xPos = xPositions[i] + glyph.xOffset;
             const int yPos = finalBaselineY + glyph.yOffset;
 
-            for (int y = 0; y < glyph.height; ++y)
+            for (int yOffset = 0; yOffset < glyph.height; ++yOffset)
             {
-                for (int x = 0; x < glyph.width; ++x)
+                for (int xOffset = 0; xOffset < glyph.width; ++xOffset)
                 {
-                    const int bitmapX = xPos + x;
-                    const int bitmapY = yPos + y;
+                    const int bitmapX = xPos + xOffset;
+                    const int bitmapY = yPos + yOffset;
 
                     if (bitmapX < 0 || bitmapX >= outWidth || bitmapY < 0 || bitmapY >= outHeight) continue;
 
                     const int pixelIndex = (bitmapY * outWidth + bitmapX) * 4;
-                    const uint8_t srcAlpha = glyph.bitmap[y * glyph.width + x];
+                    const uint8_t srcAlpha = glyph.bitmap[(yOffset * glyph.width) + xOffset];
 
                     // 使用 MAX 混合 Alpha，防止重叠字符相互擦除
                     const uint8_t curAlpha = result[pixelIndex + 3];
-                    const uint8_t newAlpha = static_cast<uint8_t>(srcAlpha * a / 255);
+                    const auto newAlpha = static_cast<uint8_t>(srcAlpha * alpha / 255);
                     const uint8_t finalAlpha = std::max(curAlpha, newAlpha);
 
                     // 仅更新 Alpha通道 (Straight Alpha)
@@ -363,14 +362,13 @@ public:
 private:
     /**
      * @brief 解码 UTF-8 字符
-     * @param text UTF-8 字符串指针
-     * @param maxBytes 可用的最大字节数
+     * @param text UTF-8 字符串视图
      * @param outCodepoint 输出码点
      * @return 字符占用的字节数，失败返回 0
      */
-    static size_t decodeUTF8(const char* text, size_t maxBytes, int& outCodepoint)
+    static size_t decodeUTF8(std::string_view text, int& outCodepoint)
     {
-        if (maxBytes == 0) return 0;
+        if (text.empty()) return 0;
 
         const auto byte0 = static_cast<uint8_t>(text[0]);
 
@@ -382,38 +380,39 @@ private:
         }
 
         // 2 字节
-        if ((byte0 & 0xE0) == 0xC0)
+        if ((byte0 & 0xE0U) == 0xC0)
         {
-            if (maxBytes < 2) return 0;
-            outCodepoint = ((byte0 & 0x1F) << 6) | (text[1] & 0x3F);
+            if (text.size() < 2) return 0;
+            outCodepoint = static_cast<int>(((byte0 & 0x1FU) << 6U) | (static_cast<uint8_t>(text[1]) & 0x3FU));
             return 2;
         }
 
         // 3 字节
-        if ((byte0 & 0xF0) == 0xE0)
+        if ((byte0 & 0xF0U) == 0xE0)
         {
-            if (maxBytes < 3) return 0;
-            outCodepoint = ((byte0 & 0x0F) << 12) | ((text[1] & 0x3F) << 6) | (text[2] & 0x3F);
+            if (text.size() < 3) return 0;
+            outCodepoint = static_cast<int>(((byte0 & 0x0FU) << 12U) | ((static_cast<uint8_t>(text[1]) & 0x3FU) << 6U) |
+                                            (static_cast<uint8_t>(text[2]) & 0x3FU));
             return 3;
         }
 
         // 4 字节
-        if ((byte0 & 0xF8) == 0xF0)
+        if ((byte0 & 0xF8U) == 0xF0)
         {
-            if (maxBytes < 4) return 0;
-            outCodepoint =
-                ((byte0 & 0x07) << 18) | ((text[1] & 0x3F) << 12) | ((text[2] & 0x3F) << 6) | (text[3] & 0x3F);
+            if (text.size() < 4) return 0;
+            outCodepoint = static_cast<int>(
+                ((byte0 & 0x07U) << 18U) | ((static_cast<uint8_t>(text[1]) & 0x3FU) << 12U) |
+                ((static_cast<uint8_t>(text[2]) & 0x3FU) << 6U) | (static_cast<uint8_t>(text[3]) & 0x3FU));
             return 4;
         }
 
         return 0;
     }
 
-private:
     bool m_loaded = false;
-    float m_fontSize = 16.0f;
-    float m_scale = 1.0f;
-    float m_oversampleScale = 1.0f;
+    float m_fontSize = 16.0F;
+    float m_scale = 1.0F;
+    float m_oversampleScale = 1.0F;
 
     std::vector<uint8_t> m_fontData;
     stbtt_fontinfo m_fontInfo = {};

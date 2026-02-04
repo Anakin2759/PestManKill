@@ -123,7 +123,7 @@ inline void CreateMainWindow()
                                        currentHistory += fullMsg;
 
                                        // 限制消息行数 (简单实现)
-                                       const size_t MAX_MESSAGES = 20;
+                                       constexpr size_t MAX_MESSAGES = 20;
                                        // TODO: 这里可以优化，但保持原有逻辑
                                        std::vector<std::string> lines;
                                        lines.reserve(MAX_MESSAGES + 5);

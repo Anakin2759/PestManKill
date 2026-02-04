@@ -21,10 +21,10 @@
 #include "../interface/IRenderer.hpp"
 #include "../singleton/Registry.hpp"
 #include "../common/Components.hpp"
-#include "../common/Tags.hpp"
 #include "../managers/IconManager.hpp"
-#include "../api/Utils.hpp"
-
+#include "../managers/FontManager.hpp"
+#include "../core/RenderContext.hpp"
+#include "../managers/BatchManager.hpp"
 namespace ui::renderers
 {
 
@@ -38,19 +38,19 @@ namespace ui::renderers
 class IconRenderer : public core::IRenderer
 {
 public:
-    IconRenderer(managers::IconManager* iconManager) : m_iconManager(iconManager) {}
+    explicit IconRenderer(managers::IconManager* iconManager) : m_iconManager(iconManager) {}
 
     bool canHandle(entt::entity entity) const override { return Registry::AnyOf<components::Icon>(entity); }
-
+    
     void collect(entt::entity entity, core::RenderContext& context) override
     {
-        if (!context.batchManager)
+        if (context.batchManager == nullptr)
         {
             return;
         }
 
         const auto* iconComp = Registry::TryGet<components::Icon>(entity);
-        if (!iconComp) return;
+        if (iconComp == nullptr) return;
 
         // 计算图标的绘制位置和大小
         Eigen::Vector2f iconDrawPos = context.position;
@@ -60,14 +60,14 @@ public:
             iconComp->tintColor.red, iconComp->tintColor.green, iconComp->tintColor.blue, iconComp->tintColor.alpha);
 
         SDL_GPUTexture* iconTexture = nullptr;
-        Eigen::Vector2f uvMin = {0.0f, 0.0f};
-        Eigen::Vector2f uvMax = {1.0f, 1.0f};
+        Eigen::Vector2f uvMin = {0.0F, 0.0F};
+        Eigen::Vector2f uvMax = {1.0F, 1.0F};
         Eigen::Vector2f actualIconSize = iconDrawSize;
 
         if (HasFlag(iconComp->type, policies::IconFlag::Texture))
         {
             // 纹理图标
-            if (auto* textureInfo = m_iconManager->getTextureInfo(iconComp->textureId))
+            if (const auto* textureInfo = m_iconManager->getTextureInfo(iconComp->textureId))
             {
                 iconTexture = textureInfo->texture;
                 uvMin = textureInfo->uvMin;
@@ -90,7 +90,8 @@ public:
                 fontName = static_cast<const char*>(iconComp->fontHandle);
             }
 
-            if (auto* textureInfo = m_iconManager->getTextureInfo(fontName, iconComp->codepoint, iconComp->size.y()))
+            if (const auto* textureInfo =
+                    m_iconManager->getTextureInfo(fontName, iconComp->codepoint, iconComp->size.y()))
             {
                 iconTexture = textureInfo->texture;
                 uvMin = textureInfo->uvMin;
@@ -103,7 +104,7 @@ public:
             }
         }
 
-        if (iconTexture)
+        if (iconTexture != nullptr)
         {
             // 计算绘制位置：考虑 Padding 与是否存在文本
             Eigen::Vector2f contentPos = context.position;
@@ -122,9 +123,9 @@ public:
 
             // 如果存在文本且非空，则将图标与文本一起居中（图标在文本左侧）
             if (const auto* textComp = Registry::TryGet<components::Text>(entity);
-                textComp && !textComp->content.empty() && context.fontManager)
+                textComp != nullptr && !textComp->content.empty() && context.fontManager != nullptr)
             {
-                float textWidth = context.fontManager->measureTextWidth(textComp->content);
+                auto textWidth = static_cast<float>(context.fontManager->measureTextWidth(textComp->content));
                 float totalWidth = actualIconSize.x() + iconComp->spacing + textWidth;
                 drawPos.x() = contentPos.x() + std::max(0.0F, (contentSize.x() - totalWidth) * 0.5F);
                 drawPos.y() = contentPos.y() + std::max(0.0F, (contentSize.y() - actualIconSize.y()) * 0.5F);
@@ -147,8 +148,11 @@ public:
             context.batchManager->addRect(drawPos, actualIconSize, tint, uvMin, uvMax);
         }
     }
-
-    int getPriority() const override
+    /**
+     * @brief 获取渲染优先级
+     * @return 优先级数值，数值越小越先渲染
+     */
+    [[nodiscard]] int getPriority() const override
     {
         return 20; // 图标在文本之后渲染
     }

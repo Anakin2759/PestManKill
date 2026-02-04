@@ -278,8 +278,8 @@ public:
     }
 
 private:
-    std::vector<render::RenderBatch> m_batches;
-    std::optional<render::RenderBatch> m_currentBatch;
+    std::vector<render::RenderBatch> m_batches;        // 存储所有渲染批次
+    std::optional<render::RenderBatch> m_currentBatch; // 当前正在构建的批次
 };
 
 } // namespace ui::managers
