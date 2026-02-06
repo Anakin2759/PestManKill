@@ -44,7 +44,7 @@
 namespace ui::systems
 {
 
-// GlobalState now lives in ui::globalContext::GlobalState (see GlobalContext.hpp)
+// GlobalState now lives in ui::globalcontext::GlobalState (see GlobalContext.hpp)
 
 class StateSystem : public ui::interface::EnableRegister<StateSystem>
 {
@@ -96,7 +96,7 @@ public:
      */
     void onHoverEvent(const events::HoverEvent& event)
     {
-        auto& state = Registry::ctx().get<globalContext::StateContext>();
+        auto& state = Registry::ctx().get<globalcontext::StateContext>();
 
         // 标记旧悬停实体需要移除 Hover 标签
         if (state.hoveredEntity != entt::null && Registry::Valid(state.hoveredEntity))
@@ -119,7 +119,7 @@ public:
      */
     void onUnhoverEvent(const events::UnhoverEvent& event)
     {
-        auto& state = Registry::ctx().get<globalContext::StateContext>();
+        auto& state = Registry::ctx().get<globalcontext::StateContext>();
 
         if (Registry::Valid(event.entity))
         {
@@ -140,7 +140,7 @@ public:
      */
     void onMousePressEvent(const events::MousePressEvent& event)
     {
-        auto& state = Registry::ctx().get<globalContext::StateContext>();
+        auto& state = Registry::ctx().get<globalcontext::StateContext>();
 
         // 标记旧激活实体需要移除 Active 标签
         if (state.activeEntity != entt::null && Registry::Valid(state.activeEntity))
@@ -163,7 +163,7 @@ public:
      */
     void onMouseReleaseEvent(const events::MouseReleaseEvent& event)
     {
-        auto& state = Registry::ctx().get<globalContext::StateContext>();
+        auto& state = Registry::ctx().get<globalcontext::StateContext>();
 
         if (Registry::Valid(event.entity))
         {
@@ -185,7 +185,7 @@ public:
 
     void onHitPointerMove(const events::HitPointerMove& event)
     {
-        auto& state = Registry::ctx().get<globalContext::StateContext>();
+        auto& state = Registry::ctx().get<globalcontext::StateContext>();
         state.latestMousePosition = event.raw.position;
         state.latestMouseDelta = event.raw.delta;
 
@@ -203,7 +203,7 @@ public:
     {
         if (event.raw.button != SDL_BUTTON_LEFT) return;
 
-        auto& state = Registry::ctx().get<globalContext::StateContext>();
+        auto& state = Registry::ctx().get<globalcontext::StateContext>();
         state.latestMousePosition = event.raw.position;
 
         if (event.raw.pressed)
@@ -222,7 +222,7 @@ public:
 
     void onHitPointerWheel(const events::HitPointerWheel& event)
     {
-        auto& state = Registry::ctx().get<globalContext::StateContext>();
+        auto& state = Registry::ctx().get<globalcontext::StateContext>();
         state.latestScrollDelta = event.raw.delta;
 
         entt::entity target = entt::null;
@@ -290,7 +290,7 @@ public:
      */
     static void setFocus(entt::entity entity, SDL_Window* sdlWindow = nullptr)
     {
-        auto& state = Registry::ctx().get<globalContext::StateContext>();
+        auto& state = Registry::ctx().get<globalcontext::StateContext>();
 
         // 移除旧焦点实体的标签（Focus 需要立即应用）
         if (state.focusedEntity != entt::null && Registry::Valid(state.focusedEntity))
@@ -323,7 +323,7 @@ public:
      */
     static void clearFocus(SDL_Window* sdlWindow = nullptr)
     {
-        auto& state = Registry::ctx().get<globalContext::StateContext>();
+        auto& state = Registry::ctx().get<globalcontext::StateContext>();
 
         if (state.focusedEntity != entt::null && Registry::Valid(state.focusedEntity))
         {
@@ -654,7 +654,7 @@ public:
     }
 
 private:
-    void handleScrollbarDrag(const events::HitPointerMove& event, globalContext::StateContext& state)
+    void handleScrollbarDrag(const events::HitPointerMove& event, globalcontext::StateContext& state)
     {
         float deltaPix = state.isVerticalDrag ? (event.raw.position.y() - state.dragStartMousePos.y())
                                               : (event.raw.position.x() - state.dragStartMousePos.x());
@@ -688,7 +688,7 @@ private:
         }
     }
 
-    void handleHoverUpdate(const events::HitPointerMove& event, const globalContext::StateContext& state)
+    void handleHoverUpdate(const events::HitPointerMove& event, const globalcontext::StateContext& state)
     {
         if (event.hitEntity != state.hoveredEntity)
         {
@@ -710,7 +710,7 @@ private:
      * @return true 如果处理了滚动条按下事件
      * @return false 如果未处理滚动条按下事件
      */
-    bool tryHandleScrollbarPress(const events::HitPointerButton& event, globalContext::StateContext& state)
+    bool tryHandleScrollbarPress(const events::HitPointerButton& event, globalcontext::StateContext& state)
     {
         entt::entity scrollEntity = entt::null;
         bool isVertical = true;
@@ -776,7 +776,7 @@ private:
      * @param event 点击事件
      * @param state 状态上下文
      */
-    void handleEntityRelease(const events::HitPointerButton& event, globalContext::StateContext& state)
+    void handleEntityRelease(const events::HitPointerButton& event, globalcontext::StateContext& state)
     {
         // 先保存当前激活实体，点击逻辑需要在释放清理之前完成
         const entt::entity releasedEntity = state.activeEntity;

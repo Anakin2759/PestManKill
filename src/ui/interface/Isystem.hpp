@@ -19,6 +19,9 @@
 
 namespace ui::interface
 {
+/**
+ * @brief 系统接口 - 定义注册和注销事件处理器的方法
+ */
 struct ISystem : entt::type_list<>
 {
     template <typename Base>
@@ -32,6 +35,9 @@ struct ISystem : entt::type_list<>
     using impl = entt::value_list<&T::registerHandlers, &T::unregisterHandlers>;
 };
 
+/**
+ * @brief 启用注册功能的系统基类模板
+ */
 template <typename Derived>
 struct EnableRegister
 {

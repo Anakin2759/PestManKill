@@ -20,6 +20,7 @@
 #include "../common/Tags.hpp"
 #include "../managers/TextTextureCache.hpp"
 #include "../managers/FontManager.hpp"
+#include "../managers/BatchManager.hpp"
 #include "../core/TextUtils.hpp"
 #include "../api/Utils.hpp"
 #include <functional>
@@ -89,7 +90,7 @@ private:
         policies::TextWrap wrapMode = textComp.wordWrap;
         float wrapWidth = textComp.wrapWidth;
 
-        if (wrapMode == policies::TextWrap::None)
+        if (wrapMode == policies::TextWrap::NONE)
         {
             // 如果在 ScrollArea 内，默认启用换行
             float inferredWidth = getAncestorScrollAreaTextWidth(entity);
@@ -100,7 +101,7 @@ private:
             }
         }
 
-        if (wrapMode != policies::TextWrap::None && wrapWidth <= 0.0F)
+        if (wrapMode != policies::TextWrap::NONE && wrapWidth <= 0.0F)
         {
             wrapWidth = context.size.x();
         }
@@ -108,7 +109,7 @@ private:
         auto measureFunc = [fontManager = context.fontManager](const std::string& str)
         { return fontManager->measureTextWidth(str); };
 
-        if (wrapMode != policies::TextWrap::None && wrapWidth > 0.0F)
+        if (wrapMode != policies::TextWrap::NONE && wrapWidth > 0.0F)
         {
             // 根据换行结果动态修正自动高度，避免滚动区内容高度不匹配
             if (auto* sizeComp = Registry::TryGet<components::Size>(entity))
@@ -236,7 +237,7 @@ private:
         {
             // 多行：自动换行 + 支持滚动
             policies::TextWrap wrapMode =
-                textComp.wordWrap != policies::TextWrap::None ? textComp.wordWrap : policies::TextWrap::Word;
+                textComp.wordWrap != policies::TextWrap::NONE ? textComp.wordWrap : policies::TextWrap::Word;
             std::vector<std::string> lines =
                 ui::utils::wrapTextLines(displayText, static_cast<int>(textSize.x()), wrapMode, measureFunc);
 

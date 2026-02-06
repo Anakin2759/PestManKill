@@ -32,23 +32,6 @@ namespace ui
  */
 class SystemManager
 {
-private:
-    // 使用 entt::poly 动态管理所有系统
-    std::vector<entt::poly<interface::ISystem>> m_systems;
-
-    // 系统索引（用于快速访问特定系统）
-    enum SystemIndex : uint8_t
-    {
-        INTERACTION = 0, // 鼠标交互系统
-        HITTEST = 1,     // 命中测试系统
-        ANIMATION = 2,   // 动画系统
-        LAYOUT = 3,      // 布局系统
-        RENDER = 4,      // 渲染系统
-        WINDOW = 5,      // 窗口同步系统
-        ACTION = 6
-    };
-    static constexpr size_t SYSTEM_COUNT = 7;
-
 public:
     // 构造函数：初始化所有子系统
     SystemManager();
@@ -96,5 +79,8 @@ public:
      * @brief 清空所有UI元素 携带uitag的组件
      */
     void clear(); // NOLINT(readability-convert-member-functions-to-static)
+private:
+    // 使用 entt::poly 动态管理所有系统
+    std::vector<entt::poly<interface::ISystem>> m_systems;
 };
 } // namespace ui

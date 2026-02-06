@@ -186,8 +186,9 @@ public:
         }
 
         // 排序：Z-Order 值越大（越靠近前端）的排在前面
-        std::sort(
-            interactables.begin(), interactables.end(), [](const auto& a, const auto& b) { return a.first > b.first; });
+        std::ranges::sort(interactables,
+                          [](const auto& interactable1, const auto& interactable2)
+                          { return interactable1.first > interactable2.first; });
 
         std::vector<entt::entity> result;
         result.reserve(interactables.size());
@@ -197,7 +198,7 @@ public:
         }
 
         // 更新缓存
-        m_zOrderCache[topWindow] = {result, false};
+        m_zOrderCache[topWindow] = {.entities = result, .dirty = false};
 
         return result;
     }
@@ -312,7 +313,7 @@ private:
     /**
      * @brief ZOrderIndex 组件变化回调
      */
-    void onZOrderChanged(entt::registry& reg, entt::entity entity)
+    void onZOrderChanged(entt::entity entity)
     {
         entt::entity window = findRootWindow(entity);
         invalidateWindowCache(window);
@@ -321,7 +322,7 @@ private:
     /**
      * @brief 层级关系变化回调
      */
-    void onHierarchyChanged([[maybe_unused]] entt::registry& reg, [[maybe_unused]] entt::entity entity)
+    void onHierarchyChanged([[maybe_unused]] entt::entity entity)
     {
         // 层级变化可能影响多个窗口，为简化处理，使所有缓存失效
         invalidateAllCaches();
@@ -330,21 +331,26 @@ private:
     /**
      * @brief 可见性变化回调
      */
-    void onVisibilityChanged([[maybe_unused]] entt::registry& reg, [[maybe_unused]] entt::entity entity)
+    void onVisibilityChanged([[maybe_unused]] entt::entity entity)
     {
         entt::entity window = findRootWindow(entity);
         invalidateWindowCache(window);
     }
-
+    /**
+     * @brief 解析鼠标位置对应的命中实体
+     * @param pos 鼠标绝对位置
+     * @param windowID 窗口ID
+     * @return 命中的实体，如果未命中返回 entt::null
+     */
     entt::entity resolveHitEntity(const Vec2& pos, uint32_t windowID)
     {
         entt::entity topWindow = entt::null;
         auto viewWin = Registry::View<components::Window>();
-        for (auto e : viewWin)
+        for (auto entity : viewWin)
         {
-            if (viewWin.get<components::Window>(e).windowID == windowID)
+            if (viewWin.get<components::Window>(entity).windowID == windowID)
             {
-                topWindow = e;
+                topWindow = entity;
                 break;
             }
         }

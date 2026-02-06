@@ -227,9 +227,9 @@ struct Text
     Color color{1.0F, 1.0F, 1.0F, 1.0F};
     float fontSize = 24.0F; // 0 表示使用默认字体大小
 
-    float wrapWidth = 0.0F;// 换行宽度，0 表示不换行
-    float lineHeight = 1.2F; // 行高倍数
-    policies::TextWrap wordWrap = policies::TextWrap::None;    // 默认不换行
+    float wrapWidth = 0.0F;                                    // 换行宽度，0 表示不换行
+    float lineHeight = 1.2F;                                   // 行高倍数
+    policies::TextWrap wordWrap = policies::TextWrap::NONE;    // 默认不换行
     policies::Alignment alignment = policies::Alignment::NONE; // 默认居中
     policies::TextFlag flags = policies::TextFlag::Default;    // 其他文本属性
 };
@@ -611,7 +611,18 @@ struct Caret
     bool visible = true;
 };
 
+/**
+ * @brief 菜单组件
+ */
 struct Menu
+{
+    using is_component_tag = void;
+};
+
+/**
+ * @brief 复选框组件
+ */
+struct CheckBox
 {
     using is_component_tag = void;
 };

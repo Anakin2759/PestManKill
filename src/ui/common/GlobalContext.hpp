@@ -18,7 +18,7 @@
 #include "Types.hpp"
 #include <entt/entt.hpp>
 
-namespace ui::globalContext
+namespace ui::globalcontext
 {
 /**
  * @brief 全局获取帧间隔状态组件
@@ -26,8 +26,8 @@ namespace ui::globalContext
 struct FrameContext
 {
     using is_component_tag = void;
-    uint32_t intervalMs = 0; // 时间间隔（毫秒）
-    uint8_t frameSlot = 0;
+    uint32_t intervalMs = 0;              // 时间间隔（毫秒）
+    uint8_t frameSlot = 0;                // 当前帧变更槽位 0-1和1-0 是切换到下一帧
     std::vector<uint32_t> taskHandleList; // 任务句柄列表
 };
 
@@ -70,4 +70,4 @@ struct StateContext
     }
 };
 
-} // namespace ui::globalContext
+} // namespace ui::globalcontext

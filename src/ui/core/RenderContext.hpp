@@ -120,7 +120,7 @@ struct RenderContext
     /**
      * @brief 创建子上下文（用于递归渲染子元素）
      */
-    RenderContext
+    [[nodiscard]] RenderContext
         createChildContext(const Eigen::Vector2f& childPos, const Eigen::Vector2f& childSize, float childAlpha) const
     {
         RenderContext child = *this;

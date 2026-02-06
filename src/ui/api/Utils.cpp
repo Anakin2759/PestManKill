@@ -79,8 +79,8 @@ void InvokeTask(std::move_only_function<void()> func)
  */
 TaskHandle TimerCallback(uint32_t interval, std::move_only_function<void()> func)
 {
-    auto& frameSlot = Registry::ctx().get<globalContext::FrameContext>().frameSlot;
-    auto& taskHandleList = Registry::ctx().get<globalContext::FrameContext>().taskHandleList;
+    auto& frameSlot = Registry::ctx().get<globalcontext::FrameContext>().frameSlot;
+    auto& taskHandleList = Registry::ctx().get<globalcontext::FrameContext>().taskHandleList;
     events::QueuedTask task;
     task.func = std::move(func);
     task.intervalMs = interval;

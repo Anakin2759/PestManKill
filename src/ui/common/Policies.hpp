@@ -11,8 +11,25 @@
 #pragma once
 #include <cstdint>
 #include "../traits/PoliciesTraits.hpp"
+
 namespace ui::policies
 {
+
+enum class SystemManager : uint32_t // NOLINT(performance-enum-size)
+{
+    DISABLE_ALL = 0,
+    INTERACTION = 1U << 0U,
+
+    HIT_TEST = 1U << 1U,
+    TWEEN = 1U << 2U,
+    LAYOUT = 1U << 3U,
+    RENDER = 1U << 4U,
+    STATE = 1U << 5U,
+    ACTION = 1U << 6U,
+    TIMER = 1U << 7U,
+    THEME = 1U << 8U,
+    DEFAULT = INTERACTION | HIT_TEST | TWEEN | LAYOUT | RENDER | STATE | ACTION | TIMER | THEME
+};
 /**
  * @brief 布局方向枚举
  */
@@ -74,15 +91,12 @@ enum class Easing : uint8_t
     CUSTOM // 自定义 (例如通过函数指针 Component)
 };
 
-
-
-
 enum class Focus : uint8_t
 {
-    NoFocus,    // 不接受焦点
-    TabFocus,   // 通过 Tab 键接受焦点
-    ClickFocus, // 通过鼠标点击接受焦点
-    StrongFocus // 通过 Tab 键和鼠标点击均可接受焦点
+    NOFOCUS,     // 不接受焦点
+    TAB_FOCUS,   // 通过 Tab 键接受焦点
+    CLICK_FOCUS, // 通过鼠标点击接受焦点
+    STRONG_FOCUS // 通过 Tab 键和鼠标点击均可接受焦点
 };
 
 /**
@@ -90,7 +104,7 @@ enum class Focus : uint8_t
  */
 enum class Size : uint8_t
 {
-    None = 0,
+    NONE = 0,
 
     // 水平方向策略 (Horizontal)
     HFixed = 1 << 0,      // 水平固定
@@ -133,7 +147,7 @@ enum class Visibility : uint8_t
  */
 enum class TextWrap : uint8_t
 {
-    None,
+    NONE,
     Word, // 按单词换行
     Char  // 按字符换行
 };
@@ -184,7 +198,7 @@ enum class Selection : uint8_t
 
 enum class SortOrder : uint8_t
 {
-    None,
+    NONE,
     Ascending,
     Descending
 };
@@ -224,7 +238,7 @@ enum class Position : uint8_t
 
 enum class Scroll : uint8_t
 {
-    None,       // 不滚动
+    NONE,       // 不滚动
     Vertical,   // 垂直滚动
     Horizontal, // 水平滚动
     Both        // 双向滚动

@@ -112,7 +112,7 @@ inline std::vector<std::string> wrapTextLines(const std::string& text,
 {
     std::vector<std::string> lines;
 
-    if (wrapMode == policies::TextWrap::None || maxWidth <= 0)
+    if (wrapMode == policies::TextWrap::NONE || maxWidth <= 0)
     {
         lines.push_back(text);
         return lines;

@@ -19,18 +19,47 @@
  */
 
 #pragma once
+#include <cstdint>
 #include <entt/entt.hpp>
-#include <chrono>
 #include <vector>
 #include "../common/Events.hpp"
-
+#include "../interface/ISystem.hpp"
+#include "../singleton/Dispatcher.hpp"
 namespace ui::systems
 {
 /**
  * @brief 定时器系统
  */
-class TimerSystem
+class TimerSystem : public interface::EnableRegister<TimerSystem>
 {
 public:
+    /**
+     * @brief 注册事件处理器
+     */
+    void registerHandlersImpl();
+
+    /**
+     * @brief 注销事件处理器
+     */
+    void unregisterHandlersImpl();
+
+    void update() noexcept
+    {
+        // 遍历所有活动定时器，检查是否到期
+        for (auto& timer : m_activeTimers)
+        {
+        }
+    };
+
+    void QuitTimer() noexcept {
+
+    };
+
+    void clearTimer() {
+
+    };
+
+private:
+    std::vector<uint32_t> m_activeTimers; // 活动定时器ID列表
 };
-} // namespace ui::systems  
+} // namespace ui::systems

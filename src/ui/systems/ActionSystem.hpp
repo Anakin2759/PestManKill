@@ -78,14 +78,14 @@ private:
             (duration > 0 && (targetScale.has_value() && targetScale.value() == defaultScale)))
         {
             auto& animScale = Registry::GetOrEmplace<components::AnimationScale>(entity);
-            Vec2 to = targetScale.value_or(defaultScale);
+            Vec2 target = targetScale.value_or(defaultScale);
 
             // 只有目标值不同时才重置
-            if (animScale.to != to)
+            if (animScale.to != target)
             {
                 const auto* currentScale = Registry::TryGet<components::Scale>(entity);
-                animScale.from = currentScale ? currentScale->value : defaultScale;
-                animScale.to = to;
+                animScale.from = currentScale != nullptr ? currentScale->value : defaultScale;
+                animScale.to = target;
                 changed = true;
             }
         }
@@ -95,13 +95,13 @@ private:
             (duration > 0 && (targetOffset.has_value() && targetOffset.value() == defaultOffset)))
         {
             auto& animOffset = Registry::GetOrEmplace<components::AnimationRenderOffset>(entity);
-            Vec2 to = targetOffset.value_or(defaultOffset);
+            Vec2 target = targetOffset.value_or(defaultOffset);
 
-            if (animOffset.to != to)
+            if (animOffset.to != target)
             {
                 const auto* currentOffset = Registry::TryGet<components::RenderOffset>(entity);
-                animOffset.from = currentOffset ? currentOffset->value : defaultOffset;
-                animOffset.to = to;
+                animOffset.from = currentOffset != nullptr ? currentOffset->value : defaultOffset;
+                animOffset.to = target;
                 changed = true;
             }
         }
@@ -115,17 +115,20 @@ private:
             animTime.easing = policies::Easing::EASE_OUT_QUAD;
         }
     }
-
+    /**
+     * @brief 处理命中点的指针移动事件
+     * @param event 命中点指针移动事件数据
+     */
     void onHitPointerMove(const ui::events::HitPointerMove& event)
     {
-        auto& ctx = Registry::ctx().get<globalContext::StateContext>();
+        auto& ctx = Registry::ctx().get<globalcontext::StateContext>();
         entt::entity entity = ctx.activeEntity;
 
         if (!Registry::Valid(entity)) return;
 
         // 检查是否可拖拽
         if (auto* draggable = Registry::TryGet<components::Draggable>(entity);
-            draggable && draggable->enabled == policies::Feature::Enabled)
+            draggable != nullptr && draggable->enabled == policies::Feature::Enabled)
         {
             // 只有当鼠标移动且按下时
             if (event.raw.delta == Vec2{0, 0}) return;
@@ -178,7 +181,7 @@ private:
 
     void onMouseRelease(const ui::events::MouseReleaseEvent& event)
     {
-        auto& ctx = Registry::ctx().get<globalContext::StateContext>();
+        auto& ctx = Registry::ctx().get<globalcontext::StateContext>();
         entt::entity entity = event.entity;
 
         if (!Registry::Valid(entity)) return;
@@ -275,7 +278,7 @@ private:
 
     void onQueuedTask(ui::events::QueuedTask& event)
     {
-        auto& frameContext = Registry::ctx().get<globalContext::FrameContext>();
+        auto& frameContext = Registry::ctx().get<globalcontext::FrameContext>();
         event.remainingMs =
             frameContext.intervalMs < event.remainingMs ? event.remainingMs - frameContext.intervalMs : 0;
 

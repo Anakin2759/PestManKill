@@ -73,7 +73,7 @@ public:
         uint32_t batchCount = 0;
         uint32_t vertexCount = 0;
         uint32_t textureCount = 0;
-        float lastFrameTime = 0.0f;
+        float lastFrameTime = 0.0F;
     };
 
     const RenderStats& getStats() const { return m_stats; }
@@ -123,7 +123,6 @@ private:
      */
     void collectBackgroundData(entt::entity entity, core::RenderContext& context);
 
-private:
     std::unique_ptr<managers::DeviceManager> m_deviceManager;
     std::unique_ptr<managers::FontManager> m_fontManager;
     std::unique_ptr<managers::IconManager> m_iconManager;

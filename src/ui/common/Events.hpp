@@ -242,6 +242,11 @@ struct EndFrame
     using is_event_tag = void;
 };
 
+struct UpdateTimer
+{
+    using is_event_tag = void;
+};
+
 struct QueuedTask
 {
     using is_event_tag = void;

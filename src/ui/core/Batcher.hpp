@@ -17,7 +17,7 @@
 #include <optional>
 #include <SDL3/SDL_gpu.h>
 #include <Eigen/Dense>
-#include "RenderTypes.hpp"
+#include "../common/RenderTypes.hpp"
 #include "../managers/DeviceManager.hpp"
 #include "../managers/PipelineCache.hpp"
 
@@ -33,6 +33,10 @@ public:
     }
 
     ~Batcher() { cleanup(); }
+    Batcher(const Batcher&) = delete;
+    Batcher& operator=(const Batcher&) = delete;
+    Batcher(Batcher&&) = delete;
+    Batcher& operator=(Batcher&&) = delete;
 
     void begin()
     {
@@ -101,7 +105,7 @@ public:
                                    float shadowOffsetX = 0.0F,
                                    float shadowOffsetY = 0.0F)
     {
-        RenderBatch batch;
+        render::RenderBatch batch;
         if (!m_scissorStack.empty())
         {
             batch.scissorRect = m_scissorStack.back();
@@ -142,7 +146,7 @@ public:
                        const Eigen::Vector4f& tint,
                        float opacity)
     {
-        RenderBatch batch;
+        render::RenderBatch batch;
         if (!m_scissorStack.empty())
         {
             batch.scissorRect = m_scissorStack.back();
@@ -234,24 +238,13 @@ public:
                 SDL_SetGPUScissor(renderPass, &scissor);
             }
 
-            SDL_BindGPUFragmentSamplers(renderPass, 0, &batch.texture, 1);
-            SDL_BindGPUFragmentSamplers(renderPass, 0, &batch.texture, 1); // 重新绑定 texture sampler?
-
-            // NOTE: The original code used m_sampler. SDL_BindGPUFragmentSamplers expects texture AND sampler.
-            // Let's check how it was done.
-            // SDL_BindGPUFragmentSamplers(renderPass, 0, SDL_GPUTextureBinding{texture, sampler}, 1);
-            // Wait, SDL3 GPU API has changed recently.
-            // In original code:
-            // SDL_GPUTextureSamplerBinding textureSamplerBinding = {batch.texture, m_sampler};
-            // SDL_BindGPUFragmentSamplers(renderPass, 0, &textureSamplerBinding, 1);
-
             SDL_GPUTextureSamplerBinding textureSamplerBinding = {};
             textureSamplerBinding.texture = batch.texture;
             textureSamplerBinding.sampler = m_pipelineCache.getSampler();
 
             SDL_BindGPUFragmentSamplers(renderPass, 0, &textureSamplerBinding, 1);
 
-            SDL_PushGPUFragmentUniformData(cmdBuf, 0, &batch.pushConstants, sizeof(UiPushConstants));
+            SDL_PushGPUFragmentUniformData(cmdBuf, 0, &batch.pushConstants, sizeof(render::UiPushConstants));
 
             SDL_GPUBuffer* vertBuf = uploadBatchVertices(batch.vertices);
             SDL_GPUBuffer* idxBuf = uploadBatchIndices(batch.indices);
@@ -327,10 +320,10 @@ private:
         SDL_ReleaseGPUTransferBuffer(device, transfer);
     }
 
-    SDL_GPUBuffer* uploadBatchVertices(const std::vector<Vertex>& vertices)
+    SDL_GPUBuffer* uploadBatchVertices(const std::vector<render::Vertex>& vertices)
     {
         SDL_GPUDevice* device = m_deviceManager.getDevice();
-        const uint32_t bufferSize = static_cast<uint32_t>(vertices.size() * sizeof(Vertex));
+        const auto bufferSize = static_cast<uint32_t>(vertices.size() * sizeof(render::Vertex));
 
         SDL_GPUBufferCreateInfo bufferInfo = {};
         bufferInfo.usage = SDL_GPU_BUFFERUSAGE_VERTEX;
@@ -424,7 +417,7 @@ private:
     ui::managers::DeviceManager& m_deviceManager;
     ui::managers::PipelineCache& m_pipelineCache;
 
-    std::vector<RenderBatch> m_batches;
+    std::vector<render::RenderBatch> m_batches;
     std::vector<SDL_Rect> m_scissorStack;
     SDL_GPUTexture* m_whiteTexture = nullptr;
 

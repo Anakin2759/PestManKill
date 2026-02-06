@@ -51,7 +51,7 @@ private:
     void update()
     {
         float deltaTime = 16.0F; // 默认 16ms
-        if (const auto* ctx = ui::Registry::ctx().find<globalContext::FrameContext>())
+        if (const auto* ctx = ui::Registry::ctx().find<globalcontext::FrameContext>())
         {
             if (ctx->intervalMs > 0)
             {
