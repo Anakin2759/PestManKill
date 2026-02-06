@@ -16,6 +16,7 @@
 
 #pragma once
 #include <vector>
+#include <memory_resource>
 #include <SDL3/SDL_gpu.h>
 #include "../managers/DeviceManager.hpp"
 #include "../managers/PipelineCache.hpp"
@@ -50,7 +51,7 @@ public:
      * @brief 执行渲染批次
      * @param batches 渲染批次列表
      */
-    void execute(SDL_Window* window, int width, int height, const std::vector<render::RenderBatch>& batches)
+    void execute(SDL_Window* window, int width, int height, const std::pmr::vector<render::RenderBatch>& batches)
     {
         SDL_GPUDevice* device = m_deviceManager.getDevice();
         if (device == nullptr) return;

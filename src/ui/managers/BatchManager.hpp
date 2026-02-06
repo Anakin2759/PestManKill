@@ -17,6 +17,7 @@
 #include <vector>
 #include <optional>
 #include <array>
+#include <memory_resource>
 #include <SDL3/SDL_gpu.h>
 #include <SDL3/SDL_rect.h>
 #include <Eigen/Dense>
@@ -36,15 +37,21 @@ namespace ui::managers
 class BatchManager
 {
 public:
-    BatchManager() = default;
+    BatchManager()
+        : m_bufferResource(256 * 1024), // 预分配 256KB
+          m_batches(&m_bufferResource)
+    {
+    }
 
     /**
      * @brief 清空所有批次
      */
     void clear()
     {
-        m_batches.clear();
         m_currentBatch.reset();
+        // 否则 m_batches 会保留指向已释放内存的指针（capacity），导致内存重叠
+        m_batches = std::pmr::vector<render::RenderBatch>(&m_bufferResource);
+        m_bufferResource.release();
     }
 
     /**
@@ -120,7 +127,7 @@ public:
 
         if (!m_currentBatch.has_value())
         {
-            m_currentBatch = render::RenderBatch{};
+            m_currentBatch.emplace(&m_bufferResource);
             m_currentBatch->texture = texture;
             m_currentBatch->scissorRect = scissor;
             m_currentBatch->pushConstants = pushConstants;
@@ -257,7 +264,7 @@ public:
     /**
      * @brief 获取所有批次
      */
-    [[nodiscard]] const std::vector<render::RenderBatch>& getBatches() const { return m_batches; }
+    [[nodiscard]] const std::pmr::vector<render::RenderBatch>& getBatches() const { return m_batches; }
 
     /**
      * @brief 获取批次数量
@@ -278,8 +285,9 @@ public:
     }
 
 private:
-    std::vector<render::RenderBatch> m_batches;        // 存储所有渲染批次
-    std::optional<render::RenderBatch> m_currentBatch; // 当前正在构建的批次
+    std::pmr::monotonic_buffer_resource m_bufferResource; // 帧内内存池资源
+    std::pmr::vector<render::RenderBatch> m_batches;      // 存储所有渲染批次
+    std::optional<render::RenderBatch> m_currentBatch;    // 当前正在构建的批次
 };
 
 } // namespace ui::managers

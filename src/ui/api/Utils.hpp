@@ -1,3 +1,17 @@
+/**
+ * ************************************************************************
+ *
+ * @file Utils.hpp
+ * @author AnakinLiu (azrael2759@qq.com)
+ * @date 2026-02-06
+ * @version 0.1
+ * @brief 对外部提供的通用工具函数
+ *
+ * ************************************************************************
+ * @copyright Copyright (c) 2026 AnakinLiu
+ * For study and research only, no reprinting.
+ * ************************************************************************
+ */
 #pragma once
 
 #include <cstdint>

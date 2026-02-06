@@ -24,10 +24,9 @@ namespace ui::utils
 /**
  * @brief 换行处理单个段落
  */
-inline std::vector<std::string> wrapParagraph(const std::string& paragraph,
-                                              int maxWidth,
-                                              policies::TextWrap wrapMode,
-                                              std::function<float(const std::string&)> measureFunc)
+template <typename MeasureFunc>
+inline std::vector<std::string>
+    WrapParagraph(const std::string& paragraph, int maxWidth, policies::TextWrap wrapMode, MeasureFunc&& measureFunc)
 {
     std::vector<std::string> lines;
 
@@ -40,10 +39,8 @@ inline std::vector<std::string> wrapParagraph(const std::string& paragraph,
     std::string currentLine;
     std::string word;
 
-    for (size_t i = 0; i < paragraph.size(); ++i)
+    for (auto c : paragraph)
     {
-        char c = paragraph[i];
-
         if (c == ' ' || c == '\t')
         {
             // 空格或制表符
@@ -83,7 +80,7 @@ inline std::vector<std::string> wrapParagraph(const std::string& paragraph,
         std::string testLine = currentLine.empty() ? word : currentLine + " " + word;
         float width = measureFunc(testLine);
 
-        if (width > maxWidth && !currentLine.empty())
+        if (width > static_cast<float>(maxWidth) && !currentLine.empty())
         {
             lines.push_back(currentLine);
             currentLine = word;
@@ -105,10 +102,9 @@ inline std::vector<std::string> wrapParagraph(const std::string& paragraph,
 /**
  * @brief 文本换行处理
  */
-inline std::vector<std::string> wrapTextLines(const std::string& text,
-                                              int maxWidth,
-                                              policies::TextWrap wrapMode,
-                                              std::function<float(const std::string&)> measureFunc)
+template <typename MeasureFunc>
+inline std::vector<std::string>
+    WrapTextLines(const std::string& text, int maxWidth, policies::TextWrap wrapMode, MeasureFunc&& measureFunc)
 {
     std::vector<std::string> lines;
 
@@ -127,7 +123,7 @@ inline std::vector<std::string> wrapTextLines(const std::string& text,
             if (!currentParagraph.empty())
             {
                 // 处理当前段落
-                auto wrappedLines = wrapParagraph(currentParagraph, maxWidth, wrapMode, measureFunc);
+                auto wrappedLines = WrapParagraph(currentParagraph, maxWidth, wrapMode, measureFunc);
                 lines.insert(lines.end(), wrappedLines.begin(), wrappedLines.end());
                 currentParagraph.clear();
             }
@@ -142,7 +138,7 @@ inline std::vector<std::string> wrapTextLines(const std::string& text,
     // 处理最后一段
     if (!currentParagraph.empty())
     {
-        auto wrappedLines = wrapParagraph(currentParagraph, maxWidth, wrapMode, measureFunc);
+        auto wrappedLines = WrapParagraph(currentParagraph, maxWidth, wrapMode, measureFunc);
         lines.insert(lines.end(), wrappedLines.begin(), wrappedLines.end());
     }
 
@@ -152,10 +148,8 @@ inline std::vector<std::string> wrapTextLines(const std::string& text,
 /**
  * @brief 获取能够显示在指定宽度内的文本尾部
  */
-inline std::string getTailThatFits(const std::string& text,
-                                   int maxWidth,
-                                   std::function<float(const std::string&)> measureFunc,
-                                   float& outWidth)
+template <typename MeasureFunc>
+inline std::string GetTailThatFits(const std::string& text, int maxWidth, MeasureFunc&& measureFunc, float& outWidth)
 {
     outWidth = 0.0f;
 

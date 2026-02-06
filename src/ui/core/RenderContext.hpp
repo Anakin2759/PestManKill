@@ -79,6 +79,7 @@ struct RenderContext
      */
     void pushScissor(const SDL_Rect& rect)
     {
+        // 计算新的裁剪区域
         SDL_Rect newScissor = rect;
 
         // 与父级裁剪区域求交集

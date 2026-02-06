@@ -141,7 +141,8 @@ public:
             return false;
         }
 
-        if (m_claimedWindows.find(sdlWindow) != m_claimedWindows.end())
+        SDL_WindowID windowID = SDL_GetWindowID(sdlWindow);
+        if (m_claimedWindows.find(windowID) != m_claimedWindows.end())
         {
             return true;
         }
@@ -153,7 +154,7 @@ public:
             return false;
         }
 
-        m_claimedWindows.insert(sdlWindow);
+        m_claimedWindows.insert(windowID);
         return true;
     }
 
@@ -161,7 +162,8 @@ public:
     {
         if (m_gpuDevice == nullptr || sdlWindow == nullptr) return;
 
-        auto it = m_claimedWindows.find(sdlWindow);
+        SDL_WindowID windowID = SDL_GetWindowID(sdlWindow);
+        auto it = m_claimedWindows.find(windowID);
         if (it != m_claimedWindows.end())
         {
             SDL_ReleaseWindowFromGPUDevice(m_gpuDevice, sdlWindow);
@@ -175,8 +177,9 @@ public:
 
         SDL_WaitForGPUIdle(m_gpuDevice);
 
-        for (auto* window : m_claimedWindows)
+        for (auto windowID : m_claimedWindows)
         {
+            SDL_Window* window = SDL_GetWindowFromID(windowID);
             if (window != nullptr)
             {
                 SDL_ReleaseWindowFromGPUDevice(m_gpuDevice, window);
@@ -196,7 +199,7 @@ public:
 private:
     SDL_GPUDevice* m_gpuDevice = nullptr;
     std::string m_gpuDriver;
-    std::unordered_set<SDL_Window*> m_claimedWindows;
+    std::unordered_set<SDL_WindowID> m_claimedWindows;
 };
 
 } // namespace ui::managers

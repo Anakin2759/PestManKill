@@ -119,7 +119,7 @@ private:
                     const float lineHeight = static_cast<float>(context.fontManager->getFontHeight());
                     if (lineHeight > 0.0F)
                     {
-                        const auto lines = ui::utils::wrapTextLines(
+                        const auto lines = ui::utils::WrapTextLines(
                             textComp.content, static_cast<int>(wrapWidth), wrapMode, measureFunc);
                         const float desiredHeight = static_cast<float>(lines.size()) * lineHeight;
                         if (std::abs(sizeComp->size.y() - desiredHeight) > 0.5F)
@@ -197,7 +197,7 @@ private:
             // 单行：水平滚动显示尾部
             float visibleWidth = 0.0F;
             std::string visibleText =
-                ui::utils::getTailThatFits(displayText, static_cast<int>(textSize.x()), measureFunc, visibleWidth);
+                ui::utils::GetTailThatFits(displayText, static_cast<int>(textSize.x()), measureFunc, visibleWidth);
 
             const policies::Alignment align = policies::Alignment::LEFT | policies::Alignment::VCENTER;
             if (!visibleText.empty())
@@ -239,7 +239,7 @@ private:
             policies::TextWrap wrapMode =
                 textComp.wordWrap != policies::TextWrap::NONE ? textComp.wordWrap : policies::TextWrap::Word;
             std::vector<std::string> lines =
-                ui::utils::wrapTextLines(displayText, static_cast<int>(textSize.x()), wrapMode, measureFunc);
+                ui::utils::WrapTextLines(displayText, static_cast<int>(textSize.x()), wrapMode, measureFunc);
 
             // 计算文本总高度并更新 ScrollArea contentSize
             float totalTextHeight = lines.size() * lineHeight;
@@ -543,7 +543,7 @@ private:
         { return fontManager->measureTextWidth(str); };
 
         std::vector<std::string> lines =
-            ui::utils::wrapTextLines(text, static_cast<int>(wrapWidth), wrapMode, measureFunc);
+            ui::utils::WrapTextLines(text, static_cast<int>(wrapWidth), wrapMode, measureFunc);
         const float totalHeight = static_cast<float>(lines.size()) * lineHeight;
 
         float startY = pos.y();

@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <vector>
 #include <optional>
+#include <memory_resource>
 #include <SDL3/SDL_gpu.h>
 #include <SDL3/SDL_rect.h>
 
@@ -36,11 +37,31 @@ struct Vertex
  */
 struct RenderBatch
 {
-    std::vector<Vertex> vertices;
-    std::vector<uint16_t> indices;
+    using allocator_type = std::pmr::polymorphic_allocator<std::byte>;
+
+    std::pmr::vector<Vertex> vertices;
+    std::pmr::vector<uint16_t> indices;
     UiPushConstants pushConstants{};
     SDL_GPUTexture* texture = nullptr;
     std::optional<SDL_Rect> scissorRect;
+
+    // PMR 兼容构造函数
+    RenderBatch(allocator_type alloc = {}) : vertices(alloc), indices(alloc) {}
+
+    RenderBatch(const RenderBatch& other, allocator_type alloc = {})
+        : vertices(other.vertices, alloc), indices(other.indices, alloc), pushConstants(other.pushConstants),
+          texture(other.texture), scissorRect(other.scissorRect)
+    {
+    }
+
+    RenderBatch(RenderBatch&& other, allocator_type alloc = {})
+        : vertices(std::move(other.vertices), alloc), indices(std::move(other.indices), alloc),
+          pushConstants(other.pushConstants), texture(other.texture), scissorRect(other.scissorRect)
+    {
+    }
+
+    RenderBatch& operator=(const RenderBatch&) = default;
+    RenderBatch& operator=(RenderBatch&&) = default;
 };
 
 // 纹理缓存条目（用于文本）
