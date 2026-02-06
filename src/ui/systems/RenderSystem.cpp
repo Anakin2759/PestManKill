@@ -14,6 +14,7 @@
  */
 
 #include "RenderSystem.hpp"
+#include <algorithm>
 #include "../renderers/ShapeRenderer.hpp"
 #include "../renderers/TextRenderer.hpp"
 #include "../renderers/IconRenderer.hpp"
@@ -270,6 +271,8 @@ void RenderSystem::update() noexcept
         m_screenHeight = static_cast<float>(height);
 
         m_batchManager->clear();
+        m_renderQueue.clear();
+        m_submissionIndex = 0;
 
         if (Registry::AnyOf<components::VisibleTag>(windowEntity))
         {
@@ -293,6 +296,15 @@ void RenderSystem::update() noexcept
             rootContext.alpha = 1.0F;
 
             collectRenderData(windowEntity, rootContext);
+        }
+
+        // Sort render queue by RenderKey (Z-Order primarily)
+        std::sort(m_renderQueue.begin(), m_renderQueue.end());
+
+        // Execute collected render commands
+        for (auto& item : m_renderQueue)
+        {
+            item.renderer->collect(item.entity, item.context);
         }
 
         m_batchManager->optimize();
@@ -470,12 +482,31 @@ void RenderSystem::collectRenderData(entt::entity entity, core::RenderContext& c
         contentOffset = -scrollArea->scrollOffset;
     }
 
+    // Determine Z-Order
+    int32_t zOrder = 0;
+    if (const auto* zOrderComp = Registry::TryGet<components::ZOrderIndex>(entity))
+    {
+        zOrder = zOrderComp->value;
+    }
+
+    // Shift to positive range for unsigned sorting (int32_min -> 0)
+    uint64_t encodedZ = static_cast<uint64_t>(static_cast<int64_t>(zOrder) + 2147483648LL);
+
     // 使用渲染器收集数据
     for (auto& renderer : m_renderers)
     {
         if (renderer->canHandle(entity))
         {
-            renderer->collect(entity, entityContext);
+            RenderItem item;
+            item.entity = entity;
+            item.renderer = renderer.get();
+            item.context = entityContext;
+
+            // Build Key: High=Z, Low=Order
+            item.sortKey = (encodedZ << 32) | (m_submissionIndex & 0xFFFFFFFF);
+
+            m_renderQueue.push_back(item);
+            m_submissionIndex++;
         }
     }
 

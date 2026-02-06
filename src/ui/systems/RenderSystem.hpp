@@ -76,7 +76,7 @@ public:
         float lastFrameTime = 0.0F;
     };
 
-    const RenderStats& getStats() const { return m_stats; }
+    [[nodiscard]] const RenderStats& getStats() const { return m_stats; }
 
     void registerHandlersImpl()
     {
@@ -103,6 +103,17 @@ private:
     void onWindowsGraphicsContextUnset(const events::WindowGraphicsContextUnsetEvent& event);
     void cleanup();
     void createWhiteTexture();
+
+    struct RenderItem
+    {
+        uint64_t sortKey; // Sort key for rendering order
+        entt::entity entity;
+        core::IRenderer* renderer;
+        core::RenderContext context;
+
+        // Custom comparator for sorting
+        bool operator<(const RenderItem& other) const { return sortKey < other.sortKey; }
+    };
 
 public:
     void update() noexcept;
@@ -133,6 +144,10 @@ private:
 
     // 渲染器列表
     std::vector<std::unique_ptr<core::IRenderer>> m_renderers;
+
+    // 渲染队列
+    std::vector<RenderItem> m_renderQueue;
+    uint32_t m_submissionIndex = 0; // Ensures stability for same Z-order items
 
     RenderStats m_stats;
     SDL_GPUTexture* m_whiteTexture = nullptr;

@@ -11,10 +11,11 @@
 经过对 UI 模块的全面审查，发现了 **15 个潜在资源泄漏点** 和 **8 个资源管理不当问题**。主要集中在以下几个方面：
 
 1. **GPU 纹理资源泄漏** (4 处高危)
-2. **TransferBuffer 泄漏** (3 处中危)
-3. **缓存未设置容量限制** (3 处高危)
-4. **异常安全性问题** (5 处中危)
-5. **缺少资源池化机制** (2 处低危)
+2. **PMR 内存安全问题** (1 处高危)
+3. **TransferBuffer 泄漏** (3 处中危)
+4. **缓存未设置容量限制** (3 处高危)
+5. **异常安全性问题** (5 处中危)
+6. **缺少资源池化机制** (2 处低危)
 
 ---
 
@@ -241,6 +242,47 @@ public:
         m_usedBuffers.clear();
     }
 };
+```
+
+---
+
+### 5. BatchManager PMR 内存安全问题 - 崩溃风险
+
+**文件**: `src/ui/managers/BatchManager.hpp`  
+**严重程度**: 🔴 高危  
+
+#### 问题描述
+
+`BatchManager` 使用 `std::pmr::monotonic_buffer_resource` 管理内存，但在 `clear()` 方法中，直接调用 `m_bufferResource.release()` 而没有正确重置 `m_batches` 的内部状态。
+
+```cpp
+void clear()
+{
+    m_batches.clear(); // 仅清空元素，保留 capacity
+    m_currentBatch.reset();
+    m_bufferResource.release(); // 释放底层内存
+}
+```
+
+`vector::clear()` 不会释放内存（capacity保持不变）。当 `resource` 释放后，`vector` 仍然持有指向已释放内存的指针作为其 storage。下次 `push_back` 时，`vector` 可能会继续使用这块已释放（或已重新分配给其他用途）的内存，导致内存破坏或访问冲突。
+
+#### 潜在后果
+
+- **程序崩溃**: 访问违规 (Exception 0xc0000005)
+- **数据损坏**: 渲染批次数据可能被覆盖
+
+#### 建议修复
+
+必须在释放资源前重置 vector 对象，以丢弃过期的内部指针。
+
+```cpp
+void clear()
+{
+    m_currentBatch.reset();
+    // 关键修复：重置 vector 以丢弃旧的 capacity 指针
+    m_batches = std::pmr::vector<render::RenderBatch>(&m_bufferResource);
+    m_bufferResource.release();
+}
 ```
 
 ---
