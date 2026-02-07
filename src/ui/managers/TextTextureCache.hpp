@@ -21,6 +21,7 @@
 #include "DeviceManager.hpp"
 #include "FontManager.hpp"
 #include "../common/RenderTypes.hpp"
+#include "../common/GPUWrappers.hpp"
 #include "../singleton/Logger.hpp"
 #include <Eigen/Dense>
 
@@ -46,18 +47,8 @@ public:
 
     void clear()
     {
-        SDL_GPUDevice* device = m_deviceManager.getDevice();
-        if (device == nullptr) return;
-
-        for (auto& [key, entry] : m_cache)
-        {
-            if (entry.cachedTexture.texture != nullptr)
-            {
-                SDL_ReleaseGPUTexture(device, entry.cachedTexture.texture);
-            }
-        }
         m_cache.clear();
-        Logger::info("[TextTextureCache] Cleared all {} cached textures", m_cache.size());
+        Logger::info("[TextTextureCache] Cleared all cached textures");
     }
 
     /**
@@ -118,7 +109,9 @@ private:
     // 缓存条目结构
     struct CacheEntry
     {
-        ui::render::CachedTexture cachedTexture;
+        wrappers::UniqueGPUTexture texture;
+        uint32_t width = 0;
+        uint32_t height = 0;
         std::chrono::steady_clock::time_point lastAccessTime;
         uint32_t accessCount = 0;
     };
@@ -145,9 +138,9 @@ private:
             iter->second.accessCount++;
             m_hitCount++;
 
-            outWidth = iter->second.cachedTexture.width;
-            outHeight = iter->second.cachedTexture.height;
-            return iter->second.cachedTexture.texture;
+            outWidth = iter->second.width;
+            outHeight = iter->second.height;
+            return iter->second.texture.get();
         }
         return nullptr;
     }
@@ -189,32 +182,34 @@ private:
         }
 
         // 创建GPU纹理并上传数据
-        SDL_GPUTexture* texture = createAndUploadTexture(device, bitmap, bitmapWidth, bitmapHeight);
+        auto texture = createAndUploadTexture(device, bitmap, bitmapWidth, bitmapHeight);
         if (texture == nullptr)
         {
             return nullptr;
         }
 
+        SDL_GPUTexture* rawTexture = texture.get();
+
         // 创建缓存条目
         CacheEntry entry{};
-        entry.cachedTexture = {.texture = texture,
-                               .width = static_cast<uint32_t>(bitmapWidth),
-                               .height = static_cast<uint32_t>(bitmapHeight)};
+        entry.texture = std::move(texture);
+        entry.width = static_cast<uint32_t>(bitmapWidth);
+        entry.height = static_cast<uint32_t>(bitmapHeight);
         entry.lastAccessTime = std::chrono::steady_clock::now();
         entry.accessCount = 1;
 
-        m_cache[cacheKey] = entry;
+        m_cache[cacheKey] = std::move(entry);
 
         outWidth = static_cast<uint32_t>(bitmapWidth);
         outHeight = static_cast<uint32_t>(bitmapHeight);
 
-        return texture;
+        return rawTexture;
     }
 
     /**
      * @brief 创建GPU纹理并上传数据
      */
-    SDL_GPUTexture*
+    wrappers::UniqueGPUTexture
         createAndUploadTexture(SDL_GPUDevice* device, const std::vector<uint8_t>& bitmap, int width, int height)
     {
         SDL_GPUTextureCreateInfo textureInfo = {};
@@ -226,17 +221,17 @@ private:
         textureInfo.num_levels = 1;
         textureInfo.usage = SDL_GPU_TEXTUREUSAGE_SAMPLER;
 
-        SDL_GPUTexture* texture = SDL_CreateGPUTexture(device, &textureInfo);
-        if (texture == nullptr)
+        auto texture =
+            wrappers::make_gpu_resource<wrappers::UniqueGPUTexture>(device, SDL_CreateGPUTexture, &textureInfo);
+        if (!texture)
         {
             Logger::error("[TextTextureCache] Failed to create texture");
             return nullptr;
         }
 
         // 上传纹理数据
-        if (!uploadTextureData(device, texture, bitmap, textureInfo.width, textureInfo.height))
+        if (!uploadTextureData(device, texture.get(), bitmap, textureInfo.width, textureInfo.height))
         {
-            SDL_ReleaseGPUTexture(device, texture);
             return nullptr;
         }
 
@@ -256,29 +251,29 @@ private:
         transferInfo.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
         transferInfo.size = static_cast<uint32_t>(bitmap.size());
 
-        SDL_GPUTransferBuffer* transferBuffer = SDL_CreateGPUTransferBuffer(device, &transferInfo);
-        if (transferBuffer == nullptr)
+        auto transferBuffer = wrappers::make_gpu_resource<wrappers::UniqueGPUTransferBuffer>(
+            device, SDL_CreateGPUTransferBuffer, &transferInfo);
+        if (!transferBuffer)
         {
             Logger::error("[TextTextureCache] Failed to create transfer buffer");
             return false;
         }
 
-        void* data = SDL_MapGPUTransferBuffer(device, transferBuffer, false);
+        void* data = SDL_MapGPUTransferBuffer(device, transferBuffer.get(), false);
         if (data == nullptr)
         {
             Logger::error("[TextTextureCache] Failed to map transfer buffer");
-            SDL_ReleaseGPUTransferBuffer(device, transferBuffer);
             return false;
         }
 
         SDL_memcpy(data, bitmap.data(), bitmap.size());
-        SDL_UnmapGPUTransferBuffer(device, transferBuffer);
+        SDL_UnmapGPUTransferBuffer(device, transferBuffer.get());
 
         SDL_GPUCommandBuffer* cmd = SDL_AcquireGPUCommandBuffer(device);
         SDL_GPUCopyPass* copyPass = SDL_BeginGPUCopyPass(cmd);
 
         SDL_GPUTextureTransferInfo srcInfo = {};
-        srcInfo.transfer_buffer = transferBuffer;
+        srcInfo.transfer_buffer = transferBuffer.get();
         srcInfo.pixels_per_row = width;
         srcInfo.rows_per_layer = height;
 
@@ -291,7 +286,6 @@ private:
         SDL_UploadToGPUTexture(copyPass, &srcInfo, &dstRegion, false);
         SDL_EndGPUCopyPass(copyPass);
         SDL_SubmitGPUCommandBuffer(cmd);
-        SDL_ReleaseGPUTransferBuffer(device, transferBuffer);
 
         return true;
     }
@@ -316,11 +310,13 @@ private:
             }
         }
 
-        // 释放纹理资源
+        // 释放纹理资源 (Auto managed by UniqueGPUTexture)
+        /*
         if (lru->second.cachedTexture.texture != nullptr)
         {
             SDL_ReleaseGPUTexture(device, lru->second.cachedTexture.texture);
         }
+        */
 
         Logger::debug("[TextTextureCache] Evicted LRU entry: {} (access count: {})",
                       lru->first.substr(0, 50),
@@ -367,10 +363,6 @@ private:
             auto iter = m_cache.find(entries[i].first);
             if (iter != m_cache.end())
             {
-                if (iter->second.cachedTexture.texture != nullptr)
-                {
-                    SDL_ReleaseGPUTexture(device, iter->second.cachedTexture.texture);
-                }
                 m_cache.erase(iter);
                 evicted++;
             }

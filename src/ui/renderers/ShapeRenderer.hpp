@@ -39,7 +39,7 @@ class ShapeRenderer : public core::IRenderer
 public:
     ShapeRenderer() = default;
 
-    bool canHandle(entt::entity entity) const override
+    [[nodiscard]] bool canHandle(entt::entity entity) const override
     {
         // 任何有背景或边框的实体都需要形状渲染
         return Registry::AnyOf<components::Background, components::Border>(entity);

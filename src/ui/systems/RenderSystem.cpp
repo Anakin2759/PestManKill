@@ -141,11 +141,10 @@ void RenderSystem::cleanup()
         m_textTextureCache->clear();
     }
 
-    if (m_whiteTexture != nullptr)
+    if (m_whiteTexture)
     {
         Logger::info("[RenderSystem] 释放白色纹理");
-        SDL_ReleaseGPUTexture(device, m_whiteTexture);
-        m_whiteTexture = nullptr;
+        m_whiteTexture.reset();
     }
 
     Logger::info("[RenderSystem] 清理渲染器");
@@ -178,30 +177,31 @@ void RenderSystem::createWhiteTexture()
     texInfo.num_levels = 1;
     texInfo.usage = SDL_GPU_TEXTUREUSAGE_SAMPLER;
 
-    m_whiteTexture = SDL_CreateGPUTexture(device, &texInfo);
-    if (m_whiteTexture == nullptr) return;
+    m_whiteTexture = wrappers::make_gpu_resource<wrappers::UniqueGPUTexture>(device, SDL_CreateGPUTexture, &texInfo);
+    if (!m_whiteTexture) return;
 
     uint32_t whitePixel = 0xFFFFFFFF;
     SDL_GPUTransferBufferCreateInfo transferInfo = {};
     transferInfo.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
     transferInfo.size = sizeof(whitePixel);
 
-    SDL_GPUTransferBuffer* transfer = SDL_CreateGPUTransferBuffer(device, &transferInfo);
+    auto transfer = wrappers::make_gpu_resource<wrappers::UniqueGPUTransferBuffer>(
+        device, SDL_CreateGPUTransferBuffer, &transferInfo);
 
-    void* data = SDL_MapGPUTransferBuffer(device, transfer, false);
+    void* data = SDL_MapGPUTransferBuffer(device, transfer.get(), false);
     SDL_memcpy(data, &whitePixel, sizeof(whitePixel));
-    SDL_UnmapGPUTransferBuffer(device, transfer);
+    SDL_UnmapGPUTransferBuffer(device, transfer.get());
 
     SDL_GPUCommandBuffer* cmd = SDL_AcquireGPUCommandBuffer(device);
     SDL_GPUCopyPass* copyPass = SDL_BeginGPUCopyPass(cmd);
 
     SDL_GPUTextureTransferInfo srcInfo = {};
-    srcInfo.transfer_buffer = transfer;
+    srcInfo.transfer_buffer = transfer.get();
     srcInfo.pixels_per_row = 1;
     srcInfo.rows_per_layer = 1;
 
     SDL_GPUTextureRegion dstRegion = {};
-    dstRegion.texture = m_whiteTexture;
+    dstRegion.texture = m_whiteTexture.get();
     dstRegion.w = 1;
     dstRegion.h = 1;
     dstRegion.d = 1;
@@ -209,7 +209,6 @@ void RenderSystem::createWhiteTexture()
     SDL_UploadToGPUTexture(copyPass, &srcInfo, &dstRegion, false);
     SDL_EndGPUCopyPass(copyPass);
     SDL_SubmitGPUCommandBuffer(cmd);
-    SDL_ReleaseGPUTransferBuffer(device, transfer);
 }
 
 void RenderSystem::update() noexcept
@@ -237,9 +236,9 @@ void RenderSystem::update() noexcept
         return;
     }
 
-    if (m_pipelineCache == nullptr || m_pipelineCache->getPipeline() == nullptr)
+    if (m_pipelineCache == nullptr)
     {
-        Logger::warn("Pipeline not ready");
+        Logger::warn("Pipeline cache not initialized");
         return;
     }
 
@@ -267,6 +266,21 @@ void RenderSystem::update() noexcept
         SDL_GetWindowSizeInPixels(sdlWindow, &width, &height);
         if (width <= 0 || height <= 0) continue;
 
+        // Ensure pipeline is ready for this window
+        // This handles cases where OnWindowGraphicsContextSet event was missed or not yet fired
+        if (m_pipelineCache->getPipeline() == nullptr)
+        {
+            m_deviceManager->claimWindow(sdlWindow);
+            m_pipelineCache->createPipeline(sdlWindow);
+
+            if (m_pipelineCache->getPipeline() == nullptr)
+            {
+                // Still failed? Likely shader loading issue or device context issue
+                // Don't log continuously to avoid spamming
+                continue;
+            }
+        }
+
         m_screenWidth = static_cast<float>(width);
         m_screenHeight = static_cast<float>(height);
 
@@ -284,7 +298,7 @@ void RenderSystem::update() noexcept
             rootContext.textTextureCache = m_textTextureCache.get();
             rootContext.batchManager = m_batchManager.get();
             rootContext.sdlWindow = sdlWindow;
-            rootContext.whiteTexture = m_whiteTexture;
+            rootContext.whiteTexture = m_whiteTexture.get();
 
             Eigen::Vector2f rootOffset = Eigen::Vector2f(0, 0);
             if (const auto* pos = Registry::TryGet<components::Position>(windowEntity))

@@ -35,6 +35,7 @@
 #include "../managers/FontManager.hpp"
 #include "../managers/IconManager.hpp"
 #include "../managers/DeviceManager.hpp"
+#include "../common/GPUWrappers.hpp"
 #include "../managers/PipelineCache.hpp"
 #include "../managers/TextTextureCache.hpp"
 #include "../managers/BatchManager.hpp"
@@ -106,9 +107,9 @@ private:
 
     struct RenderItem
     {
-        uint64_t sortKey; // Sort key for rendering order
-        entt::entity entity;
-        core::IRenderer* renderer;
+        uint64_t sortKey = 0; // Sort key for rendering order
+        entt::entity entity = entt::null;
+        core::IRenderer* renderer = nullptr;
         core::RenderContext context;
 
         // Custom comparator for sorting
@@ -150,7 +151,7 @@ private:
     uint32_t m_submissionIndex = 0; // Ensures stability for same Z-order items
 
     RenderStats m_stats;
-    SDL_GPUTexture* m_whiteTexture = nullptr;
+    wrappers::UniqueGPUTexture m_whiteTexture;
 
     float m_screenWidth = 0.0F;
     float m_screenHeight = 0.0F;
