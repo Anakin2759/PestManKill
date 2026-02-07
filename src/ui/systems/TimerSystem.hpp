@@ -28,7 +28,7 @@
 #include <entt/entt.hpp>
 #include <vector>
 #include "../common/Events.hpp"
-#include "../interface/ISystem.hpp"
+#include "../interface/Isystem.hpp"
 #include "../singleton/Dispatcher.hpp"
 namespace ui::systems
 {
@@ -48,23 +48,28 @@ public:
      */
     void unregisterHandlersImpl();
 
-    void update() noexcept
-    {
-        // 遍历所有活动定时器，检查是否到期
-        for (auto& timer : m_activeTimers)
-        {
-        }
-    };
+    /**
+     * @brief 添加定时任务
+     * @param interval 间隔时间（毫秒）
+     * @param func 任务函数
+     * @param singleShot 是否单次执行（默认为false，重复执行）
+     * @return 任务句柄
+     */
+    static uint32_t addTask(uint32_t interval, std::move_only_function<void()> func, bool singleShot = false);
 
-    void QuitTimer() noexcept {
+    /**
+     * @brief 取消定时任务
+     * @param handle 任务句柄
+     */
+    static void cancelTask(uint32_t handle);
 
-    };
-
-    void clearTimer() {
-
-    };
+    /**
+     * @brief 更新定时器状态（每帧调用）
+     * @param deltaMs 时间增量（毫秒）
+     */
+    static void update(uint32_t deltaMs);
 
 private:
-    std::vector<uint32_t> m_activeTimers; // 活动定时器ID列表
+    void onUpdateTimer(const events::UpdateTimer& event);
 };
 } // namespace ui::systems

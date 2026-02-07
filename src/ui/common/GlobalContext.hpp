@@ -28,7 +28,30 @@ struct FrameContext
     using is_component_tag = void;
     uint32_t intervalMs = 0;              // 时间间隔（毫秒）
     uint8_t frameSlot = 0;                // 当前帧变更槽位 0-1和1-0 是切换到下一帧
-    std::vector<uint32_t> taskHandleList; // 任务句柄列表
+};
+
+/**
+ * @brief 定时器任务信息
+ */
+struct TimerTask
+{
+    uint32_t id;                               // 任务ID
+    std::move_only_function<void()> func;      // 任务函数
+    uint32_t intervalMs;                       // 间隔时间（毫秒）
+    uint32_t remainingMs;                      // 剩余时间（毫秒）
+    bool singleShot;                           // 是否单次执行
+    uint8_t frameSlot;                         // 帧槽位
+    bool cancelled;                            // 是否已取消
+};
+
+/**
+ * @brief 定时器上下文 - 保存定时器状态
+ */
+struct TimerContext
+{
+    using is_component_tag = void;
+    std::vector<TimerTask> tasks;       // 定时任务列表
+    uint32_t nextTaskId = 1;            // 下一个任务ID
 };
 
 /**

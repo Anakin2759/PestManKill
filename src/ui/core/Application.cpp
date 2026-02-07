@@ -28,6 +28,7 @@ Application::Application([[maybe_unused]] int argc, [[maybe_unused]] char* argv[
     Logger::info("SDL 初始化成功");
     Registry::ctx().emplace<globalcontext::FrameContext>();
     Registry::ctx().emplace<globalcontext::StateContext>();
+    Registry::ctx().emplace<globalcontext::TimerContext>();
 
     m_systems.registerAllHandlers();
     auto taskChain = tasks::QueuedTask{} | tasks::InputTask{} | tasks::RenderTask{};
