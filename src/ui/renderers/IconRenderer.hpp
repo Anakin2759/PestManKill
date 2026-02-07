@@ -69,7 +69,7 @@ public:
             // 纹理图标
             if (const auto* textureInfo = m_iconManager->getTextureInfo(iconComp->textureId))
             {
-                iconTexture = textureInfo->texture;
+                iconTexture = textureInfo->texture.get();
                 uvMin = textureInfo->uvMin;
                 uvMax = textureInfo->uvMax;
                 actualIconSize = iconDrawSize.cwiseMin(Eigen::Vector2f(textureInfo->width, textureInfo->height));
@@ -93,7 +93,7 @@ public:
             if (const auto* textureInfo =
                     m_iconManager->getTextureInfo(fontName, iconComp->codepoint, iconComp->size.y()))
             {
-                iconTexture = textureInfo->texture;
+                iconTexture = textureInfo->texture.get();
                 uvMin = textureInfo->uvMin;
                 uvMax = textureInfo->uvMax;
                 actualIconSize = {textureInfo->width, textureInfo->height};

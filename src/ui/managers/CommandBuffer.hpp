@@ -21,6 +21,7 @@
 #include "../managers/DeviceManager.hpp"
 #include "../managers/PipelineCache.hpp"
 #include "../common/RenderTypes.hpp"
+#include "../common/GPUWrappers.hpp"
 #include "../singleton/Logger.hpp"
 
 namespace ui::managers
@@ -82,7 +83,7 @@ public:
 
         // 上传所有数据到传输缓冲区
         // 使用 cycle=true 让 SDL 自动管理传输缓冲区的轮替，避免 CPU 等待
-        void* mapData = SDL_MapGPUTransferBuffer(device, m_transferBuffer, true);
+        void* mapData = SDL_MapGPUTransferBuffer(device, m_transferBuffer.get(), true);
         if (mapData != nullptr)
         {
             auto* ptr = static_cast<uint8_t*>(mapData);
@@ -105,7 +106,7 @@ public:
                 iOffset += iSize; // Not strictly needed but good for logic
             }
 
-            SDL_UnmapGPUTransferBuffer(device, m_transferBuffer);
+            SDL_UnmapGPUTransferBuffer(device, m_transferBuffer.get());
         }
         else
         {
@@ -134,11 +135,11 @@ public:
         SDL_GPUCopyPass* copyPass = SDL_BeginGPUCopyPass(cmdBuf);
 
         SDL_GPUTransferBufferLocation srcLoc = {};
-        srcLoc.transfer_buffer = m_transferBuffer;
+        srcLoc.transfer_buffer = m_transferBuffer.get();
         srcLoc.offset = 0;
 
         SDL_GPUBufferRegion dstReg = {};
-        dstReg.buffer = currentFrame.vertexBuffer;
+        dstReg.buffer = currentFrame.vertexBuffer.get();
         dstReg.offset = 0;
         dstReg.size = totalVertexSize;
 
@@ -147,7 +148,7 @@ public:
 
         // 复制索引数据
         srcLoc.offset = totalVertexSize;
-        dstReg.buffer = currentFrame.indexBuffer;
+        dstReg.buffer = currentFrame.indexBuffer.get();
         dstReg.size = totalIndexSize;
         SDL_UploadToGPUBuffer(copyPass, &srcLoc, &dstReg, false);
 
@@ -177,12 +178,12 @@ public:
 
         // 绑定顶点和索引缓冲区 (使用当前帧的缓冲区)
         SDL_GPUBufferBinding vertexBinding = {};
-        vertexBinding.buffer = currentFrame.vertexBuffer;
+        vertexBinding.buffer = currentFrame.vertexBuffer.get();
         vertexBinding.offset = 0;
         SDL_BindGPUVertexBuffers(renderPass, 0, &vertexBinding, 1);
 
         SDL_GPUBufferBinding indexBinding = {};
-        indexBinding.buffer = currentFrame.indexBuffer;
+        indexBinding.buffer = currentFrame.indexBuffer.get();
         indexBinding.offset = 0;
         SDL_BindGPUIndexBuffer(renderPass, &indexBinding, SDL_GPU_INDEXELEMENTSIZE_16BIT);
 
@@ -248,31 +249,15 @@ public:
      */
     void cleanup()
     {
-        SDL_GPUDevice* device = m_deviceManager.getDevice();
-        if (device)
+        // RAII handles destruction
+        for (auto& frame : m_frameResources)
         {
-            for (auto& frame : m_frameResources)
-            {
-                if (frame.vertexBuffer)
-                {
-                    SDL_ReleaseGPUBuffer(device, frame.vertexBuffer);
-                    frame.vertexBuffer = nullptr;
-                }
-                if (frame.indexBuffer)
-                {
-                    SDL_ReleaseGPUBuffer(device, frame.indexBuffer);
-                    frame.indexBuffer = nullptr;
-                }
-                frame.vertexBufferSize = 0;
-                frame.indexBufferSize = 0;
-            }
-
-            if (m_transferBuffer)
-            {
-                SDL_ReleaseGPUTransferBuffer(device, m_transferBuffer);
-                m_transferBuffer = nullptr;
-            }
+            frame.vertexBuffer.reset();
+            frame.indexBuffer.reset();
+            frame.vertexBufferSize = 0;
+            frame.indexBufferSize = 0;
         }
+        m_transferBuffer.reset();
         m_transferBufferSize = 0;
     }
 
@@ -281,8 +266,8 @@ private:
 
     struct FrameResource
     {
-        SDL_GPUBuffer* vertexBuffer = nullptr;
-        SDL_GPUBuffer* indexBuffer = nullptr;
+        wrappers::UniqueGPUBuffer vertexBuffer;
+        wrappers::UniqueGPUBuffer indexBuffer;
         uint32_t vertexBufferSize = 0;
         uint32_t indexBufferSize = 0;
     };
@@ -294,8 +279,6 @@ private:
 
         if (m_transferBufferSize < neededTransfer)
         {
-            if (m_transferBuffer) SDL_ReleaseGPUTransferBuffer(device, m_transferBuffer);
-
             m_transferBufferSize =
                 neededTransfer > m_transferBufferSize * 2 ? neededTransfer : m_transferBufferSize * 2;
             if (m_transferBufferSize < neededTransfer) m_transferBufferSize = neededTransfer;
@@ -303,33 +286,35 @@ private:
             SDL_GPUTransferBufferCreateInfo tInfo = {};
             tInfo.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
             tInfo.size = m_transferBufferSize;
-            m_transferBuffer = SDL_CreateGPUTransferBuffer(device, &tInfo);
+
+            m_transferBuffer = wrappers::make_gpu_resource<wrappers::UniqueGPUTransferBuffer>(
+                device, SDL_CreateGPUTransferBuffer, &tInfo);
             if (!m_transferBuffer) return false;
         }
 
         // 顶点缓冲区 (Per Frame)
         if (frame.vertexBufferSize < vSize)
         {
-            if (frame.vertexBuffer) SDL_ReleaseGPUBuffer(device, frame.vertexBuffer);
             frame.vertexBufferSize = vSize > frame.vertexBufferSize * 2 ? vSize : frame.vertexBufferSize * 2;
 
             SDL_GPUBufferCreateInfo bInfo = {};
             bInfo.usage = SDL_GPU_BUFFERUSAGE_VERTEX;
             bInfo.size = frame.vertexBufferSize;
-            frame.vertexBuffer = SDL_CreateGPUBuffer(device, &bInfo);
+            frame.vertexBuffer =
+                wrappers::make_gpu_resource<wrappers::UniqueGPUBuffer>(device, SDL_CreateGPUBuffer, &bInfo);
             if (!frame.vertexBuffer) return false;
         }
 
         // 索引缓冲区 (Per Frame)
         if (frame.indexBufferSize < iSize)
         {
-            if (frame.indexBuffer) SDL_ReleaseGPUBuffer(device, frame.indexBuffer);
             frame.indexBufferSize = iSize > frame.indexBufferSize * 2 ? iSize : frame.indexBufferSize * 2;
 
             SDL_GPUBufferCreateInfo bInfo = {};
             bInfo.usage = SDL_GPU_BUFFERUSAGE_INDEX;
             bInfo.size = frame.indexBufferSize;
-            frame.indexBuffer = SDL_CreateGPUBuffer(device, &bInfo);
+            frame.indexBuffer =
+                wrappers::make_gpu_resource<wrappers::UniqueGPUBuffer>(device, SDL_CreateGPUBuffer, &bInfo);
             if (!frame.indexBuffer) return false;
         }
         return true;
@@ -342,7 +327,7 @@ private:
     FrameResource m_frameResources[MAX_FRAMES_IN_FLIGHT];
     uint32_t m_frameIndex = 0;
 
-    SDL_GPUTransferBuffer* m_transferBuffer = nullptr;
+    wrappers::UniqueGPUTransferBuffer m_transferBuffer;
     uint32_t m_transferBufferSize = 0;
 };
 
