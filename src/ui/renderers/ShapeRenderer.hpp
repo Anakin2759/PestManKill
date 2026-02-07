@@ -39,18 +39,6 @@ class ShapeRenderer : public core::IRenderer
 public:
     ShapeRenderer() = default;
 
-    // 焦点边框颜色常量
-    static constexpr float FOCUS_BORDER_COLOR_R = 0.2f;
-    static constexpr float FOCUS_BORDER_COLOR_G = 0.6f;
-    static constexpr float FOCUS_BORDER_COLOR_B = 1.0f;
-    static constexpr float FOCUS_BORDER_COLOR_A = 1.0f;
-    
-    // 焦点边框最小粗细
-    static constexpr float FOCUS_BORDER_MIN_THICKNESS = 2.0f;
-    
-    // 边框粗细半值系数
-    static constexpr float HALF_THICKNESS_MULTIPLIER = 0.5f;
-
     [[nodiscard]] bool canHandle(entt::entity entity) const override
     {
         // 任何有背景或边框的实体都需要形状渲染
@@ -77,22 +65,28 @@ public:
     }
 
 private:
+    // 焦点边框颜色常量
+    static constexpr Eigen::Vector4f FOCUS_BORDER_COLOR{0.2f, 0.6f, 1.0f, 1.0f};
+    
+    // 焦点边框最小粗细
+    static constexpr float FOCUS_BORDER_MIN_THICKNESS = 2.0f;
+    
+    // 边框粗细半值系数
+    static constexpr float HALF_THICKNESS_MULTIPLIER = 0.5f;
     /**
      * @brief 初始化基础推送常量
      * @param pushConstants 要初始化的推送常量
      * @param context 渲染上下文
-     * @param rectWidth 矩形宽度
-     * @param rectHeight 矩形高度
+     * @param rectSize 矩形尺寸
      */
     void initBasicPushConstants(render::UiPushConstants& pushConstants,
                                 const core::RenderContext& context,
-                                float rectWidth,
-                                float rectHeight) const
+                                const Eigen::Vector2f& rectSize) const
     {
         pushConstants.screen_size[0] = context.screenWidth;
         pushConstants.screen_size[1] = context.screenHeight;
-        pushConstants.rect_size[0] = rectWidth;
-        pushConstants.rect_size[1] = rectHeight;
+        pushConstants.rect_size[0] = rectSize.x();
+        pushConstants.rect_size[1] = rectSize.y();
         pushConstants.opacity = context.alpha;
         pushConstants.shadow_soft = 0.0f;
         pushConstants.shadow_offset_x = 0.0f;
@@ -109,7 +103,7 @@ private:
 
         // 准备推送常量
         render::UiPushConstants pushConstants{};
-        initBasicPushConstants(pushConstants, context, context.size.x(), context.size.y());
+        initBasicPushConstants(pushConstants, context, context.size);
         
         pushConstants.radius[0] = bg->borderRadius.x();
         pushConstants.radius[1] = bg->borderRadius.y();
@@ -157,8 +151,7 @@ private:
         // 焦点状态覆盖边框样式
         if (focused)
         {
-            color = Eigen::Vector4f(FOCUS_BORDER_COLOR_R, FOCUS_BORDER_COLOR_G, 
-                                    FOCUS_BORDER_COLOR_B, FOCUS_BORDER_COLOR_A);
+            color = FOCUS_BORDER_COLOR;
             if (thickness < FOCUS_BORDER_MIN_THICKNESS)
             {
                 thickness = FOCUS_BORDER_MIN_THICKNESS;
@@ -190,7 +183,7 @@ private:
     void renderBorderLines(core::RenderContext& context, const Eigen::Vector4f& color, float thickness)
     {
         render::UiPushConstants pushConstants{};
-        initBasicPushConstants(pushConstants, context, context.size.x(), context.size.y());
+        initBasicPushConstants(pushConstants, context, context.size);
 
         context.batchManager->beginBatch(context.whiteTexture, context.currentScissor, pushConstants);
 
