@@ -18,6 +18,7 @@
 #include <SDL3/SDL_gpu.h>
 #include <Eigen/Dense>
 #include "../common/RenderTypes.hpp"
+#include "../common/GPUWrappers.hpp"
 #include "../managers/DeviceManager.hpp"
 #include "../managers/PipelineCache.hpp"
 
@@ -42,7 +43,7 @@ public:
     {
         m_batches.clear();
         m_scissorStack.clear();
-        if (m_whiteTexture == nullptr)
+        if (!m_whiteTexture)
         {
             createWhiteTexture();
         }
@@ -50,12 +51,7 @@ public:
 
     void cleanup()
     {
-        SDL_GPUDevice* device = m_deviceManager.getDevice();
-        if (device != nullptr && m_whiteTexture != nullptr)
-        {
-            SDL_ReleaseGPUTexture(device, m_whiteTexture);
-            m_whiteTexture = nullptr;
-        }
+        m_whiteTexture.reset();
         m_batches.clear();
     }
 
@@ -110,7 +106,7 @@ public:
         {
             batch.scissorRect = m_scissorStack.back();
         }
-        batch.texture = m_whiteTexture;
+        batch.texture = m_whiteTexture.get();
 
         batch.pushConstants.screen_size[0] = m_screenWidth;
         batch.pushConstants.screen_size[1] = m_screenHeight;
@@ -287,8 +283,9 @@ private:
         texInfo.num_levels = 1;
         texInfo.usage = SDL_GPU_TEXTUREUSAGE_SAMPLER;
 
-        m_whiteTexture = SDL_CreateGPUTexture(device, &texInfo);
-        if (m_whiteTexture == nullptr) return;
+        m_whiteTexture =
+            wrappers::make_gpu_resource<wrappers::UniqueGPUTexture>(device, SDL_CreateGPUTexture, &texInfo);
+        if (!m_whiteTexture) return;
 
         uint32_t whitePixel = 0xFFFFFFFF;
         SDL_GPUTransferBufferCreateInfo transferInfo = {};
@@ -309,7 +306,7 @@ private:
         srcInfo.rows_per_layer = 1;
 
         SDL_GPUTextureRegion dstRegion = {};
-        dstRegion.texture = m_whiteTexture;
+        dstRegion.texture = m_whiteTexture.get();
         dstRegion.w = 1;
         dstRegion.h = 1;
         dstRegion.d = 1;
@@ -419,7 +416,7 @@ private:
 
     std::vector<render::RenderBatch> m_batches;
     std::vector<SDL_Rect> m_scissorStack;
-    SDL_GPUTexture* m_whiteTexture = nullptr;
+    wrappers::UniqueGPUTexture m_whiteTexture;
 
     float m_screenWidth = 0.0F;
     float m_screenHeight = 0.0F;
