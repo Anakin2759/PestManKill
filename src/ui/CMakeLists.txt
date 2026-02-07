@@ -8,6 +8,7 @@ set(UI_SOURCES
     core/EventLoop.cpp
     core/SystemManager.cpp
     systems/RenderSystem.cpp
+    systems/TimerSystem.cpp
     managers/FontManager.cpp
     managers/IconManager.cpp
     api/Size.cpp
@@ -37,6 +38,7 @@ set(UI_HEADERS
     systems/StateSystem.hpp
     systems/HitTestSystem.hpp
     systems/ActionSystem.hpp
+    systems/TimerSystem.hpp
     
     # Managers
     managers/DeviceManager.hpp

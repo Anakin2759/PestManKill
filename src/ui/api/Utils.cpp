@@ -4,6 +4,7 @@
 #include "../singleton/Dispatcher.hpp"
 #include "../common/Components.hpp"
 #include "../common/GlobalContext.hpp"
+#include "../systems/TimerSystem.hpp"
 namespace ui::utils
 {
 void MarkLayoutDirty(::entt::entity entity)
@@ -79,16 +80,16 @@ void InvokeTask(std::move_only_function<void()> func)
  */
 TaskHandle TimerCallback(uint32_t interval, std::move_only_function<void()> func)
 {
-    auto& frameSlot = Registry::ctx().get<globalcontext::FrameContext>().frameSlot;
-    auto& taskHandleList = Registry::ctx().get<globalcontext::FrameContext>().taskHandleList;
-    events::QueuedTask task;
-    task.func = std::move(func);
-    task.intervalMs = interval;
-    task.remainingMs = interval;
-    task.singleShoot = false;
-    task.frameSlot = frameSlot;
-    Dispatcher::Enqueue<events::QueuedTask>(std::move(task));
-    return 0;
+    return systems::TimerSystem::addTask(interval, std::move(func));
+}
+
+/**
+ * @brief 取消注册一个定时任务
+ * @param handle 任务句柄
+ */
+void CancelQueuedTask(TaskHandle handle)
+{
+    systems::TimerSystem::cancelTask(handle);
 }
 
 } // namespace ui::utils
