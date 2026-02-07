@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <sstream>
 #include <ui.hpp>
 #include "src/utils/Logger.h"
 
@@ -110,60 +111,58 @@ inline void CreateMainWindow()
                                    std::string content = ui::text::GetTextEditContent(chatInput);
                                    if (!content.empty())
                                    {
-                                       LOG_INFO("发送聊天消息: {}", content);
-
-                                       // 追加新消息到 TextBrowser
-                                       const std::string fullMsg = "[Me]: " + content;
-                                       std::string currentHistory = ui::text::GetTextEditContent(messageArea);
-
-                                       if (!currentHistory.empty())
+                                       try
                                        {
-                                           currentHistory += "\n";
-                                       }
-                                       currentHistory += fullMsg;
+                                           LOG_INFO("发送聊天消息: {}", content);
 
-                                       // 限制消息行数 (简单实现)
-                                       constexpr size_t MAX_MESSAGES = 20;
-                                       // TODO: 这里可以优化，但保持原有逻辑
-                                       std::vector<std::string> lines;
-                                       lines.reserve(MAX_MESSAGES + 5);
-                                       size_t start = 0;
-                                       while (start <= currentHistory.size())
-                                       {
-                                           size_t end = currentHistory.find('\n', start);
-                                           if (end == std::string::npos)
+                                           // 追加新消息到 TextBrowser
+                                           const std::string fullMsg = "[Me]: " + content;
+                                           std::string currentHistory = ui::text::GetTextEditContent(messageArea);
+
+                                           if (!currentHistory.empty())
                                            {
-                                               lines.emplace_back(currentHistory.substr(start));
-                                               break;
+                                               currentHistory += "\n";
                                            }
-                                           lines.emplace_back(currentHistory.substr(start, end - start));
-                                           start = end + 1;
-                                       }
+                                           currentHistory += fullMsg;
 
-                                       if (lines.size() > MAX_MESSAGES)
-                                       {
-                                           const size_t keepFrom = lines.size() - MAX_MESSAGES;
-                                           std::string trimmed;
-                                           for (size_t i = keepFrom; i < lines.size(); ++i)
+                                           // 限制消息行数 (使用 stringstream 更安全)
+                                           constexpr size_t MAX_MESSAGES = 20;
+                                           std::vector<std::string> lines;
+                                           std::stringstream ss(currentHistory);
+                                           std::string line;
+                                           while (std::getline(ss, line))
                                            {
-                                               if (!trimmed.empty()) trimmed += "\n";
-                                               trimmed += lines[i];
+                                               lines.push_back(line);
                                            }
-                                           currentHistory = trimmed;
+
+                                           if (lines.size() > MAX_MESSAGES)
+                                           {
+                                               currentHistory.clear();
+                                               const size_t keepFrom = lines.size() - MAX_MESSAGES;
+                                               for (size_t i = keepFrom; i < lines.size(); ++i)
+                                               {
+                                                   if (!currentHistory.empty()) currentHistory += "\n";
+                                                   currentHistory += lines[i];
+                                               }
+                                           }
+
+                                           // 更新显示内容 (TextBrowser 通常同时使用 TextEdit.buffer 存储长文本 和
+                                           // Text.content 显示)
+                                           ui::text::SetTextEditContent(messageArea, currentHistory);
+                                           ui::text::SetTextContent(messageArea, currentHistory);
+
+                                           // 清空输入框
+                                           ui::text::SetTextEditContent(chatInput, "");
+                                           ui::text::SetTextContent(chatInput, "");
+
+                                           // 文本内容变化但尺寸不变，只需标记渲染脏
+                                           ui::utils::MarkRenderDirty(chatInput);
+                                           ui::utils::MarkRenderDirty(messageArea);
                                        }
-
-                                       // 更新显示内容 (TextBrowser 通常同时使用 TextEdit.buffer 存储长文本 和
-                                       // Text.content 显示)
-                                       ui::text::SetTextEditContent(messageArea, currentHistory);
-                                       ui::text::SetTextContent(messageArea, currentHistory);
-
-                                       // 清空输入框
-                                       ui::text::SetTextEditContent(chatInput, "");
-                                       ui::text::SetTextContent(chatInput, "");
-
-                                       // 文本内容变化但尺寸不变，只需标记渲染脏
-                                       ui::utils::MarkRenderDirty(chatInput);
-                                       ui::utils::MarkRenderDirty(messageArea);
+                                       catch (const std::exception& e)
+                                       {
+                                           LOG_ERROR("Chat Error: {}", e.what());
+                                       }
                                    }
                                });
 

@@ -108,6 +108,8 @@ public:
 
     static void Destroy(::entt::entity entity) { getInstance().m_registry.destroy(entity); }
 
+
+
     template <ComponentOrUiTag... Type>
     static auto Clear()
     {

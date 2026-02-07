@@ -246,12 +246,12 @@ struct TextEdit
     Color textColor{1.0F, 1.0F, 1.0F, 1.0F};
     size_t maxLength = MAX_LENGTH;
     policies::TextFlag inputMode = policies::TextFlag::Default;
-    
+
     // Cursor and selection
-    size_t cursorPosition = 0;  // 光标位置（字节索引）
-    size_t selectionStart = 0;  // 选择起始位置（字节索引）
-    size_t selectionEnd = 0;    // 选择结束位置（字节索引）
-    bool hasSelection = false;  // 是否有选中内容
+    size_t cursorPosition = 0; // 光标位置（字节索引）
+    size_t selectionStart = 0; // 选择起始位置（字节索引）
+    size_t selectionEnd = 0;   // 选择结束位置（字节索引）
+    bool hasSelection = false; // 是否有选中内容
 };
 
 // ===================== 图像组件 =====================

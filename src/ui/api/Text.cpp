@@ -21,9 +21,13 @@ void SetButtonEnabled(::entt::entity entity, bool enabled)
 {
     if (!Registry::Valid(entity)) return;
     if (enabled)
+    {
         Registry::Remove<components::DisabledTag>(entity);
+    }
     else
+    {
         Registry::EmplaceOrReplace<components::DisabledTag>(entity);
+    }
 }
 
 void SetTextContent(::entt::entity entity, const std::string& content)
@@ -67,7 +71,19 @@ std::string GetTextEditContent(::entt::entity entity)
 void SetTextEditContent(::entt::entity entity, const std::string& content)
 {
     if (!Registry::Valid(entity)) return;
-    if (auto* textEdit = Registry::TryGet<components::TextEdit>(entity)) textEdit->buffer = content;
+    if (auto* textEdit = Registry::TryGet<components::TextEdit>(entity))
+    {
+        textEdit->buffer = content;
+        // Ensure cursor is within bounds to prevent "invalid string position" exception
+        if (textEdit->cursorPosition > textEdit->buffer.size())
+        {
+            textEdit->cursorPosition = textEdit->buffer.size();
+        }
+        // Reset selection on content change to ensure validity
+        textEdit->hasSelection = false;
+        textEdit->selectionStart = 0;
+        textEdit->selectionEnd = 0;
+    }
 }
 
 void SetPasswordMode(::entt::entity entity, policies::TextFlag enabled)

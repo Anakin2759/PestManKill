@@ -91,16 +91,16 @@ entt::entity CreateTextEdit(const std::string& placeholder, bool multiline, std:
     textEdit.selectionStart = 0;
     textEdit.selectionEnd = 0;
     textEdit.hasSelection = false;
-    
+
     auto& text = Registry::Emplace<components::Text>(entity);
     text.content = "";
     Registry::Emplace<components::Clickable>(entity);
     Registry::Get<components::Size>(entity).minSize = {100.0F, multiline ? 80.0F : 30.0F};
     Registry::Emplace<components::TextEditTag>(entity);
-    
+
     // Add Caret component for cursor rendering
     Registry::Emplace<components::Caret>(entity);
-    
+
     return entity;
 }
 
@@ -266,8 +266,6 @@ entt::entity CreateTextBrowser(std::string_view initialText, std::string_view pl
     scrollArea.scrollBar = policies::ScrollBar::Draggable | policies::ScrollBar::AutoHide;
     scrollArea.anchor = policies::ScrollAnchor::Smart; // 设置为智能模式
 
-    // 设置文本默认对齐方式：左上对齐
-    auto& text = Registry::Get<components::Text>(entity);
     text.alignment = policies::Alignment::TOP | policies::Alignment::LEFT;
     text.wordWrap = policies::TextWrap::Word; // 自动换行
 
