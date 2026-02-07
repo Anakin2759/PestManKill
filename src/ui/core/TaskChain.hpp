@@ -154,7 +154,6 @@ struct QueuedTask
         auto& frameContext = Registry::ctx().get<globalcontext::FrameContext>();
         frameContext.intervalMs = delta;
         frameContext.frameSlot = (frameContext.frameSlot + 1) % 2;
-        Dispatcher::Update<ui::events::QueuedTask>();
         Dispatcher::Trigger<ui::events::UpdateTimer>();
         Dispatcher::Update();
     }

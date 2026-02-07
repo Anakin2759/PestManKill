@@ -69,8 +69,22 @@ void QuitUiEventLoop()
 
 void InvokeTask(std::move_only_function<void()> func)
 {
-    events::QueuedTask task{.func = std::move(func), .intervalMs = 0, .remainingMs = 0, .singleShoot = true};
-    Dispatcher::Enqueue<events::QueuedTask>(std::move(task));
+    // Use TimerSystem for single-shot immediate task
+    auto& timerCtx = Registry::ctx().get<globalcontext::TimerContext>();
+    auto& frameCtx = Registry::ctx().get<globalcontext::FrameContext>();
+    
+    uint32_t taskId = timerCtx.nextTaskId++;
+    
+    globalcontext::TimerTask task;
+    task.id = taskId;
+    task.func = std::move(func);
+    task.intervalMs = 0;
+    task.remainingMs = 0;
+    task.singleShot = true;
+    task.frameSlot = frameCtx.frameSlot;
+    task.cancelled = false;
+    
+    timerCtx.tasks.push_back(std::move(task));
 }
 /**
  * @brief 注册一个定时任务，返回任务句柄
