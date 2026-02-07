@@ -14,6 +14,7 @@
  */
 #pragma once
 #include <vector>
+#include <span>
 #include <optional>
 #include <SDL3/SDL_gpu.h>
 #include <Eigen/Dense>
@@ -317,7 +318,7 @@ private:
         SDL_ReleaseGPUTransferBuffer(device, transfer);
     }
 
-    SDL_GPUBuffer* uploadBatchVertices(const std::vector<render::Vertex>& vertices)
+    SDL_GPUBuffer* uploadBatchVertices(std::span<const render::Vertex> vertices)
     {
         SDL_GPUDevice* device = m_deviceManager.getDevice();
         const auto bufferSize = static_cast<uint32_t>(vertices.size() * sizeof(render::Vertex));
@@ -364,7 +365,7 @@ private:
         return buffer;
     }
 
-    SDL_GPUBuffer* uploadBatchIndices(const std::vector<uint16_t>& indices)
+    SDL_GPUBuffer* uploadBatchIndices(std::span<const uint16_t> indices)
     {
         SDL_GPUDevice* device = m_deviceManager.getDevice();
         const uint32_t bufferSize = static_cast<uint32_t>(indices.size() * sizeof(uint16_t));

@@ -47,7 +47,7 @@ public:
 
     void collect(entt::entity entity, core::RenderContext& context) override
     {
-        if (!context.batchManager || !context.deviceManager || !context.whiteTexture)
+        if (context.batchManager == nullptr || context.deviceManager == nullptr || context.whiteTexture == nullptr)
         {
             return;
         }
@@ -66,13 +66,13 @@ public:
 
 private:
     // 焦点边框颜色常量
-    static inline const Eigen::Vector4f FOCUS_BORDER_COLOR{0.2f, 0.6f, 1.0f, 1.0f};
+    static inline const Eigen::Vector4f FOCUS_BORDER_COLOR{0.2F, 0.6F, 1.0F, 1.0F};
 
     // 焦点边框最小粗细
-    static constexpr float FOCUS_BORDER_MIN_THICKNESS = 2.0f;
+    static constexpr float FOCUS_BORDER_MIN_THICKNESS = 2.0F;
 
     // 边框粗细半值系数
-    static constexpr float HALF_THICKNESS_MULTIPLIER = 0.5f;
+    static constexpr float HALF_THICKNESS_MULTIPLIER = 0.5F;
     /**
      * @brief 初始化基础推送常量
      *
@@ -93,9 +93,9 @@ private:
         pushConstants.rect_size[1] = rectSize.y();
         pushConstants.opacity = context.alpha;
         // 默认无阴影，调用者可以覆盖
-        pushConstants.shadow_soft = 0.0f;
-        pushConstants.shadow_offset_x = 0.0f;
-        pushConstants.shadow_offset_y = 0.0f;
+        pushConstants.shadow_soft = 0.0F;
+        pushConstants.shadow_offset_x = 0.0F;
+        pushConstants.shadow_offset_y = 0.0F;
     }
 
     void renderBackground(entt::entity entity, core::RenderContext& context)
@@ -138,16 +138,16 @@ private:
         const bool focused = Registry::AnyOf<components::FocusedTag>(entity);
 
         // 早期返回：既没有焦点也没有有效边框
-        if (!focused && (!border || border->thickness <= 0.0f))
+        if (!focused && (!border || border->thickness <= 0.0F))
         {
             return;
         }
 
-        Eigen::Vector4f color(0.0f, 0.0f, 0.0f, 1.0f);
-        float thickness = 0.0f;
+        Eigen::Vector4f color(0.0F, 0.0F, 0.0F, 1.0F);
+        float thickness = 0.0F;
 
         // 设置边框属性
-        if (border && border->thickness > 0.0f)
+        if (border != nullptr && border->thickness > 0.0F)
         {
             color = Eigen::Vector4f(border->color.red, border->color.green, border->color.blue, border->color.alpha);
             thickness = border->thickness;
@@ -157,10 +157,7 @@ private:
         if (focused)
         {
             color = FOCUS_BORDER_COLOR;
-            if (thickness < FOCUS_BORDER_MIN_THICKNESS)
-            {
-                thickness = FOCUS_BORDER_MIN_THICKNESS;
-            }
+            thickness = std::max(thickness, FOCUS_BORDER_MIN_THICKNESS);
         }
 
         // 渲染边框线条

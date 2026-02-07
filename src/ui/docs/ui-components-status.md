@@ -12,7 +12,7 @@
 | **Window** | `Window`, `Title` | `CreateWindow` | LayoutSystem, RenderSystem | 基础窗口容器 |
 | **Buttons** | `Clickable`, `Text`, `Background` | `CreateButton` | InteractionSystem, TextRenderer | 基础按钮 |
 | **Label** | `Text` | `CreateLabel` | TextRenderer | 文本显示 |
-| **TextEdit (Input)** | `TextEdit`, `Caret` | `CreateTextEdit`, `CreateLineEdit` | InteractionSystem | 单行/多行文本输入 |
+| **TextEdit (Input)** | `TextEdit`, `Caret` | `CreateTextEdit`, `CreateLineEdit` | InteractionSystem | 单行/多行文本输入，支持光标导航、文本选择、剪贴板操作 (2026-02-07 更新) |
 | **Image** | `Image` | `CreateImage` | ShapeRenderer (Texture) | 图片显示 |
 | **ScrollArea** | `ScrollArea`, `ScrollBar` | `CreateScrollArea` | LayoutSystem, ScrollBarRenderer | 滚动容器 |
 | **Layouts** | `LayoutInfo` | `CreateVBoxLayout`, `CreateHBoxLayout` | LayoutSystem | 垂直/水平布局容器 |
@@ -55,3 +55,18 @@
 2. **增强列表与容器**: 实现 `List` 和 `Grid Layout`，这对通过数据生成 UI（如背包、技能列表）至关重要。
 3. **菜单系统**: 实现 `Menu` 和 `ComboBox`，完善设置界面的交互体验。
 4. **整合工厂方法**: 统一所有新组件到 `src/ui/api/Factory.hpp` 中。
+
+## 5. 最近更新 (Recent Updates)
+
+### 2026-02-07: TextEdit 输入框基本功能完善
+完整实现了文本输入框的基本编辑功能：
+- ✅ 光标位置跟踪和管理
+- ✅ 键盘导航 (方向键, Home/End)
+- ✅ 文本选择 (Shift + 导航键)
+- ✅ 删除操作 (Backspace, Delete)
+- ✅ 剪贴板集成 (Ctrl+C/X/V)
+- ✅ 全选功能 (Ctrl+A)
+- ✅ 光标位置插入文本
+- ⏳ 待实现: 鼠标选择、撤销/重做
+
+详见: `src/ui/docs/textedit-implementation-2026-02-07.md`
