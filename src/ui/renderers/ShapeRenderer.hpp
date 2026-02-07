@@ -75,6 +75,10 @@ private:
     static constexpr float HALF_THICKNESS_MULTIPLIER = 0.5f;
     /**
      * @brief 初始化基础推送常量
+     * 
+     * 设置所有推送常量的默认值，包括屏幕尺寸、矩形尺寸、不透明度和阴影默认值。
+     * 阴影参数默认设置为0，调用者可以根据需要在之后覆盖这些值。
+     * 
      * @param pushConstants 要初始化的推送常量
      * @param context 渲染上下文
      * @param rectSize 矩形尺寸
@@ -88,6 +92,7 @@ private:
         pushConstants.rect_size[0] = rectSize.x();
         pushConstants.rect_size[1] = rectSize.y();
         pushConstants.opacity = context.alpha;
+        // 默认无阴影，调用者可以覆盖
         pushConstants.shadow_soft = 0.0f;
         pushConstants.shadow_offset_x = 0.0f;
         pushConstants.shadow_offset_y = 0.0f;
