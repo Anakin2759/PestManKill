@@ -60,7 +60,7 @@ public:
      * @brief  隐式转换为 SDL_PropertiesID 以便直接传递给 SDL 函数
      * @return SDL_PropertiesID
      */
-    explicit operator SDL_PropertiesID() const { return m_id; }
+    operator SDL_PropertiesID() const { return m_id; }
     [[nodiscard]] SDL_PropertiesID get() const { return m_id; }
 
 private:

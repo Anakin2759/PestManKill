@@ -46,11 +46,10 @@ RenderSystem::RenderSystem(RenderSystem&& other) noexcept
       m_iconManager(std::move(other.m_iconManager)), m_pipelineCache(std::move(other.m_pipelineCache)),
       m_textTextureCache(std::move(other.m_textTextureCache)), m_batchManager(std::move(other.m_batchManager)),
       m_commandBuffer(std::move(other.m_commandBuffer)), m_renderers(std::move(other.m_renderers)),
-      m_stats(other.m_stats), m_whiteTexture(other.m_whiteTexture), m_screenWidth(other.m_screenWidth),
+      m_stats(other.m_stats), m_whiteTexture(std::move(other.m_whiteTexture)), m_screenWidth(other.m_screenWidth),
       m_screenHeight(other.m_screenHeight)
 {
     Logger::info("[RenderSystem] 移动构造完成");
-    other.m_whiteTexture = nullptr;
 }
 
 RenderSystem& RenderSystem::operator=(RenderSystem&& other) noexcept
@@ -69,11 +68,10 @@ RenderSystem& RenderSystem::operator=(RenderSystem&& other) noexcept
         m_commandBuffer = std::move(other.m_commandBuffer);
         m_renderers = std::move(other.m_renderers);
         m_stats = other.m_stats;
-        m_whiteTexture = other.m_whiteTexture;
+        m_whiteTexture = std::move(other.m_whiteTexture);
         m_screenWidth = other.m_screenWidth;
         m_screenHeight = other.m_screenHeight;
 
-        other.m_whiteTexture = nullptr;
         other.m_iconManager = nullptr;
         Logger::info("[RenderSystem] 移动赋值完成");
     }
