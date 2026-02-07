@@ -33,7 +33,7 @@ void TimerSystem::unregisterHandlersImpl()
     Dispatcher::Sink<events::UpdateTimer>().disconnect<&TimerSystem::onUpdateTimer>(*this);
 }
 
-uint32_t TimerSystem::addTask(uint32_t interval, std::move_only_function<void()> func)
+uint32_t TimerSystem::addTask(uint32_t interval, std::move_only_function<void()> func, bool singleShot)
 {
     auto& timerCtx = Registry::ctx().get<globalcontext::TimerContext>();
     auto& frameCtx = Registry::ctx().get<globalcontext::FrameContext>();
@@ -45,13 +45,13 @@ uint32_t TimerSystem::addTask(uint32_t interval, std::move_only_function<void()>
     task.func = std::move(func);
     task.intervalMs = interval;
     task.remainingMs = interval;
-    task.singleShot = false;
+    task.singleShot = singleShot;
     task.frameSlot = frameCtx.frameSlot;
     task.cancelled = false;
     
     timerCtx.tasks.push_back(std::move(task));
     
-    Logger::info("TimerSystem: Added task {} with interval {}ms", taskId, interval);
+    Logger::info("TimerSystem: Added task {} with interval {}ms (singleShot={})", taskId, interval, singleShot);
     return taskId;
 }
 

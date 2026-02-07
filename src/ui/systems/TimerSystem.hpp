@@ -52,9 +52,10 @@ public:
      * @brief 添加定时任务
      * @param interval 间隔时间（毫秒）
      * @param func 任务函数
+     * @param singleShot 是否单次执行（默认为false，重复执行）
      * @return 任务句柄
      */
-    static uint32_t addTask(uint32_t interval, std::move_only_function<void()> func);
+    static uint32_t addTask(uint32_t interval, std::move_only_function<void()> func, bool singleShot = false);
 
     /**
      * @brief 取消定时任务
