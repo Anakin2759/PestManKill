@@ -262,7 +262,20 @@ public:
     }
 
 private:
-    // Helper functions for text editing
+    // =====================================================================
+    // Text Editing Helper Functions
+    // =====================================================================
+    // These functions implement basic text editing operations for TextEdit
+    // components including cursor movement, text selection, and clipboard
+    // integration.
+    //
+    // Mouse selection is not yet implemented - would require:
+    // 1. Converting mouse coordinates to text buffer positions
+    // 2. Tracking mouse down/drag/up states
+    // 3. Coordinating with TextRenderer for glyph positioning
+    // 4. Handling multi-line text layout
+    // =====================================================================
+    
     static void clearSelection(components::TextEdit& edit)
     {
         edit.hasSelection = false;
