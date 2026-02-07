@@ -39,6 +39,18 @@ class ShapeRenderer : public core::IRenderer
 public:
     ShapeRenderer() = default;
 
+    // 焦点边框颜色常量
+    static constexpr float FOCUS_BORDER_COLOR_R = 0.2f;
+    static constexpr float FOCUS_BORDER_COLOR_G = 0.6f;
+    static constexpr float FOCUS_BORDER_COLOR_B = 1.0f;
+    static constexpr float FOCUS_BORDER_COLOR_A = 1.0f;
+    
+    // 焦点边框最小粗细
+    static constexpr float FOCUS_BORDER_MIN_THICKNESS = 2.0f;
+    
+    // 边框粗细半值系数
+    static constexpr float HALF_THICKNESS_MULTIPLIER = 0.5f;
+
     [[nodiscard]] bool canHandle(entt::entity entity) const override
     {
         // 任何有背景或边框的实体都需要形状渲染
@@ -65,6 +77,28 @@ public:
     }
 
 private:
+    /**
+     * @brief 初始化基础推送常量
+     * @param pushConstants 要初始化的推送常量
+     * @param context 渲染上下文
+     * @param rectWidth 矩形宽度
+     * @param rectHeight 矩形高度
+     */
+    void initBasicPushConstants(render::UiPushConstants& pushConstants,
+                                const core::RenderContext& context,
+                                float rectWidth,
+                                float rectHeight) const
+    {
+        pushConstants.screen_size[0] = context.screenWidth;
+        pushConstants.screen_size[1] = context.screenHeight;
+        pushConstants.rect_size[0] = rectWidth;
+        pushConstants.rect_size[1] = rectHeight;
+        pushConstants.opacity = context.alpha;
+        pushConstants.shadow_soft = 0.0f;
+        pushConstants.shadow_offset_x = 0.0f;
+        pushConstants.shadow_offset_y = 0.0f;
+    }
+
     void renderBackground(entt::entity entity, core::RenderContext& context)
     {
         const auto* bg = Registry::TryGet<components::Background>(entity);
@@ -75,15 +109,12 @@ private:
 
         // 准备推送常量
         render::UiPushConstants pushConstants{};
-        pushConstants.screen_size[0] = context.screenWidth;
-        pushConstants.screen_size[1] = context.screenHeight;
-        pushConstants.rect_size[0] = context.size.x();
-        pushConstants.rect_size[1] = context.size.y();
+        initBasicPushConstants(pushConstants, context, context.size.x(), context.size.y());
+        
         pushConstants.radius[0] = bg->borderRadius.x();
         pushConstants.radius[1] = bg->borderRadius.y();
         pushConstants.radius[2] = bg->borderRadius.z();
         pushConstants.radius[3] = bg->borderRadius.w();
-        pushConstants.opacity = context.alpha;
 
         // 处理阴影
         const auto* shadow = Registry::TryGet<components::Shadow>(entity);
@@ -92,12 +123,6 @@ private:
             pushConstants.shadow_soft = shadow->softness;
             pushConstants.shadow_offset_x = shadow->offset.x();
             pushConstants.shadow_offset_y = shadow->offset.y();
-        }
-        else
-        {
-            pushConstants.shadow_soft = 0.0f;
-            pushConstants.shadow_offset_x = 0.0f;
-            pushConstants.shadow_offset_y = 0.0f;
         }
 
         // 开始批次
@@ -111,51 +136,67 @@ private:
     void renderBorder(entt::entity entity, core::RenderContext& context)
     {
         const auto* border = Registry::TryGet<components::Border>(entity);
-        bool focused = Registry::AnyOf<components::FocusedTag>(entity);
+        const bool focused = Registry::AnyOf<components::FocusedTag>(entity);
 
+        // 早期返回：既没有焦点也没有有效边框
         if (!focused && (!border || border->thickness <= 0.0f))
         {
             return;
         }
 
         Eigen::Vector4f color(0.0f, 0.0f, 0.0f, 1.0f);
-        Eigen::Vector4f radius(0.0f, 0.0f, 0.0f, 0.0f);
         float thickness = 0.0f;
 
-        if (border)
+        // 设置边框属性
+        if (border && border->thickness > 0.0f)
         {
             color = Eigen::Vector4f(border->color.red, border->color.green, border->color.blue, border->color.alpha);
-            radius = Eigen::Vector4f(
-                border->borderRadius.x(), border->borderRadius.y(), border->borderRadius.z(), border->borderRadius.w());
             thickness = border->thickness;
         }
 
+        // 焦点状态覆盖边框样式
         if (focused)
         {
-            color = Eigen::Vector4f(0.2f, 0.6f, 1.0f, 1.0f); // 蓝色焦点环
-            if (thickness < 2.0f) thickness = 2.0f;
+            color = Eigen::Vector4f(FOCUS_BORDER_COLOR_R, FOCUS_BORDER_COLOR_G, 
+                                    FOCUS_BORDER_COLOR_B, FOCUS_BORDER_COLOR_A);
+            if (thickness < FOCUS_BORDER_MIN_THICKNESS)
+            {
+                thickness = FOCUS_BORDER_MIN_THICKNESS;
+            }
         }
 
+        // 渲染边框线条
         if (thickness > 0.0f)
         {
             renderBorderLines(context, color, thickness);
         }
     }
 
+    /**
+     * @brief 渲染边框线条
+     * 
+     * 通过绘制4个矩形来创建边框效果：
+     * - 顶边：从左上角开始，宽度为整个元素宽度
+     * - 右边：从右上角开始，高度为整个元素高度
+     * - 底边：从左下角开始，宽度为整个元素宽度
+     * - 左边：从左上角开始，高度为整个元素高度
+     * 
+     * 使用 halfThickness 偏移确保边框绘制在元素边界上
+     * 
+     * @param context 渲染上下文
+     * @param color 边框颜色
+     * @param thickness 边框粗细（必须 > 0）
+     */
     void renderBorderLines(core::RenderContext& context, const Eigen::Vector4f& color, float thickness)
     {
         render::UiPushConstants pushConstants{};
-        pushConstants.screen_size[0] = context.screenWidth;
-        pushConstants.screen_size[1] = context.screenHeight;
-        pushConstants.rect_size[0] = context.size.x();
-        pushConstants.rect_size[1] = context.size.y();
-        pushConstants.opacity = context.alpha;
+        initBasicPushConstants(pushConstants, context, context.size.x(), context.size.y());
 
         context.batchManager->beginBatch(context.whiteTexture, context.currentScissor, pushConstants);
 
         const Eigen::Vector2f& pos = context.position;
         const Eigen::Vector2f& size = context.size;
-        const float halfThickness = thickness * 0.5f;
+        const float halfThickness = thickness * HALF_THICKNESS_MULTIPLIER;
 
         // 顶边
         context.batchManager->addRect({pos.x(), pos.y() - halfThickness}, {size.x(), thickness}, color);
