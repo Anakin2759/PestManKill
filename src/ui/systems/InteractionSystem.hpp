@@ -262,6 +262,186 @@ public:
     }
 
 private:
+    // Helper functions for text editing
+    static void clearSelection(components::TextEdit& edit)
+    {
+        edit.hasSelection = false;
+        edit.selectionStart = 0;
+        edit.selectionEnd = 0;
+    }
+
+    static void deleteSelection(components::TextEdit& edit)
+    {
+        if (!edit.hasSelection) return;
+        
+        size_t start = edit.selectionStart;
+        size_t end = edit.selectionEnd;
+        
+        edit.buffer.erase(start, end - start);
+        edit.cursorPosition = start;
+        clearSelection(edit);
+    }
+
+    static void selectAll(components::TextEdit& edit)
+    {
+        if (edit.buffer.empty()) return;
+        
+        edit.hasSelection = true;
+        edit.selectionStart = 0;
+        edit.selectionEnd = edit.buffer.size();
+        edit.cursorPosition = edit.selectionEnd;
+    }
+
+    static void moveCursorLeft(components::TextEdit& edit, bool extend)
+    {
+        if (edit.cursorPosition > 0)
+        {
+            if (extend)
+            {
+                if (!edit.hasSelection)
+                {
+                    edit.hasSelection = true;
+                    edit.selectionStart = edit.cursorPosition;
+                    edit.selectionEnd = edit.cursorPosition;
+                }
+                edit.cursorPosition--;
+                if (edit.cursorPosition < edit.selectionStart)
+                {
+                    edit.selectionStart = edit.cursorPosition;
+                }
+                else
+                {
+                    edit.selectionEnd = edit.cursorPosition;
+                }
+            }
+            else
+            {
+                edit.cursorPosition--;
+            }
+        }
+    }
+
+    static void moveCursorRight(components::TextEdit& edit, bool extend)
+    {
+        if (edit.cursorPosition < edit.buffer.size())
+        {
+            if (extend)
+            {
+                if (!edit.hasSelection)
+                {
+                    edit.hasSelection = true;
+                    edit.selectionStart = edit.cursorPosition;
+                    edit.selectionEnd = edit.cursorPosition;
+                }
+                edit.cursorPosition++;
+                if (edit.cursorPosition > edit.selectionEnd)
+                {
+                    edit.selectionEnd = edit.cursorPosition;
+                }
+                else
+                {
+                    edit.selectionStart = edit.cursorPosition;
+                }
+            }
+            else
+            {
+                edit.cursorPosition++;
+            }
+        }
+    }
+
+    static void moveCursorToLineStart(components::TextEdit& edit, bool extend)
+    {
+        // Find the start of current line
+        size_t lineStart = edit.cursorPosition;
+        while (lineStart > 0 && edit.buffer[lineStart - 1] != '\n')
+        {
+            lineStart--;
+        }
+        
+        if (extend)
+        {
+            if (!edit.hasSelection)
+            {
+                edit.hasSelection = true;
+                edit.selectionEnd = edit.cursorPosition;
+            }
+            edit.selectionStart = lineStart;
+        }
+        
+        edit.cursorPosition = lineStart;
+    }
+
+    static void moveCursorToLineEnd(components::TextEdit& edit, bool extend)
+    {
+        // Find the end of current line
+        size_t lineEnd = edit.cursorPosition;
+        while (lineEnd < edit.buffer.size() && edit.buffer[lineEnd] != '\n')
+        {
+            lineEnd++;
+        }
+        
+        if (extend)
+        {
+            if (!edit.hasSelection)
+            {
+                edit.hasSelection = true;
+                edit.selectionStart = edit.cursorPosition;
+            }
+            edit.selectionEnd = lineEnd;
+        }
+        
+        edit.cursorPosition = lineEnd;
+    }
+
+    static void copyToClipboard(const components::TextEdit& edit)
+    {
+        if (!edit.hasSelection) return;
+        
+        std::string selectedText = edit.buffer.substr(edit.selectionStart, edit.selectionEnd - edit.selectionStart);
+        SDL_SetClipboardText(selectedText.c_str());
+    }
+
+    static void pasteFromClipboard(components::TextEdit& edit)
+    {
+        if (!SDL_HasClipboardText()) return;
+        
+        char* clipboardText = SDL_GetClipboardText();
+        if (clipboardText == nullptr) return;
+        
+        std::string text(clipboardText);
+        SDL_free(clipboardText);
+        
+        if (text.empty()) return;
+        
+        // Filter newlines for single-line input
+        const auto modeVal = static_cast<uint8_t>(edit.inputMode);
+        const auto multiFlag = static_cast<uint8_t>(policies::TextFlag::Multiline);
+        if ((modeVal & multiFlag) == 0)
+        {
+            text.erase(std::remove(text.begin(), text.end(), '\n'), text.end());
+            text.erase(std::remove(text.begin(), text.end(), '\r'), text.end());
+        }
+        
+        // Delete selection if exists
+        if (edit.hasSelection)
+        {
+            deleteSelection(edit);
+        }
+        
+        // Check max length
+        if (edit.buffer.size() + text.size() > edit.maxLength)
+        {
+            size_t available = edit.maxLength - edit.buffer.size();
+            if (available == 0) return;
+            text = text.substr(0, available);
+        }
+        
+        // Insert at cursor position
+        edit.buffer.insert(edit.cursorPosition, text);
+        edit.cursorPosition += text.size();
+    }
+
     static void handleTextInput(const char* text)
     {
         auto view = Registry::View<components::FocusedTag, components::TextEdit, components::Text>();
@@ -284,6 +464,12 @@ private:
                 input.erase(std::remove(input.begin(), input.end(), '\r'), input.end());
             }
 
+            // 如果有选中内容，先删除选中内容
+            if (edit.hasSelection)
+            {
+                deleteSelection(edit);
+            }
+
             // 限制最大长度（按字节计）
             if (edit.buffer.size() + input.size() > edit.maxLength)
             {
@@ -292,7 +478,9 @@ private:
                 input = input.substr(0, available);
             }
 
-            edit.buffer += input;
+            // 在光标位置插入文本
+            edit.buffer.insert(edit.cursorPosition, input);
+            edit.cursorPosition += input.size();
 
             // 同步渲染文本
             auto& textComp = view.get<components::Text>(entity);
@@ -315,13 +503,178 @@ private:
             if (policies::HasFlag(edit.inputMode, policies::TextFlag::ReadOnly)) continue;
 
             auto& textComp = view.get<components::Text>(entity);
+            
+            // Get modifier keys
+            SDL_Keymod modState = SDL_GetModState();
+            bool ctrl = (modState & SDL_KMOD_CTRL) != 0;
+            bool shift = (modState & SDL_KMOD_SHIFT) != 0;
 
-            if (key == SDLK_BACKSPACE && !edit.buffer.empty())
+            // Clipboard operations
+            if (ctrl && key == SDLK_C)
             {
-                edit.buffer.pop_back();
+                // Copy
+                if (edit.hasSelection)
+                {
+                    copyToClipboard(edit);
+                }
+            }
+            else if (ctrl && key == SDLK_X)
+            {
+                // Cut
+                if (edit.hasSelection)
+                {
+                    copyToClipboard(edit);
+                    deleteSelection(edit);
+                    textComp.content = edit.buffer;
+                    Registry::EmplaceOrReplace<ui::components::LayoutDirtyTag>(entity);
+                    ui::utils::MarkRenderDirty(entity);
+                }
+            }
+            else if (ctrl && key == SDLK_V)
+            {
+                // Paste
+                pasteFromClipboard(edit);
                 textComp.content = edit.buffer;
                 Registry::EmplaceOrReplace<ui::components::LayoutDirtyTag>(entity);
                 ui::utils::MarkRenderDirty(entity);
+            }
+            else if (ctrl && key == SDLK_A)
+            {
+                // Select All
+                selectAll(edit);
+            }
+            else if (key == SDLK_BACKSPACE)
+            {
+                if (edit.hasSelection)
+                {
+                    deleteSelection(edit);
+                }
+                else if (edit.cursorPosition > 0)
+                {
+                    edit.buffer.erase(edit.cursorPosition - 1, 1);
+                    edit.cursorPosition--;
+                }
+                textComp.content = edit.buffer;
+                Registry::EmplaceOrReplace<ui::components::LayoutDirtyTag>(entity);
+                ui::utils::MarkRenderDirty(entity);
+            }
+            else if (key == SDLK_DELETE)
+            {
+                if (edit.hasSelection)
+                {
+                    deleteSelection(edit);
+                }
+                else if (edit.cursorPosition < edit.buffer.size())
+                {
+                    edit.buffer.erase(edit.cursorPosition, 1);
+                }
+                textComp.content = edit.buffer;
+                Registry::EmplaceOrReplace<ui::components::LayoutDirtyTag>(entity);
+                ui::utils::MarkRenderDirty(entity);
+            }
+            else if (key == SDLK_LEFT)
+            {
+                if (shift)
+                {
+                    // Extend selection left
+                    moveCursorLeft(edit, true);
+                }
+                else
+                {
+                    if (edit.hasSelection)
+                    {
+                        // Move to start of selection
+                        edit.cursorPosition = edit.selectionStart;
+                        clearSelection(edit);
+                    }
+                    else
+                    {
+                        moveCursorLeft(edit, false);
+                    }
+                }
+            }
+            else if (key == SDLK_RIGHT)
+            {
+                if (shift)
+                {
+                    // Extend selection right
+                    moveCursorRight(edit, true);
+                }
+                else
+                {
+                    if (edit.hasSelection)
+                    {
+                        // Move to end of selection
+                        edit.cursorPosition = edit.selectionEnd;
+                        clearSelection(edit);
+                    }
+                    else
+                    {
+                        moveCursorRight(edit, false);
+                    }
+                }
+            }
+            else if (key == SDLK_HOME)
+            {
+                if (shift)
+                {
+                    moveCursorToLineStart(edit, true);
+                }
+                else
+                {
+                    clearSelection(edit);
+                    moveCursorToLineStart(edit, false);
+                }
+            }
+            else if (key == SDLK_END)
+            {
+                if (shift)
+                {
+                    moveCursorToLineEnd(edit, true);
+                }
+                else
+                {
+                    clearSelection(edit);
+                    moveCursorToLineEnd(edit, false);
+                }
+            }
+            else if (key == SDLK_UP)
+            {
+                const auto modeVal = static_cast<uint8_t>(edit.inputMode);
+                const auto multiFlag = static_cast<uint8_t>(policies::TextFlag::Multiline);
+                if ((modeVal & multiFlag) != 0)
+                {
+                    // TODO: Implement multi-line cursor movement
+                    // For now, just move to start
+                    if (shift)
+                    {
+                        moveCursorToLineStart(edit, true);
+                    }
+                    else
+                    {
+                        clearSelection(edit);
+                        moveCursorToLineStart(edit, false);
+                    }
+                }
+            }
+            else if (key == SDLK_DOWN)
+            {
+                const auto modeVal = static_cast<uint8_t>(edit.inputMode);
+                const auto multiFlag = static_cast<uint8_t>(policies::TextFlag::Multiline);
+                if ((modeVal & multiFlag) != 0)
+                {
+                    // TODO: Implement multi-line cursor movement
+                    // For now, just move to end
+                    if (shift)
+                    {
+                        moveCursorToLineEnd(edit, true);
+                    }
+                    else
+                    {
+                        clearSelection(edit);
+                        moveCursorToLineEnd(edit, false);
+                    }
+                }
             }
             else if (key == SDLK_RETURN)
             {
@@ -331,7 +684,12 @@ private:
                 {
                     if (edit.buffer.size() + 1 <= edit.maxLength)
                     {
-                        edit.buffer.push_back('\n');
+                        if (edit.hasSelection)
+                        {
+                            deleteSelection(edit);
+                        }
+                        edit.buffer.insert(edit.cursorPosition, "\n");
+                        edit.cursorPosition++;
                         textComp.content = edit.buffer;
                         Registry::EmplaceOrReplace<ui::components::LayoutDirtyTag>(entity);
                         ui::utils::MarkRenderDirty(entity);
