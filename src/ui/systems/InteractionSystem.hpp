@@ -287,8 +287,10 @@ private:
     {
         if (!edit.hasSelection) return;
         
-        size_t start = edit.selectionStart;
-        size_t end = edit.selectionEnd;
+        // Validate bounds before erase
+        size_t start = std::min(edit.selectionStart, edit.buffer.size());
+        size_t end = std::min(edit.selectionEnd, edit.buffer.size());
+        if (start >= end) return;
         
         edit.buffer.erase(start, end - start);
         edit.cursorPosition = start;
@@ -405,7 +407,12 @@ private:
     {
         if (!edit.hasSelection) return;
         
-        std::string selectedText = edit.buffer.substr(edit.selectionStart, edit.selectionEnd - edit.selectionStart);
+        // Validate bounds before substr
+        size_t start = std::min(edit.selectionStart, edit.buffer.size());
+        size_t end = std::min(edit.selectionEnd, edit.buffer.size());
+        if (start >= end) return;
+        
+        std::string selectedText = edit.buffer.substr(start, end - start);
         SDL_SetClipboardText(selectedText.c_str());
     }
 
