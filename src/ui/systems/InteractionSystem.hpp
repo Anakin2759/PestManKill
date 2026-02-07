@@ -313,19 +313,14 @@ private:
             {
                 if (!edit.hasSelection)
                 {
+                    // Start new selection with current position as anchor
                     edit.hasSelection = true;
-                    edit.selectionStart = edit.cursorPosition;
-                    edit.selectionEnd = edit.cursorPosition;
+                    edit.selectionAnchor = edit.cursorPosition;
                 }
                 edit.cursorPosition--;
-                if (edit.cursorPosition < edit.selectionStart)
-                {
-                    edit.selectionStart = edit.cursorPosition;
-                }
-                else
-                {
-                    edit.selectionEnd = edit.cursorPosition;
-                }
+                // Update selection bounds based on anchor
+                edit.selectionStart = std::min(edit.cursorPosition, edit.selectionAnchor);
+                edit.selectionEnd = std::max(edit.cursorPosition, edit.selectionAnchor);
             }
             else
             {
@@ -342,19 +337,14 @@ private:
             {
                 if (!edit.hasSelection)
                 {
+                    // Start new selection with current position as anchor
                     edit.hasSelection = true;
-                    edit.selectionStart = edit.cursorPosition;
-                    edit.selectionEnd = edit.cursorPosition;
+                    edit.selectionAnchor = edit.cursorPosition;
                 }
                 edit.cursorPosition++;
-                if (edit.cursorPosition > edit.selectionEnd)
-                {
-                    edit.selectionEnd = edit.cursorPosition;
-                }
-                else
-                {
-                    edit.selectionStart = edit.cursorPosition;
-                }
+                // Update selection bounds based on anchor
+                edit.selectionStart = std::min(edit.cursorPosition, edit.selectionAnchor);
+                edit.selectionEnd = std::max(edit.cursorPosition, edit.selectionAnchor);
             }
             else
             {
@@ -377,9 +367,11 @@ private:
             if (!edit.hasSelection)
             {
                 edit.hasSelection = true;
-                edit.selectionEnd = edit.cursorPosition;
+                edit.selectionAnchor = edit.cursorPosition;
             }
-            edit.selectionStart = lineStart;
+            // Update selection bounds based on anchor
+            edit.selectionStart = std::min(lineStart, edit.selectionAnchor);
+            edit.selectionEnd = std::max(lineStart, edit.selectionAnchor);
         }
         
         edit.cursorPosition = lineStart;
@@ -399,9 +391,11 @@ private:
             if (!edit.hasSelection)
             {
                 edit.hasSelection = true;
-                edit.selectionStart = edit.cursorPosition;
+                edit.selectionAnchor = edit.cursorPosition;
             }
-            edit.selectionEnd = lineEnd;
+            // Update selection bounds based on anchor
+            edit.selectionStart = std::min(lineEnd, edit.selectionAnchor);
+            edit.selectionEnd = std::max(lineEnd, edit.selectionAnchor);
         }
         
         edit.cursorPosition = lineEnd;

@@ -90,6 +90,7 @@ entt::entity CreateTextEdit(const std::string& placeholder, bool multiline, std:
     textEdit.cursorPosition = 0;
     textEdit.selectionStart = 0;
     textEdit.selectionEnd = 0;
+    textEdit.selectionAnchor = 0;
     textEdit.hasSelection = false;
     
     auto& text = Registry::Emplace<components::Text>(entity);
@@ -244,7 +245,7 @@ entt::entity CreateLineEdit(std::string_view initialText, std::string_view place
     auto entity = CreateTextEdit(std::string(placeholder), false, alias);
     auto& edit = Registry::Get<components::TextEdit>(entity);
     edit.buffer = std::string(initialText);
-    edit.cursorPosition = edit.buffer.size(); // Place cursor at end
+    edit.cursorPosition = edit.buffer.size(); // Place cursor at end to allow immediate appending of text
     auto& text = Registry::Get<components::Text>(entity);
     text.content = edit.buffer;
     return entity;
