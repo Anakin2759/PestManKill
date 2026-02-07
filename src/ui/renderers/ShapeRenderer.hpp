@@ -59,7 +59,7 @@ public:
         renderBorder(entity, context);
     }
 
-    int getPriority() const override
+    [[nodiscard]] int getPriority() const override
     {
         return 0; // 背景应该最先渲染
     }
