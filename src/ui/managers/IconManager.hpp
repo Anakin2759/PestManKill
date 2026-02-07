@@ -34,6 +34,7 @@
 #include <SDL3/SDL.h>
 #include <Eigen/Core>
 #include "../singleton/Logger.hpp"
+#include "../common/GPUWrappers.hpp"
 
 namespace ui::managers
 {
@@ -49,7 +50,7 @@ struct FontData
 
 struct TextureInfo
 {
-    SDL_GPUTexture* texture;
+    wrappers::UniqueGPUTexture texture;
     Eigen::Vector2f uvMin;
     Eigen::Vector2f uvMax;
     float width;
@@ -233,10 +234,10 @@ private:
     /**
      * @brief 创建并上传图标纹理
      */
-    SDL_GPUTexture* createAndUploadIconTexture(SDL_GPUDevice* device,
-                                               const std::vector<uint32_t>& rgbaPixels,
-                                               uint32_t width,
-                                               uint32_t height);
+    wrappers::UniqueGPUTexture createAndUploadIconTexture(SDL_GPUDevice* device,
+                                                          const std::vector<uint32_t>& rgbaPixels,
+                                                          uint32_t width,
+                                                          uint32_t height);
 
     DeviceManager* m_deviceManager;
 

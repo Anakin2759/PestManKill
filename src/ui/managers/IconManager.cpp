@@ -7,14 +7,22 @@
 
 namespace ui::managers
 {
-
+/**
+ * @brief 加载 IconFont 字体和 codepoints 文件
+ * @param name 字体库名称（用于后续引用）
+ * @param fontPath TTF 字体文件路径
+ * @param codepointsPath codepoints 文件路径（支持 .txt 或 .json）
+ * @param fontSize 字体大小
+ * @return true 加载成功
+ * @return false 加载失败
+ */
 bool IconManager::loadIconFont(const std::string& name,
                                const std::string& fontPath,
                                const std::string& codepointsPath,
                                int fontSize)
 {
     Logger::info("Loading IconFont '{}' from '{}'", name, fontPath);
-    // Read file
+    // 读取文件并初始化 stbtt_fontinfo
     std::ifstream file(fontPath, std::ios::binary | std::ios::ate); // NOLINT
     if (!file.is_open())
     {
@@ -167,24 +175,6 @@ void IconManager::unloadIconFont(std::string_view fontName)
 
 void IconManager::shutdown()
 {
-    SDL_GPUDevice* device = m_deviceManager->getDevice();
-    if (device != nullptr)
-    {
-        for (auto& [key, entry] : m_fontTextureCache)
-        {
-            if (entry.textureInfo.texture != nullptr)
-            {
-                SDL_ReleaseGPUTexture(device, entry.textureInfo.texture);
-            }
-        }
-        for (auto& [key, entry] : m_imageTextureCache)
-        {
-            if (entry.textureInfo.texture != nullptr)
-            {
-                SDL_ReleaseGPUTexture(device, entry.textureInfo.texture);
-            }
-        }
-    }
     m_fontTextureCache.clear();
     m_imageTextureCache.clear();
     m_fonts.clear();
@@ -258,7 +248,7 @@ const TextureInfo* IconManager::getTextureInfo(std::string_view fontName, uint32
     stbtt_FreeBitmap(bitmap, nullptr);
 
     // 创建并上传纹理
-    SDL_GPUTexture* texture =
+    auto texture =
         createAndUploadIconTexture(device, rgbaPixels, static_cast<uint32_t>(width), static_cast<uint32_t>(height));
     if (texture == nullptr)
     {
@@ -267,7 +257,7 @@ const TextureInfo* IconManager::getTextureInfo(std::string_view fontName, uint32
 
     // 创建缓存条目
     CachedTextureEntry entry{};
-    entry.textureInfo.texture = texture;
+    entry.textureInfo.texture = std::move(texture);
     entry.textureInfo.uvMin = {0.0F, 0.0F};
     entry.textureInfo.uvMax = {1.0F, 1.0F};
     entry.textureInfo.width = static_cast<float>(width);
@@ -275,7 +265,7 @@ const TextureInfo* IconManager::getTextureInfo(std::string_view fontName, uint32
     entry.lastAccessTime = std::chrono::steady_clock::now();
     entry.accessCount = 1;
 
-    m_fontTextureCache[cacheKey] = entry;
+    m_fontTextureCache[cacheKey] = std::move(entry);
     return &m_fontTextureCache[cacheKey].textureInfo;
 }
 
@@ -397,10 +387,12 @@ void IconManager::evictLRUFromFontCache()
     }
 
     // 释放纹理资源
+    /*
     if (lruEntry->second.textureInfo.texture != nullptr)
     {
         SDL_ReleaseGPUTexture(device, lruEntry->second.textureInfo.texture);
     }
+    */
 
     Logger::debug("[IconManager] Evicted LRU entry: {} (access count: {})",
                   lruEntry->first.substr(0, 50),
@@ -432,10 +424,6 @@ void IconManager::evictLRUFromFontCache()
             auto iter = m_fontTextureCache.find(entries[idx].first);
             if (iter != m_fontTextureCache.end())
             {
-                if (iter->second.textureInfo.texture != nullptr)
-                {
-                    SDL_ReleaseGPUTexture(device, iter->second.textureInfo.texture);
-                }
                 m_fontTextureCache.erase(iter);
                 evicted++;
             }
@@ -445,11 +433,18 @@ void IconManager::evictLRUFromFontCache()
         Logger::info("[IconManager] Batch evicted {} entries, cache size: {}", evicted, m_fontTextureCache.size());
     }
 }
-
-SDL_GPUTexture* IconManager::createAndUploadIconTexture(SDL_GPUDevice* device,
-                                                        const std::vector<uint32_t>& rgbaPixels,
-                                                        uint32_t width,
-                                                        uint32_t height)
+/**
+ * @brief
+ * @param devices 设备
+ * @param rgbaPixels {comment}
+ * @param width {comment}
+ * @param height {comment}
+ * @return wrappers::UniqueGPUTexture {comment}
+ */
+wrappers::UniqueGPUTexture IconManager::createAndUploadIconTexture(SDL_GPUDevice* device,
+                                                                   const std::vector<uint32_t>& rgbaPixels,
+                                                                   uint32_t width,
+                                                                   uint32_t height)
 {
     // 创建纹理
     SDL_GPUTextureCreateInfo texInfo = {};
@@ -461,8 +456,8 @@ SDL_GPUTexture* IconManager::createAndUploadIconTexture(SDL_GPUDevice* device,
     texInfo.num_levels = 1;
     texInfo.usage = SDL_GPU_TEXTUREUSAGE_SAMPLER;
 
-    SDL_GPUTexture* texture = SDL_CreateGPUTexture(device, &texInfo);
-    if (texture == nullptr)
+    auto texture = wrappers::make_gpu_resource<wrappers::UniqueGPUTexture>(device, SDL_CreateGPUTexture, &texInfo);
+    if (!texture)
     {
         Logger::error("[IconManager] Failed to create GPU texture");
         return nullptr;
@@ -473,46 +468,42 @@ SDL_GPUTexture* IconManager::createAndUploadIconTexture(SDL_GPUDevice* device,
     transferInfo.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
     transferInfo.size = static_cast<uint32_t>(rgbaPixels.size() * sizeof(uint32_t));
 
-    SDL_GPUTransferBuffer* transferBuffer = SDL_CreateGPUTransferBuffer(device, &transferInfo);
-    if (transferBuffer == nullptr)
+    auto transferBuffer = wrappers::make_gpu_resource<wrappers::UniqueGPUTransferBuffer>(
+        device, SDL_CreateGPUTransferBuffer, &transferInfo);
+    if (!transferBuffer)
     {
         Logger::error("[IconManager] Failed to create transfer buffer");
-        SDL_ReleaseGPUTexture(device, texture);
         return nullptr;
     }
 
     // 映射传输缓冲区
-    void* mappedData = SDL_MapGPUTransferBuffer(device, transferBuffer, false);
+    void* mappedData = SDL_MapGPUTransferBuffer(device, transferBuffer.get(), false);
     if (mappedData == nullptr)
     {
         Logger::error("[IconManager] Failed to map transfer buffer");
-        SDL_ReleaseGPUTransferBuffer(device, transferBuffer);
-        SDL_ReleaseGPUTexture(device, texture);
         return nullptr;
     }
 
     SDL_memcpy(mappedData, rgbaPixels.data(), transferInfo.size);
-    SDL_UnmapGPUTransferBuffer(device, transferBuffer);
+    SDL_UnmapGPUTransferBuffer(device, transferBuffer.get());
 
     // 上传到GPU
     SDL_GPUCommandBuffer* cmd = SDL_AcquireGPUCommandBuffer(device);
     if (cmd == nullptr)
     {
         Logger::error("[IconManager] Failed to acquire command buffer");
-        SDL_ReleaseGPUTransferBuffer(device, transferBuffer);
-        SDL_ReleaseGPUTexture(device, texture);
         return nullptr;
     }
 
     SDL_GPUCopyPass* copyPass = SDL_BeginGPUCopyPass(cmd);
 
     SDL_GPUTextureTransferInfo srcInfo = {};
-    srcInfo.transfer_buffer = transferBuffer;
+    srcInfo.transfer_buffer = transferBuffer.get();
     srcInfo.pixels_per_row = width;
     srcInfo.rows_per_layer = height;
 
     SDL_GPUTextureRegion dstRegion = {};
-    dstRegion.texture = texture;
+    dstRegion.texture = texture.get();
     dstRegion.w = width;
     dstRegion.h = height;
     dstRegion.d = 1;
@@ -520,7 +511,6 @@ SDL_GPUTexture* IconManager::createAndUploadIconTexture(SDL_GPUDevice* device,
     SDL_UploadToGPUTexture(copyPass, &srcInfo, &dstRegion, false);
     SDL_EndGPUCopyPass(copyPass);
     SDL_SubmitGPUCommandBuffer(cmd);
-    SDL_ReleaseGPUTransferBuffer(device, transferBuffer);
 
     return texture;
 }

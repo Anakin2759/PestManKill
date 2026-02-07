@@ -17,6 +17,7 @@
 #include <cmrc/cmrc.hpp>
 #include "../singleton/Logger.hpp"
 #include "../common/RenderTypes.hpp"
+#include "../common/GPUWrappers.hpp"
 #include "DeviceManager.hpp"
 
 // 声明资源
@@ -126,6 +127,11 @@ public:
 
         SDL_GPUColorTargetDescription colorTargetDesc = {};
         colorTargetDesc.format = SDL_GetGPUSwapchainTextureFormat(device, sdlWindow);
+        if (colorTargetDesc.format == SDL_GPU_TEXTUREFORMAT_INVALID)
+        {
+            Logger::warn("Swapchain format invalid, falling back to B8G8R8A8_UNORM");
+            colorTargetDesc.format = SDL_GPU_TEXTUREFORMAT_B8G8R8A8_UNORM;
+        }
         colorTargetDesc.blend_state = blendState;
 
         // 光栅化状态
@@ -145,8 +151,8 @@ public:
 
         // 创建图形管线
         SDL_GPUGraphicsPipelineCreateInfo pipelineInfo = {};
-        pipelineInfo.vertex_shader = m_vertexShader;
-        pipelineInfo.fragment_shader = m_fragmentShader;
+        pipelineInfo.vertex_shader = m_vertexShader.get();
+        pipelineInfo.fragment_shader = m_fragmentShader.get();
         pipelineInfo.vertex_input_state = vertexInputState;
         pipelineInfo.primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
         pipelineInfo.rasterizer_state = rasterizerState;
@@ -155,7 +161,8 @@ public:
         pipelineInfo.target_info.num_color_targets = 1;
         pipelineInfo.target_info.color_target_descriptions = &colorTargetDesc;
 
-        m_pipeline = SDL_CreateGPUGraphicsPipeline(device, &pipelineInfo);
+        m_pipeline = wrappers::make_gpu_resource<wrappers::UniqueGPUGraphicsPipeline>(
+            device, SDL_CreateGPUGraphicsPipeline, &pipelineInfo);
 
         if (m_pipeline == nullptr)
         {
@@ -170,42 +177,22 @@ public:
         samplerInfo.address_mode_u = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
         samplerInfo.address_mode_v = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
 
-        m_sampler = SDL_CreateGPUSampler(device, &samplerInfo);
+        m_sampler = wrappers::make_gpu_resource<wrappers::UniqueGPUSampler>(device, SDL_CreateGPUSampler, &samplerInfo);
     }
 
     void cleanup()
     {
-        SDL_GPUDevice* device = m_deviceManager.getDevice();
-        if (device != nullptr)
-        {
-            if (m_sampler != nullptr)
-            {
-                SDL_ReleaseGPUSampler(device, m_sampler);
-                m_sampler = nullptr;
-            }
-            if (m_pipeline != nullptr)
-            {
-                SDL_ReleaseGPUGraphicsPipeline(device, m_pipeline);
-                m_pipeline = nullptr;
-            }
-            if (m_vertexShader != nullptr)
-            {
-                SDL_ReleaseGPUShader(device, m_vertexShader);
-                m_vertexShader = nullptr;
-            }
-            if (m_fragmentShader != nullptr)
-            {
-                SDL_ReleaseGPUShader(device, m_fragmentShader);
-                m_fragmentShader = nullptr;
-            }
-        }
+        m_sampler.reset();
+        m_pipeline.reset();
+        m_vertexShader.reset();
+        m_fragmentShader.reset();
     }
 
-    SDL_GPUGraphicsPipeline* getPipeline() const { return m_pipeline; }
-    SDL_GPUSampler* getSampler() const { return m_sampler; }
+    [[nodiscard]] SDL_GPUGraphicsPipeline* getPipeline() const { return m_pipeline.get(); }
+    [[nodiscard]] SDL_GPUSampler* getSampler() const { return m_sampler.get(); }
 
 private:
-    SDL_GPUShader*
+    wrappers::UniqueGPUShader
         loadShaderFromResource(const char* resourcePath, SDL_GPUShaderStage stage, SDL_GPUShaderFormat format)
     {
         auto fs = cmrc::ui_fonts::get_filesystem();
@@ -225,14 +212,15 @@ private:
         shaderInfo.num_samplers = (stage == SDL_GPU_SHADERSTAGE_FRAGMENT) ? 1u : 0u;
         shaderInfo.num_uniform_buffers = 1u;
 
-        return SDL_CreateGPUShader(m_deviceManager.getDevice(), &shaderInfo);
+        return wrappers::make_gpu_resource<wrappers::UniqueGPUShader>(
+            m_deviceManager.getDevice(), SDL_CreateGPUShader, &shaderInfo);
     }
 
     DeviceManager& m_deviceManager;
-    SDL_GPUGraphicsPipeline* m_pipeline = nullptr;
-    SDL_GPUShader* m_vertexShader = nullptr;
-    SDL_GPUShader* m_fragmentShader = nullptr;
-    SDL_GPUSampler* m_sampler = nullptr;
+    wrappers::UniqueGPUGraphicsPipeline m_pipeline;
+    wrappers::UniqueGPUShader m_vertexShader;
+    wrappers::UniqueGPUShader m_fragmentShader;
+    wrappers::UniqueGPUSampler m_sampler;
 };
 
 } // namespace ui::managers
